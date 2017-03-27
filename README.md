@@ -1,14 +1,14 @@
 # Google Cloud Dataproc
 
-This repository contains code and documentation for use with
-[Google Cloud Dataproc](https://cloud.google.com/dataproc/).
+This repository contains code, documentation, and
+[initialization actions](https://cloud.google.com/dataproc/docs/concepts/init-actions)
+for use with [Google Cloud Dataproc](https://cloud.google.com/dataproc/).
 
 ## Additional Dataproc Repositories
 
-You can find more Dataproc resources in these github repositories:
+You can find additional Cloud Dataproc resources, which have not yet been merged
+into this location, in these GitHub repositories:
 
-* [Dataproc initialization
-  actions](https://github.com/GoogleCloudPlatform/dataproc-initialization-actions)
 * [Dataproc python
   examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
 
