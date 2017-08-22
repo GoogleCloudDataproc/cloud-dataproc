@@ -132,11 +132,8 @@ This suggests the following simple policy for our embeddings:
 *We will assign each value of a given categorical feature its rank once the
 values for that feature have been sorted (in descending order) by frequency.*
 
-This is good for the purposes of training. However, when we are trying to make
-predictions, it would be possible for us to run into values that we didn't see
-while we were training the model. In this case, we will simply assign a negative
-integer of large absolute value to the categorical value in question. [TODO:
-Implement this?]
+We will also reserve one out-of-value label for each feature, representing all
+categories that were not encountered in training.
 
 ### Handling missing values
 
