@@ -23,20 +23,21 @@ import data
 import model
 
 
-def generate_experiment(estimator,
-                        data_format,
-                        artifact_dir,
-                        batch_size,
-                        train_glob,
-                        eval_glob,
-                        train_steps,
-                        eval_steps,
-                        min_eval_frequency):
+def generate_experiment_fn(data_format,
+                           artifact_dir,
+                           batch_size,
+                           train_glob,
+                           eval_glob,
+                           train_steps,
+                           eval_steps,
+                           min_eval_frequency):
   """
   Args:
-    estimator: tf.estimator.Estimator which will perform the classification
     data_format: File format for training and evaluation data
-    artifact_dir: Directory containing preprocessing artifacts
+    artifact_dir: Directory containing preprocessing artifacts needed to
+    transform input data in the model
+    batch_size: Size of batches in which training and evaluation data should be
+    processed
     train_glob: Glob pattern matching the training data
     eval_glob: Glob pattern matching evaluation data
     train_steps: Number of training steps to perform
@@ -44,34 +45,65 @@ def generate_experiment(estimator,
     min_eval_frequency: Number of training steps between evaluation steps
 
   Returns:
-    A tf.contrib.learn.Experiment which defines the training job. To train, call
-    its train_and_evaluate method. This automatically exports a saved model
-    for TensorFlow Serving into the export subdirectory of the estimator's model
-    directory.
+    A function of two arguments which returns a tf.contrib.learn.Experiment
+    which defines the training task
   """
-  train_input_fn = data.generate_labelled_input_fn(
-    data_format,
-    batch_size,
-    train_glob,
-    artifact_dir)
-  eval_input_fn = data.generate_labelled_input_fn(
-    data_format,
-    batch_size,
-    eval_glob,
-    artifact_dir)
+  def experiment_fn(run_config, hparams):
+    """
+    Creates a tf.contrib.learn.Experiment
 
-  export_fn = generate_export_fn()
-  export_strategy = tf.contrib.learn.ExportStrategy('default', export_fn)
+    Args:
+      1. run_config: tf.contrib.learn.RunConfig
+      2. hparams: Hyperparameter object
 
-  return tf.contrib.learn.Experiment(
-      estimator,
-      train_input_fn=train_input_fn,
-      eval_input_fn=eval_input_fn,
-      train_steps=train_steps,
-      eval_steps=eval_steps,
-      min_eval_frequency=min_eval_frequency,
-      export_strategies=export_strategy
-  )
+    Returns:
+      tf.contrib.learn.Experiment
+    """
+    labelled_feature_cols = data.get_feature_columns(
+      data_format,
+      artifact_dir)
+
+    prediction_feature_cols = data.get_feature_columns(
+      data.SERVING,
+      artifact_dir)
+
+    mode_feature_cols_map = {
+      model.MODES.TRAIN: labelled_feature_cols,
+      model.MODES.EVAL: labelled_feature_cols,
+      model.MODES.PREDICT: prediction_feature_cols
+    }
+
+    estimator = model.generate_estimator(
+      mode_feature_cols_map,
+      artifact_dir,
+      hparams,
+      run_config)
+
+    train_input_fn = data.generate_labelled_input_fn(
+      data_format,
+      batch_size,
+      train_glob,
+      artifact_dir)
+    eval_input_fn = data.generate_labelled_input_fn(
+      data_format,
+      batch_size,
+      eval_glob,
+      artifact_dir)
+
+    export_fn = generate_export_fn()
+    export_strategy = tf.contrib.learn.ExportStrategy('default', export_fn)
+
+    return tf.contrib.learn.Experiment(
+        estimator,
+        train_input_fn=train_input_fn,
+        eval_input_fn=eval_input_fn,
+        train_steps=train_steps,
+        eval_steps=eval_steps,
+        min_eval_frequency=min_eval_frequency,
+        export_strategies=export_strategy
+    )
+
+  return experiment_fn
 
 
 def generate_export_fn():
@@ -121,31 +153,7 @@ def dispatch(args):
   train_glob = '{}*.{}'.format(args.train_dir, args.data_format)
   eval_glob = '{}*.{}'.format(args.eval_dir, args.data_format)
 
-  labelled_feature_cols = data.get_feature_columns(
-    args.data_format,
-    args.artifact_dir)
-
-  prediction_feature_cols = data.get_feature_columns(
-    data.SERVING,
-    args.artifact_dir)
-
-  mode_feature_cols_map = {
-    model.MODES.TRAIN: labelled_feature_cols,
-    model.MODES.EVAL: labelled_feature_cols,
-    model.MODES.PREDICT: prediction_feature_cols
-  }
-
-  config = tf.contrib.learn.RunConfig()
-  params = tf.contrib.training.HParams(learning_rate=args.learning_rate)
-
-  estimator = model.generate_estimator(
-    mode_feature_cols_map,
-    args.artifact_dir,
-    args.job_dir,
-    params,
-    config)
-
-  experiment = generate_experiment(estimator,
+  experiment_fn = generate_experiment_fn(
     args.data_format,
     args.artifact_dir,
     args.batch_size,
@@ -155,7 +163,14 @@ def dispatch(args):
     args.eval_steps,
     args.min_eval_frequency)
 
-  experiment.train_and_evaluate()
+  hparams = tf.contrib.training.HParams(learning_rate=args.learning_rate)
+  
+  run_config = tf.contrib.learn.RunConfig(model_dir=args.job_dir)
+
+  tf.contrib.learn.learn_runner.run(
+    experiment_fn,
+    run_config=run_config,
+    hparams=hparams)
 
 
 if __name__ == '__main__':

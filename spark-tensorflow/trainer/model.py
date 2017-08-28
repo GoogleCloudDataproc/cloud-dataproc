@@ -26,16 +26,14 @@ MODES = tf.estimator.ModeKeys
 def generate_estimator(
   mode_feature_cols_map,
   artifact_dir,
-  model_dir,
   params,
   config):
   """
   Args:
     mode_feature_cols_map: Dictionary mapping modes to lists of
     tf.feature_columns describing the features to expect in each mode
-    artifact_dir: Directory containing preprocessing artifacts for each of the
-    input features in our logistic classifier
-    model_dir: Directory in which to store model checkpoints
+    artifact_dir: Directory containing preprocessing artifacts used to transform
+    the input data
     params: Hyperparameter object (assumed to be an instance of
     tf.contrib.training.HParams
     config: An instance of tf.contrib.learn.RunConfig
@@ -47,7 +45,7 @@ def generate_estimator(
  
   return tf.estimator.Estimator(
       model_fn,
-      model_dir=model_dir,
+      model_dir=config.model_dir,
       params=params,
       config=config
   )
