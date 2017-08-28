@@ -19,11 +19,23 @@ package com.google.cloud.ml.samples.criteo
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 
-class ArtifactExporter (val outputPath: String)
-                       (implicit val spark: SparkSession) {
+trait ArtifactExporter {
+  def export(column: String, df: DataFrame)
+}
+
+
+class FileArtifactExporter (val outputPath: String)
+                       (implicit val spark: SparkSession)
+extends ArtifactExporter
+{
 
   def export(column: String, df: DataFrame): Unit = {
     val fullOutputPath = outputPath + "/" + column
     df.write.format("csv").save(fullOutputPath)
   }
+}
+
+class EmptyArtifactExporter
+  extends ArtifactExporter {
+  def export(column: String, df: DataFrame): Unit = None
 }

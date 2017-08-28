@@ -25,14 +25,14 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
  * @param mode Specifies whether the data set in question is intended for training, evaluation, or
  *             prediction.
  */
-case class CriteoFeatures(mode: PreprocessingMode) {
+case class CriteoFeatures(mode: NewPreprocessingMode) {
   val integerFeatureLabels: Seq[String] = (1 to 13).map(index => s"integer-feature-$index")
   val categoricalFeatureLabels: Seq[String] = (1 to 26).map(index => s"categorical-feature-$index")
   val categoricalRawLabels: Seq[String] = categoricalFeatureLabels.map({label => label + "-raw"})
   val clickedLabel = Seq("clicked")
 
   val inputLabels: Seq[String] = mode match {
-    case Predict => integerFeatureLabels ++ categoricalRawLabels
+    //case Predict => integerFeatureLabels ++ categoricalRawLabels
     case _ => clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
   }
 
@@ -40,7 +40,7 @@ case class CriteoFeatures(mode: PreprocessingMode) {
     filterNot(label => categoricalRawLabels.contains(label))
 
   val outputLabels: Seq[String] = mode match {
-    case Predict => integerFeatureLabels ++ categoricalFeatureLabels
+  //  case Predict => integerFeatureLabels ++ categoricalFeatureLabels
     case _ => clickedLabel ++ integerFeatureLabels ++ categoricalFeatureLabels
   }
 

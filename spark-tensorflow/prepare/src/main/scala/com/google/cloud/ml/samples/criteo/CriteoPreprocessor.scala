@@ -33,61 +33,58 @@ import org.apache.spark.sql.types._
  * @param exporter A CriteoExporter through which the preprocessed data set can be exported.
  * @param spark An implicit Spark session in which all the preprocessing should take place.
  */
-class CriteoPreprocessor(val mode: PreprocessingMode, val importer: CriteoImporter,
+class CriteoPreprocessor(val importer: CriteoImporter,
                          val indexer: CriteoIndexer, val exporter: CriteoExporter,
                          val missingReplacer: CriteoMissingReplacer)
                         (implicit val spark: SparkSession) {
   import spark.implicits._
 
-  val features = CriteoFeatures(mode)
+  //val features = CriteoFeatures(mode)
 
   /**
    * Execute the preprocessing job that this preprocessor has been configured for.
    */
-  def execute() {
-    val cleanedDf = importer.criteoImport
-
-    val withNulValuesReplaced = missingReplacer(cleanedDf, features.integerFeatureLabels)
-
-    val withEmbeddedCategoriesDf = indexer(withNulValuesReplaced)
-
-    val withTargetFeaturesDf = withEmbeddedCategoriesDf.
-      select(features.outputLabels.head, features.outputLabels.tail: _*).
-      toDF
-
-    val floatCastDf = features.integralColumns.
-      foldLeft(withTargetFeaturesDf)((df, col) =>
-        df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
-
-    val criteoDf = mode match {
-      case Predict =>
-        floatCastDf
-      case _ =>
-        val clickedLabel = features.clickedLabel.head
-        floatCastDf.withColumn(clickedLabel, floatCastDf(clickedLabel).cast(FloatType))
-    }
-
-    exporter.criteoExport(criteoDf)
-  }
+//  def execute() {
+//    val cleanedDf = importer.criteoImport
+//
+//    val withNulValuesReplaced = missingReplacer(cleanedDf, features.integerFeatureLabels)
+//
+//    val withEmbeddedCategoriesDf = indexer(withNulValuesReplaced)
+//
+//    val withTargetFeaturesDf = withEmbeddedCategoriesDf.
+//      select(features.outputLabels.head, features.outputLabels.tail: _*).
+//      toDF
+//
+//    val floatCastDf = features.integralColumns.
+//      foldLeft(withTargetFeaturesDf)((df, col) =>
+//        df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
+//
+//    val criteoDf = mode match {
+//      case Predict =>
+//        floatCastDf
+//      case _ =>
+//        val clickedLabel = features.clickedLabel.head
+//        floatCastDf.withColumn(clickedLabel, floatCastDf(clickedLabel).cast(FloatType))
+//    }
+//
+//    exporter.criteoExport(criteoDf)
+//  }
 }
 
 /**
  * Union of the different modes in which preprocessing can be done.
  */
-sealed trait PreprocessingMode
 
-case object Train extends PreprocessingMode
-case object Predict extends PreprocessingMode
-case object Evaluate extends PreprocessingMode
 
-/**
- * Converts string for mode into the appropriate `PreprocessingMode` object.
- */
-object PreprocessingMode {
-  def apply(specifier: String): Option[PreprocessingMode] = specifier.toLowerCase match {
-    case "train" => Some(Train)
-    case "predict" => Some(Predict)
-    case "evaluate" => Some(Evaluate)
-    case _ => None
+sealed trait NewPreprocessingMode
+
+case object Analyze extends NewPreprocessingMode
+case object Transform extends NewPreprocessingMode
+
+object NewPreprocessingMode {
+  def apply(specifier: String): Option[NewPreprocessingMode] = specifier.toLowerCase match {
+    case "analyze" => Some(Analyze)
+    case "transform" => Some(Transform)
   }
+
 }

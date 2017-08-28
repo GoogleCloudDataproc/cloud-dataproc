@@ -30,39 +30,45 @@ class CriteoMissingReplacer(val artifactExporter: ArtifactExporter)
                            (implicit val spark: SparkSession) {
   import spark.implicits._
 
-  def preprocessCriteoFeatures(df: DataFrame, integerFeatures: Seq[String]): DataFrame = {
-    val filledDf = df.na.fill("", df.columns)
-
-    averageIntegerFeatures(filledDf, integerFeatures)
-  }
-
-  def averageIntegerFeatures(to_average_df: DataFrame, features: Seq[String]): DataFrame = {
-
+  /**
+    * Calculates a map of integer columns to their average values.
+    * @param to_average_df
+    * @param features
+    * @return
+    */
+  def getAverageIntegerFeatures(to_average_df: DataFrame,
+                                features: Seq[String]): Map[String, DataFrame] = {
     val integerFeaturesDf = to_average_df.
       select(features.head, features.tail: _*).
       toDF
 
-    val averages = integerFeaturesDf.
+    integerFeaturesDf.
       columns.
       map { col_name =>
         val avg_col = integerFeaturesDf.select(avg($"$col_name"))
         (col_name, avg_col)
       }.toMap
+  }
 
-    averages.foreach { case (col: String, df: DataFrame) =>
-      artifactExporter.export(col, df)
-    }
-
+  /**
+    * Replaces the integer values with their averages.
+    * @param to_replace_df Dataframe with values to replace.
+    * @param features Set of integer features column names.
+    * @param averages Map of integer feature column names to their averages.
+    * @return The DataFrame with null values replaced with the averages.
+    */
+  def replaceIntegerFeatures(to_replace_df: DataFrame,
+                             features: Seq[String],
+                             averages: Map[String, DataFrame]): DataFrame = {
+    val integerFeaturesDf = to_replace_df.
+      select(features.head, features.tail: _*).
+      toDF
     integerFeaturesDf.columns.
-      foldLeft(to_average_df)((df, col) => {
+      foldLeft(to_replace_df)((df, col) => {
         df.na.replace(
           col,
           Map("" -> averages(col).head().getDouble(0).toString)
         )
       })
-  }
-
-  def apply(df: DataFrame, integerFeatures: Seq[String]): DataFrame = {
-    preprocessCriteoFeatures(df, integerFeatures)
   }
 }
