@@ -31,7 +31,7 @@ extends ArtifactExporter
 
   def export(column: String, df: DataFrame): Unit = {
     val fullOutputPath = outputPath + "/" + column
-    df.write.format("csv").save(fullOutputPath)
+    df.repartition(1).write.format("csv").save(fullOutputPath)
   }
 }
 

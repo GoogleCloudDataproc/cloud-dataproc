@@ -25,7 +25,7 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
  * @param mode Specifies whether the data set in question is intended for training, evaluation, or
  *             prediction.
  */
-case class CriteoFeatures(mode: NewPreprocessingMode) {
+case class CriteoFeatures(mode: PreprocessingMode) {
   val integerFeatureLabels: Seq[String] = (1 to 13).map(index => s"integer-feature-$index")
   val categoricalFeatureLabels: Seq[String] = (1 to 26).map(index => s"categorical-feature-$index")
   val categoricalRawLabels: Seq[String] = categoricalFeatureLabels.map({label => label + "-raw"})

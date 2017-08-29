@@ -68,15 +68,13 @@ trait CriteoIndexer {
     }).
       toMap
 
-  def transform(rawDf: DataFrame, resource: IndexerResource): DataFrame = {
+  def getEmbeddings(resource: IndexerResource): Map[String, DataFrame] = {
     val vocabularies = categoricalColumnVocabularies(resource)
-    val embeddings = categoricalColumnEmbeddings(vocabularies)
+    categoricalColumnEmbeddings(vocabularies)
+  }
 
-    //    features.categoricalRawLabels.
-    //      foldLeft(rawDf)((df, col) =>
-    //        df.join(embeddings(col), df(col) === embeddings(col)("value-" ++ col)).
-    //          withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
-    //      )
+  def transform(rawDf: DataFrame, resource: IndexerResource): DataFrame = {
+    val embeddings = getEmbeddings(resource)
     features.categoricalRawLabels.foldLeft(rawDf)((df, col) => {
       df.withColumnRenamed(col, features.categoricalLabelMap(col))
     })
@@ -111,10 +109,11 @@ class TrainingIndexer(val features: CriteoFeatures, val exporter: ArtifactExport
 
     vocabularies.cache()
 
+    /*
     categoricalRawLabels.value.foreach(label => {
       val vocabulary = vocabularies.select("value").where(s"feature='$label'")
       exporter.export(label, vocabulary)
-    })
+    })                                  */
 
     vocabularies
   }
