@@ -80,7 +80,7 @@ object CriteoPreprocessingApplication {
               case Some(mod) => mod
               case None =>
                 throw new Exception("Illegal mode passed under -m or --mode." +
-                  "Pass \"train\", \"predict\", or \"evaluate\".")
+                  "Pass \"analyze\", \"transform\".")
             })
         }
       ).text(

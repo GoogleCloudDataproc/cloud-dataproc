@@ -38,11 +38,11 @@ case class CriteoFeatures(mode: PreprocessingMode) {
 
   val integralColumns: Seq[String] = inputLabels.
     filterNot(label => categoricalRawLabels.contains(label))
-
+  /*
   val outputLabels: Seq[String] = mode match {
   //  case Predict => integerFeatureLabels ++ categoricalFeatureLabels
     case _ => clickedLabel ++ integerFeatureLabels ++ categoricalFeatureLabels
-  }
+  } */
 
   // Correspondence between labels in the input data and labels in the preprocessed data
   val categoricalLabelMap: Map[String, String] =
