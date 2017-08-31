@@ -58,8 +58,8 @@ def preprocess_categorical_dirs(artifact_dir):
         # remove raw from name
         # TODO: prob just should just have Scala output it correctly
         shutil.copytree(full_dir,
-                    os.path.join(artifact_dir,
-                                 categorical_dir[:categorical_dir.rfind('-')]))
+                        os.path.join(artifact_dir,
+                        categorical_dir[:categorical_dir.rfind('-')]))
 
 
 def preprocess(artifact_dir):

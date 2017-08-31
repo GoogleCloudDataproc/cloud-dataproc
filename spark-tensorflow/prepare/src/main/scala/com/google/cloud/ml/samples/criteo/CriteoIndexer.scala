@@ -109,12 +109,6 @@ class TrainingIndexer(val features: CriteoFeatures, val exporter: ArtifactExport
 
     vocabularies.cache()
 
-    /*
-    categoricalRawLabels.value.foreach(label => {
-      val vocabulary = vocabularies.select("value").where(s"feature='$label'")
-      exporter.export(label, vocabulary)
-    })                                  */
-
     vocabularies
   }
 

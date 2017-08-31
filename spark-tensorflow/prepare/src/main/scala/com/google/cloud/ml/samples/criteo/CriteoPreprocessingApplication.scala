@@ -111,6 +111,7 @@ object CriteoPreprocessingApplication {
           val missingReplacer = new CriteoMissingReplacer(artifactExporter)
 
           val cleanedDf = importer.criteoImport
+
           val averages = missingReplacer.getAverageIntegerFeatures(
             cleanedDf, features.integerFeatureLabels)
           averages.foreach {
@@ -123,6 +124,16 @@ object CriteoPreprocessingApplication {
             case (col: String, df: DataFrame) =>
               artifactExporter.export(col, df)
           }
+        } else if (config.mode == Transform) {
+          val importer = new CleanTSVImporter(inputPath, features.inputSchema, config.numPartitions)
+          val exporter = new FileExporter(config.relativeOutputPath, "tfrecords")
+          val cleanedDf = importer.criteoImport
+
+          features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
+            df.withColumnRenamed(col, features.categoricalLabelMap(col))
+          })
+
+          exporter.criteoExport(cleanedDf)
         }
     }
   }
