@@ -12,35 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import tensorflow as tf
+"""Tests."""
 
+import argparse
 import data
-import model
 import task
+import tensorflow as tf
 
 ARTIFACT_DIR = './test/artifacts/'
 DATA_DIR = './test/'
 
 
 class SampleTests(tf.test.TestCase):
+  """All tests for this sample.
+
+  Test data is present in the 'tests/' directory.
+  """
+
   def test_get_feature_columns(self):
     feature_columns = data.get_feature_columns(
-      data.TSV,
-      ARTIFACT_DIR)
+        data.TSV,
+        ARTIFACT_DIR)
     self.assertEqual(len(feature_columns),
                      len(data.INTEGER_FEATURES) + len(data.CATEGORICAL_FEATURES)
-                     )
+                    )
 
   def test_generate_labelled_input_fn_tsv(self):
-    TSV_DATA_FILE = 'train.tsv'
+    tsv_data_file = 'train.tsv'
     batch_size = 2
-    data_glob = '{}{}'.format(DATA_DIR, TSV_DATA_FILE)
+    data_glob = '{}{}'.format(DATA_DIR, tsv_data_file)
     labelled_input_fn = data.generate_labelled_input_fn(
-      data.TSV,
-      2,
-      data_glob,
-      ARTIFACT_DIR)
+        data.TSV,
+        2,
+        data_glob,
+        ARTIFACT_DIR)
     features, labels = labelled_input_fn()
 
     with tf.Session() as sess:
@@ -53,10 +58,10 @@ class SampleTests(tf.test.TestCase):
 
     features_out = result['features']
     for key in features_out:
-      self.assertEqual(features_out[key].shape, (batch_size,1))
+      self.assertEqual(features_out[key].shape, (batch_size, 1))
 
     labels_out = result['labels']
-    self.assertEqual(labels_out.shape, (batch_size,1))
+    self.assertEqual(labels_out.shape, (batch_size, 1))
 
   def test_end_to_end_tsv(self):
     job_dir = tf.test.get_temp_dir()

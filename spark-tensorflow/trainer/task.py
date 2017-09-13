@@ -17,10 +17,9 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-import tensorflow as tf
-
 import data
 import model
+import tensorflow as tf
 
 
 def generate_experiment_fn(data_format,
@@ -31,7 +30,8 @@ def generate_experiment_fn(data_format,
                            train_steps,
                            eval_steps,
                            min_eval_frequency):
-  """
+  """Creates experiment_fn to use in tf.contrib.learn.learn_runner.run.
+
   Args:
     data_format: File format for training and evaluation data
     artifact_dir: Directory containing preprocessing artifacts needed to
@@ -49,46 +49,44 @@ def generate_experiment_fn(data_format,
     which defines the training task
   """
   def experiment_fn(run_config, hparams):
-    """
-    Creates a tf.contrib.learn.Experiment
+    """Creates a tf.contrib.learn.Experiment.
 
     Args:
-      1. run_config: tf.contrib.learn.RunConfig
-      2. hparams: Hyperparameter object
+      run_config: tf.contrib.learn.RunConfig
+      hparams: Hyperparameter object
 
     Returns:
       tf.contrib.learn.Experiment
     """
     labelled_feature_cols = data.get_feature_columns(
-      data_format,
-      artifact_dir)
+        data_format,
+        artifact_dir)
 
     prediction_feature_cols = data.get_feature_columns(
-      data.SERVING,
-      artifact_dir)
+        data.SERVING,
+        artifact_dir)
 
     mode_feature_cols_map = {
-      model.MODES.TRAIN: labelled_feature_cols,
-      model.MODES.EVAL: labelled_feature_cols,
-      model.MODES.PREDICT: prediction_feature_cols
+        model.MODES.TRAIN: labelled_feature_cols,
+        model.MODES.EVAL: labelled_feature_cols,
+        model.MODES.PREDICT: prediction_feature_cols
     }
 
     estimator = model.generate_estimator(
-      mode_feature_cols_map,
-      artifact_dir,
-      hparams,
-      run_config)
+        mode_feature_cols_map,
+        hparams,
+        run_config)
 
     train_input_fn = data.generate_labelled_input_fn(
-      data_format,
-      batch_size,
-      train_glob,
-      artifact_dir)
+        data_format,
+        batch_size,
+        train_glob,
+        artifact_dir)
     eval_input_fn = data.generate_labelled_input_fn(
-      data_format,
-      batch_size,
-      eval_glob,
-      artifact_dir)
+        data_format,
+        batch_size,
+        eval_glob,
+        artifact_dir)
 
     export_fn = generate_export_fn()
     export_strategy = tf.contrib.learn.ExportStrategy('default', export_fn)
@@ -107,7 +105,8 @@ def generate_experiment_fn(data_format,
 
 
 def generate_export_fn():
-  """
+  """Produces an export_fn to use in tf.contrib.learn.Experiment.
+
   Returns:
     An export_fn for use with tf.contrib.learn.Experiment
   """
@@ -128,9 +127,7 @@ def generate_export_fn():
   )
 
   def export_fn(estimator, export_path, checkpoint_path):
-    """
-    Wraps the estimators export_savedmodel method to make it compatible with
-    tf.contrib.learn.Experiment.
+    """Makes the estimators export_savedmodel method compatible with Experiment.
 
     Args:
       estimator: A tf.estimator.Estimator
@@ -149,28 +146,36 @@ def generate_export_fn():
   return export_fn
 
 
-def dispatch(args):
-  train_glob = '{}*.{}'.format(args.train_dir, args.data_format)
-  eval_glob = '{}*.{}'.format(args.eval_dir, args.data_format)
+def dispatch(train_args):
+  """Dispatches training job to cluster specified by TF_CONFIG (or localhost).
+
+  Args:
+    train_args: Arguments passed to the trainer (argparse namespace)
+
+  Returns:
+    None
+  """
+  train_glob = '{}*.{}'.format(train_args.train_dir, train_args.data_format)
+  eval_glob = '{}*.{}'.format(train_args.eval_dir, train_args.data_format)
 
   experiment_fn = generate_experiment_fn(
-    args.data_format,
-    args.artifact_dir,
-    args.batch_size,
-    train_glob,
-    eval_glob,
-    args.train_steps,
-    args.eval_steps,
-    args.min_eval_frequency)
+      train_args.data_format,
+      train_args.artifact_dir,
+      train_args.batch_size,
+      train_glob,
+      eval_glob,
+      train_args.train_steps,
+      train_args.eval_steps,
+      train_args.min_eval_frequency)
 
-  hparams = tf.contrib.training.HParams(learning_rate=args.learning_rate)
-  
-  run_config = tf.contrib.learn.RunConfig(model_dir=args.job_dir)
+  hparams = tf.contrib.training.HParams(learning_rate=train_args.learning_rate)
+
+  run_config = tf.contrib.learn.RunConfig(model_dir=train_args.job_dir)
 
   tf.contrib.learn.learn_runner.run(
-    experiment_fn,
-    run_config=run_config,
-    hparams=hparams)
+      experiment_fn,
+      run_config=run_config,
+      hparams=hparams)
 
 
 if __name__ == '__main__':
@@ -180,7 +185,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--job-dir',
       required=True,
-      help='The directory in which trained models should (and may already ' +
+      help='The directory in which trained models should (and may already '
       'be) saved (can be a GCS path)'
   )
   parser.add_argument(
@@ -207,13 +212,13 @@ if __name__ == '__main__':
       '--batch-size',
       type=int,
       default=10000,
-      help='The size of the batches in which the criteo data should be ' +
+      help='The size of the batches in which the criteo data should be '
       'processed'
   )
   parser.add_argument(
       '--train-steps',
       type=int,
-      help='The number of batches that we should train on (if unspecified, ' +
+      help='The number of batches that we should train on (if unspecified, '
       'trains forever)'
   )
   parser.add_argument(
@@ -226,14 +231,14 @@ if __name__ == '__main__':
       '--learning-rate',
       type=float,
       default=0.01,
-      help='The learning rate used in the Gradient Descent optimization for ' +
+      help='The learning rate used in the Gradient Descent optimization for '
       'logistic regressor.'
   )
   parser.add_argument(
       '--min-eval-frequency',
       type=int,
       default=0,
-      help='The minimum number of training steps between evaluations. If 0, ' +
+      help='The minimum number of training steps between evaluations. If 0, '
       'evaluation takes place only after training. Default is 0.'
   )
 

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Data loaders."""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -34,7 +36,8 @@ LABEL = 'clicked'
 
 
 def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
-  """
+  """input_fn for labelled data.
+
   Args:
     fmt: Format of files from which data is being read
     batch_size: A positive integer specifying how large we would like each batch
@@ -56,6 +59,13 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
     features[f] = tf.FixedLenFeature([1], dtype=tf.string)
 
   def tfrecords_input_fn():
+    """input_fn for TFRecords files.
+
+    Returns:
+      (features, labels) where 'features' is a dictionary whose keys are feature
+      names and whose values are batches of values for those features and where
+      'labels' is a batch of labels corresponding to each "row" of features.
+    """
     features_batch = tf.contrib.learn.read_batch_features(
         file_pattern=data_glob,
         batch_size=batch_size,
@@ -70,60 +80,66 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
     return features_batch, label_batch
 
   def tsv_input_fn():
+    """input_fn for TSV files.
+
+    Returns:
+      (features, labels) where 'features' is a dictionary whose keys are feature
+      names and whose values are batches of values for those features and where
+      'labels' is a batch of labels corresponding to each "row" of features.
+    """
     filenames = tf.gfile.Glob(data_glob)
     filename_queue = tf.train.string_input_producer(
-      filenames,
-      shuffle=True)
+        filenames,
+        shuffle=True)
     reader = tf.TextLineReader()
 
     integer_feature_defaults = [
-      [get_integer_artifacts(feature, artifact_dir)]
-      for feature in INTEGER_FEATURES]
+        [get_integer_artifacts(feature, artifact_dir)]
+        for feature in INTEGER_FEATURES]
 
     categorical_feature_defaults = [
-      ['null']
-      for feature in CATEGORICAL_FEATURES]
+        ['null']
+        for feature in CATEGORICAL_FEATURES]
 
-    feature_defaults = ([[]] +
-      integer_feature_defaults +
-      categorical_feature_defaults)
+    feature_defaults = ([[]] + integer_feature_defaults +
+                        categorical_feature_defaults)
 
     _, rows = reader.read_up_to(filename_queue, num_records=batch_size)
 
     expanded_rows = tf.expand_dims(rows, axis=-1)
 
     columns = tf.decode_csv(expanded_rows,
-      record_defaults=feature_defaults,
-      field_delim='\t')
+                            record_defaults=feature_defaults,
+                            field_delim='\t')
 
-    features = dict(zip(
-      [LABEL] + INTEGER_FEATURES + CATEGORICAL_FEATURES,
-      columns)
-    )
-    
-    features_batch = tf.train.shuffle_batch(
-      features,
-      batch_size,
-      min_after_dequeue=2*batch_size+1,
-      capacity=batch_size*10,
-      num_threads=multiprocessing.cpu_count(),
-      enqueue_many=True,
-      allow_smaller_final_batch=True)
+    features = dict(zip([LABEL] + INTEGER_FEATURES + CATEGORICAL_FEATURES,
+                        columns))
+
+    cpu_count = multiprocessing.cpu_count()
+
+    features_batch = tf.train.shuffle_batch(features,
+                                            batch_size,
+                                            min_after_dequeue=2*batch_size+1,
+                                            capacity=batch_size*10,
+                                            num_threads=cpu_count,
+                                            enqueue_many=True,
+                                            allow_smaller_final_batch=True)
 
     label_batch = features_batch.pop(LABEL)
 
     return features_batch, label_batch
 
   format_input_fn_map = {
-    TSV: tsv_input_fn,
-    TFRECORDS: tfrecords_input_fn
+      TSV: tsv_input_fn,
+      TFRECORDS: tfrecords_input_fn
   }
 
   return format_input_fn_map[fmt]
 
 
 def get_feature_columns(fmt, artifact_dir):
-  """
+  """Feature columns to prepare input for use by the model.
+
   Args:
     fmt: Format of files from which data is being read
     artifact_dir: Path to either local directory or GCS bucket containing
@@ -142,7 +158,7 @@ def get_feature_columns(fmt, artifact_dir):
     `index.txt`.
 
   Returns:
-    None
+    List of tf.feature_column objects
   """
 
   integer_columns = [integer_column(fmt, feature, artifact_dir)
@@ -157,7 +173,8 @@ def get_feature_columns(fmt, artifact_dir):
 
 
 def integer_column(fmt, feature, artifact_dir):
-  """
+  """Feature column representing integer features (depending on input format).
+
   Args:
     fmt: Format of files from which data is being read
     feature: Name of integer feature
@@ -170,14 +187,23 @@ def integer_column(fmt, feature, artifact_dir):
     int_column = tf.feature_column.numeric_column(key=feature)
   else:
     mean = get_integer_artifacts(feature, artifact_dir)
-    int_column = tf.feature_column.numeric_column(
-      key=feature,
-      default_value=mean)
+    int_column = tf.feature_column.numeric_column(key=feature,
+                                                  default_value=mean)
 
   return int_column
 
 
 def get_integer_artifacts(feature, artifact_dir):
+  """Reads preprocessing artifacts for integer features.
+
+  Args:
+    feature: Name of the integer feature - this helps locate the relevant
+    subdirectory of the artifact directory
+    artifact_dir: Directory containing all preprocessing artifacts
+
+  Returns:
+    Mean value for that integer feature
+  """
   with tf.gfile.Open(
       '{}{}/mean.txt'.format(artifact_dir, feature),
       'r') as mean_file:
@@ -186,7 +212,8 @@ def get_integer_artifacts(feature, artifact_dir):
 
 
 def categorical_column(fmt, feature, artifact_dir):
-  """
+  """Feature column representing categorical features (also depends on format).
+
   Args:
     fmt: Format of files from which data is being read
     feature: Name of categorical feature
@@ -209,6 +236,18 @@ def categorical_column(fmt, feature, artifact_dir):
 
 
 def get_categorical_artifacts(feature, artifact_dir):
+  """Reads preprocessing artifacts for categorical features.
+
+  Args:
+    feature: Name of the integer feature - this helps locate the relevant
+    subdirectory of the artifact directory
+    artifact_dir: Directory containing all preprocessing artifacts
+
+  Returns:
+    (counts, vocabulary_file) - where 'counts' is the number of words in the
+    vocabulary for the feature and 'vocabulary_file' is the file containing the
+    vocabulary sorted in order of frequency.
+  """
   with tf.gfile.Open(
       '{}{}/count.txt'.format(artifact_dir, feature),
       'r') as count_file:

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Model definition."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,16 +25,14 @@ MODES = tf.estimator.ModeKeys
 
 
 def generate_estimator(
-  mode_feature_cols_map,
-  artifact_dir,
-  params,
-  config):
-  """
+    mode_feature_cols_map,
+    params,
+    config):
+  """Creates a tf.estimator.Estimator for the Criteo classification task.
+
   Args:
     mode_feature_cols_map: Dictionary mapping modes to lists of
     tf.feature_columns describing the features to expect in each mode
-    artifact_dir: Directory containing preprocessing artifacts used to transform
-    the input data
     params: Hyperparameter object (assumed to be an instance of
     tf.contrib.training.HParams
     config: An instance of tf.contrib.learn.RunConfig
@@ -41,8 +40,8 @@ def generate_estimator(
   Returns:
     A tf.estimator.Estimator representing the logistic classifier we will use
   """
-  model_fn = generate_model_fn(mode_feature_cols_map, artifact_dir)
- 
+  model_fn = generate_model_fn(mode_feature_cols_map)
+
   return tf.estimator.Estimator(
       model_fn,
       model_dir=config.model_dir,
@@ -51,16 +50,12 @@ def generate_estimator(
   )
 
 
-def generate_model_fn(mode_feature_cols_map, artifact_dir):
-  """
-  Creates a model_fn to inject into our custom estimator. Trains with simple
-  gradient descent.
+def generate_model_fn(mode_feature_cols_map):
+  """Creates a model_fn to inject into our custom estimator.
 
   Args:
     mode_feature_cols_map: Dictionary mapping modes to lists of
     tf.feature_columns describing the features to expect in each mode
-    artifact_dir: Path to either local directory or GCS bucket containing
-    preprocessing artifacts.
 
   Returns:
     A model_fn for tf.estimator.Estimator. Has the following signature:
