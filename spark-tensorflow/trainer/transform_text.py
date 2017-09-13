@@ -28,7 +28,7 @@ def preprocess_integer_dirs(artifact_dir):
         print('files are {}'.format(files))
         part_files = filter(lambda file: file.startswith('part'), files)
         assert len(part_files) == 1, ('Did not find 1 {' 
-                                     '}'.format(integer_dir))
+                                      '}'.format(integer_dir))
         part_file = part_files[0]
         print('Part file is {}'.format(part_file))
         shutil.copy(os.path.join(full_dir, part_file),
@@ -39,7 +39,7 @@ def preprocess_categorical_dirs(artifact_dir):
     dirs = os.listdir(artifact_dir)
     categorical_dirs = filter(lambda dir: dir.startswith('categorical-feature'),
                           dirs)
-    assert len(categorical_dirs) == 26, ('Expected 26 integer feature ' 
+    assert len(categorical_dirs) == 26, ('Expected 26 integer feature '
                                          'directories')
     for categorical_dir in categorical_dirs:
         full_dir = os.path.join(artifact_dir, categorical_dir)

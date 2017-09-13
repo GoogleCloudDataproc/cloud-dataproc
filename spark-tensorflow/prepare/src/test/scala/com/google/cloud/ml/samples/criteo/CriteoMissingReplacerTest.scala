@@ -40,8 +40,8 @@ class CriteoMissingReplacerTest
   private def fixture: TestFixture = _fixture match {
     case None =>
       val f = new TestFixture {
-        val features = CriteoFeatures(Train)
-        val replacer = new CriteoMissingReplacer()
+        val features = CriteoFeatures()
+        val replacer = new CriteoMissingReplacer(new EmptyArtifactExporter())
       }
 
       _fixture = Some(f)
@@ -72,7 +72,11 @@ class CriteoMissingReplacerTest
     ))
 
     val df = spark.createDataFrame(trainingData.asJava, schema)
-    val averagedDf = f.replacer(df, Seq("a", "b"))
+
+    val integerFeatures = Seq("a", "b")
+    val averageFeaturesMap = f.replacer.getAverageIntegerFeatures(df, integerFeatures)
+
+    val averagedDf = f.replacer.replaceIntegerFeatures(df, integerFeatures, averageFeaturesMap)
     hasColumn(averagedDf, "c") should be(true)
 
     val df_seq = averagedDf.select("a", "b").collect.map(_.toSeq)

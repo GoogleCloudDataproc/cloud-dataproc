@@ -15,10 +15,25 @@
  */
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.DataFrame
-
-class CriteoTransformer {
+import org.apache.spark.sql.SparkSession
 
 
+class CriteoTransformer(inputPath: String,
+                        features: CriteoFeatures,
+                       numPartitions: Integer,
+                        outputPath: String)
+                       (implicit val spark: SparkSession) {
+
+  def transform(): Unit = {
+    val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
+    val exporter = new FileExporter(outputPath, "tfrecords")
+    val cleanedDf = importer.criteoImport
+
+    features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
+      df.withColumnRenamed(col, features.categoricalLabelMap(col))
+    })
+
+    exporter.criteoExport(cleanedDf)
+  }
 
 }

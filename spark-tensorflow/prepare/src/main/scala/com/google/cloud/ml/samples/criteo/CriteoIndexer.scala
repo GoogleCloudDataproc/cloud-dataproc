@@ -122,7 +122,7 @@ class IndexApplier(val features: CriteoFeatures, val importer: CriteoImporter)
   type IndexerResource = CriteoImporter
 
   def categoricalColumnVocabularies(resource: CriteoImporter): DataFrame = {
-    importer.criteoImport
+    resource.criteoImport
   }
 
   def apply(rawData: DataFrame): DataFrame = transform(rawData, importer)

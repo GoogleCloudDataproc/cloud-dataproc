@@ -24,10 +24,10 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
 
   trait TestFixture {
     val indexer: CriteoIndexer
-    val exporter: TestExporter
     val trainingDf: DataFrame
     val result: DataFrame
     val transformedData: Array[Seq[Any]]
+    val artifactExporter: EmptyArtifactExporter
   }
 
   private var _fixture: Option[TestFixture] = None
@@ -35,9 +35,9 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
   private def fixture: TestFixture = _fixture match {
     case None =>
       val f = new TestFixture {
-        val features = CriteoFeatures(Train)
-        val exporter = new TestExporter
-        val indexer = new TrainingIndexer(features, exporter)
+        val features = CriteoFeatures()
+        val artifactExporter = new EmptyArtifactExporter()
+        val indexer = new TrainingIndexer(features, artifactExporter)
 
         val firstCatInput: String = features.categoricalRawLabels.head
 
@@ -91,17 +91,20 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
     assert(f.result.count == f.trainingDf.count)
   }
 
+  /*
+  TODO: move t otest for CriteoAnalyzer
   it should "export vocabulary counts for each categorical feature in the training data" in {
     val f = fixture
 
     // 3 tokens for first categorical feature, and only 1 for the other 25
     val vocabularyRows = 25 + 3
+    println("CHECK~!" +f.artifactExporter.exported.get.length)
 
-    assert(f.exporter.exported match {
+    assert(f.artifactExporter.exported match {
       case Some(data) => data.length == vocabularyRows
       case _ => false
     })
-  }
+  }*/
 
   it should "correctly transform the input dataframe" in {
     val f = fixture

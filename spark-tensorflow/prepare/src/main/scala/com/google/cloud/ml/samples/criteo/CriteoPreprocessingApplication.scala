@@ -96,44 +96,21 @@ object CriteoPreprocessingApplication {
         val inputPath = config.basePath ++ config.relativeInputPath
         val outputPath = config.basePath ++ config.relativeOutputPath
 
-        val features = CriteoFeatures(config.mode)
+        val features = CriteoFeatures()
 
         val artifactExporter = config.mode match {
           case Analyze => new FileArtifactExporter(config.basePath ++ "artifacts/")
           case _ => new EmptyArtifactExporter()
         }
 
-        val indexer = new TrainingIndexer(features, artifactExporter)
-
-
         if (config.mode == Analyze) {
-          val importer = new CleanTSVImporter(inputPath, features.inputSchema, config.numPartitions)
-          val missingReplacer = new CriteoMissingReplacer(artifactExporter)
-
-          val cleanedDf = importer.criteoImport
-
-          val averages = missingReplacer.getAverageIntegerFeatures(
-            cleanedDf, features.integerFeatureLabels)
-          averages.foreach {
-            case (col: String, df: DataFrame) =>
-              artifactExporter.export(col, df)
-          }
-
-          val embeddings = indexer.getEmbeddings(cleanedDf)
-          embeddings.foreach {
-            case (col: String, df: DataFrame) =>
-              artifactExporter.export(col, df)
-          }
+          val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
+            features, config.numPartitions, artifactExporter)
+          analyzer()
         } else if (config.mode == Transform) {
-          val importer = new CleanTSVImporter(inputPath, features.inputSchema, config.numPartitions)
-          val exporter = new FileExporter(config.relativeOutputPath, "tfrecords")
-          val cleanedDf = importer.criteoImport
-
-          features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
-            df.withColumnRenamed(col, features.categoricalLabelMap(col))
-          })
-
-          exporter.criteoExport(cleanedDf)
+          val transformer = new CriteoTransformer(inputPath,
+            features, config.numPartitions, outputPath)
+          transformer.transform()
         }
     }
   }
