@@ -24,62 +24,64 @@ DATA_DIR = './test/'
 
 
 class SampleTests(tf.test.TestCase):
-  """All tests for this sample.
+    """All tests for this sample.
 
-  Test data is present in the 'tests/' directory.
-  """
+    Test data is present in the 'tests/' directory.
+    """
 
-  def test_get_feature_columns(self):
-    feature_columns = data.get_feature_columns(
-        data.TSV,
-        ARTIFACT_DIR)
-    self.assertEqual(len(feature_columns),
-                     len(data.INTEGER_FEATURES) + len(data.CATEGORICAL_FEATURES)
-                    )
+    def test_get_feature_columns(self):
+        feature_columns = data.get_feature_columns(
+            data.TSV,
+            ARTIFACT_DIR)
+        self.assertEqual(len(feature_columns),
+                         len(data.INTEGER_FEATURES) +
+                         len(data.CATEGORICAL_FEATURES)
+                         )
 
-  def test_generate_labelled_input_fn_tsv(self):
-    tsv_data_file = 'train.tsv'
-    batch_size = 2
-    data_glob = '{}{}'.format(DATA_DIR, tsv_data_file)
-    labelled_input_fn = data.generate_labelled_input_fn(
-        data.TSV,
-        2,
-        data_glob,
-        ARTIFACT_DIR)
-    features, labels = labelled_input_fn()
+    def test_generate_labelled_input_fn_tsv(self):
+        tsv_data_file = 'train.tsv'
+        batch_size = 2
+        data_glob = '{}{}'.format(DATA_DIR, tsv_data_file)
+        labelled_input_fn = data.generate_labelled_input_fn(
+            data.TSV,
+            2,
+            data_glob,
+            ARTIFACT_DIR)
+        features, labels = labelled_input_fn()
 
-    with tf.Session() as sess:
-      coord = tf.train.Coordinator()
-      threads = tf.train.start_queue_runners(coord=coord)
-      result = sess.run({'features': features,
-                         'labels': labels})
-      coord.request_stop()
-      coord.join(threads)
+        with tf.Session() as sess:
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(coord=coord)
+            result = sess.run({'features': features,
+                               'labels': labels})
+            coord.request_stop()
+            coord.join(threads)
 
-    features_out = result['features']
-    for key in features_out:
-      self.assertEqual(features_out[key].shape, (batch_size, 1))
+        features_out = result['features']
+        for key in features_out:
+            self.assertEqual(features_out[key].shape, (batch_size, 1))
 
-    labels_out = result['labels']
-    self.assertEqual(labels_out.shape, (batch_size, 1))
+        labels_out = result['labels']
+        self.assertEqual(labels_out.shape, (batch_size, 1))
 
-  def test_end_to_end_tsv(self):
-    job_dir = tf.test.get_temp_dir()
+    def test_end_to_end_tsv(self):
+        job_dir = tf.test.get_temp_dir()
 
-    args = argparse.Namespace(
-        job_dir=job_dir,
-        data_format=data.TSV,
-        train_dir=DATA_DIR,
-        eval_dir=DATA_DIR,
-        artifact_dir=ARTIFACT_DIR,
-        batch_size=2,
-        train_steps=10,
-        eval_steps=1,
-        learning_rate=0.5,
-        min_eval_frequency=0
-    )
+        args = argparse.Namespace(
+            job_dir=job_dir,
+            data_format=data.TSV,
+            train_dir=DATA_DIR,
+            eval_dir=DATA_DIR,
+            artifact_dir=ARTIFACT_DIR,
+            batch_size=2,
+            train_steps=10,
+            eval_steps=1,
+            learning_rate=0.5,
+            min_eval_frequency=0
+        )
 
-    task.dispatch(args)
+        task.dispatch(args)
+
 
 if __name__ == '__main__':
-  tf.test.main()
+    tf.test.main()
