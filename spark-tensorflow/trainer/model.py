@@ -113,6 +113,12 @@ def generate_model_fn(mode_feature_cols_map):
                 learning_rate=params.learning_rate
             ).minimize(loss, global_step=global_step)
 
+        eval_metric_ops = None
+
+        if mode == MODES.EVAL:
+            eval_metric_ops = {
+                'accuracy': tf.metrics.accuracy(labels, logistic)}
+
         # Define serving signatures
         prediction_output = tf.estimator.export.PredictOutput(
             classifier_output)
@@ -127,6 +133,7 @@ def generate_model_fn(mode_feature_cols_map):
             predictions=classifier_output,
             loss=loss,
             train_op=train_op,
+            eval_metric_ops=eval_metric_ops,
             export_outputs=export_outputs
         )
 
