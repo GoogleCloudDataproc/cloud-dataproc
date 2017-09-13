@@ -117,13 +117,14 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
 
         cpu_count = multiprocessing.cpu_count()
 
-        features_batch = tf.train.shuffle_batch(features,
-                                                batch_size,
-                                                min_after_dequeue=2 * batch_size + 1,
-                                                capacity=batch_size * 10,
-                                                num_threads=cpu_count,
-                                                enqueue_many=True,
-                                                allow_smaller_final_batch=True)
+        features_batch = tf.train.shuffle_batch(
+            features,
+            batch_size,
+            min_after_dequeue=2 * batch_size + 1,
+            capacity=batch_size * 10,
+            num_threads=cpu_count,
+            enqueue_many=True,
+            allow_smaller_final_batch=True)
 
         label_batch = features_batch.pop(LABEL)
 
