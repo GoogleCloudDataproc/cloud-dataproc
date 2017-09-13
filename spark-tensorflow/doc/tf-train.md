@@ -6,6 +6,19 @@ TensorFlow classifier. For this, whether your run your training
 job locally or on Google Cloud Platform, you will be using [this
 code](./trainer/task.py).
 
+## Preprocess your artifacts
+
+The artifact files as written by Spark need one more preprocessing step before 
+they are ready for consumption by the Tensorflow graph. Specifically, they
+need to be renamed and the count of the categorical feature value files must
+be created.
+
+This preprocessing can be done on either a local file or on a GCS bucket 
+with the `preprocess_artifacts.py` command:
+
+  ```
+  $ python preprocess_artifacts.py --artifact-dir=<your local artifact directory or GCS bucket>
+
 ## Command line arguments
 
 Regardless of how you run the training job, you will *have* to pass it the
