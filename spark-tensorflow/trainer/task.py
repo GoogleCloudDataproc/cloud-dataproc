@@ -36,8 +36,8 @@ def generate_experiment_fn(data_format,
       data_format: File format for training and evaluation data
       artifact_dir: Directory containing preprocessing artifacts needed to
       transform input data in the model
-      batch_size: Size of batches in which training and evaluation data should be
-      processed
+      batch_size: Size of batches in which training and evaluation data should
+      be processed
       train_glob: Glob pattern matching the training data
       eval_glob: Glob pattern matching evaluation data
       train_steps: Number of training steps to perform
@@ -127,12 +127,13 @@ def generate_export_fn():
     )
 
     def export_fn(estimator, export_path, checkpoint_path):
-        """Makes the estimators export_savedmodel method compatible with Experiment.
+        """Makes export_savedmodel method compatible with Experiment.
 
         Args:
           estimator: A tf.estimator.Estimator
           export_path: Path to which saved model should be exported
-          checkpoint_path: Optional checkpoint from which the export is taking place
+          checkpoint_path: Optional checkpoint from which the export is taking
+          place
 
         Returns:
           Path to which model was exported
@@ -226,7 +227,7 @@ if __name__ == '__main__':
         '--eval-steps',
         type=int,
         default=1,
-        help='The number of evaluation batches that should be used in evaluation'
+        help='Number of evaluation batches that should be used in evaluation'
     )
     parser.add_argument(
         '--learning-rate',

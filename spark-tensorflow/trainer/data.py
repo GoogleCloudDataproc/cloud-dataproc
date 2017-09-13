@@ -40,7 +40,8 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
 
     Args:
       fmt: Format of files from which data is being read
-      batch_size: A positive integer specifying how large we would like each batch
+      batch_size: A positive integer specifying how large we would like each
+      batch
       of training or evaluation to be
       data_glob: A glob which matches the tfrecords files containing labelled
       input data
@@ -48,23 +49,24 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
       containing preprocessing artifacts
 
     Returns:
-      An input_fn which returns labelled data for use with tf.estimator.Estimator
+      An input_fn which returns labelled data for use with Estimator
     """
     features = {}
 
-    for f in INTEGER_FEATURES + [LABEL]:
-        features[f] = tf.FixedLenFeature([1], dtype=tf.float32)
+    for feature in INTEGER_FEATURES + [LABEL]:
+        features[feature] = tf.FixedLenFeature([1], dtype=tf.float32)
 
-    for f in CATEGORICAL_FEATURES:
-        features[f] = tf.FixedLenFeature([1], dtype=tf.string)
+    for feature in CATEGORICAL_FEATURES:
+        features[feature] = tf.FixedLenFeature([1], dtype=tf.string)
 
     def tfrecords_input_fn():
         """input_fn for TFRecords files.
 
         Returns:
-          (features, labels) where 'features' is a dictionary whose keys are feature
-          names and whose values are batches of values for those features and where
-          'labels' is a batch of labels corresponding to each "row" of features.
+          (features, labels) where 'features' is a dictionary whose keys are
+          feature names and whose values are batches of values for those
+          features and where 'labels' is a batch of labels corresponding to
+          each "row" of features.
         """
         features_batch = tf.contrib.learn.read_batch_features(
             file_pattern=data_glob,
@@ -83,9 +85,10 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
         """input_fn for TSV files.
 
         Returns:
-          (features, labels) where 'features' is a dictionary whose keys are feature
-          names and whose values are batches of values for those features and where
-          'labels' is a batch of labels corresponding to each "row" of features.
+          (features, labels) where 'features' is a dictionary whose keys are
+          feature names and whose values are batches of values for those
+          features and where 'labels' is a batch of labels corresponding to
+          each "row" of features.
         """
         filenames = tf.gfile.Glob(data_glob)
         filename_queue = tf.train.string_input_producer(
@@ -213,7 +216,7 @@ def get_integer_artifacts(feature, artifact_dir):
 
 
 def categorical_column(fmt, feature, artifact_dir):
-    """Feature column representing categorical features (also depends on format).
+    """Feature column representing categorical features (depends on format).
 
     Args:
       fmt: Format of files from which data is being read
@@ -247,12 +250,11 @@ def get_categorical_artifacts(feature, artifact_dir):
 
     Returns:
       (counts, vocabulary_file) - where 'counts' is the number of words in the
-      vocabulary for the feature and 'vocabulary_file' is the file containing the
-      vocabulary sorted in order of frequency.
+      vocabulary for the feature and 'vocabulary_file' is the file containing
+      the vocabulary sorted in order of frequency.
     """
     with tf.gfile.Open(
-        '{}{}/count.txt'.format(artifact_dir, feature),
-            'r') as count_file:
+        '{}{}/count.txt'.format(artifact_dir, feature), 'r') as count_file:
         count = int(count_file.read())
 
     vocabulary_file = '{}{}/index.txt'.format(artifact_dir, feature)

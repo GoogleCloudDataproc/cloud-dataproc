@@ -60,9 +60,10 @@ def generate_model_fn(mode_feature_cols_map):
     Returns:
       A model_fn for tf.estimator.Estimator. Has the following signature:
       Args:
-        features: A dictionary of strings to tensors describing the model features
-        labels: Either None or a tensor representing the labels for a given batch
-        of training or evaluation data
+        features: A dictionary of strings to tensors describing the model
+        features
+        labels: Either None or a tensor representing the labels for a given
+        batch of training or evaluation data
         mode: A member of tf.estimator.ModeKeys -- TRAIN, EVAL, or PREDICT
         params: tf.contrib.training.HParams object or None
         config: tf.contrib.learn.RunConfig object or None
