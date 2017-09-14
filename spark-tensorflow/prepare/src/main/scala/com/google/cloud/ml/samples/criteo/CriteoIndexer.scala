@@ -35,28 +35,28 @@ trait CriteoIndexer {
   import spark.implicits._
 
   /**
-    * Creates a DataFrame containing the amalgamated vocabularies for the categorical features in
-    * a Criteo data set.
-    *
+    * Creates a DataFrame containing the count of each value for each feature
     * @return A DataFrame with three columns: "feature" (specifies categorical feature), "value"
     *         (specifies a particular value for that feature), and "count" (specifies number of times
     *         that value appeared for that feature in the training data).
     */
-  def categoricalColumnVocabularies(resource: IndexerResource): DataFrame
+  def categoricalFeatureValueCounts(resource: IndexerResource): DataFrame
 
   /**
     * Constructs an embedding from the set of feature values to the positive integers for each of
-    * the feature columns in a Criteo data set. Expects to be provided with value counts for each of
-    * the features.
+    * the feature columns in a Criteo data set. Expects to be provided with value counts for each
+    * of the features.
     *
-    * @param vocabularyAmalgam Value counts as provided by the `categoricalColumnValueCounts` method.
+    * @param categoricalFeatureValueCounts Value counts as provided by the
+    *                                      `categoricalColumnValueCounts` method.
     * @return Map from feature name to embedding table DataFrame. Columns in each DataFrame are
     *         "value", "index".
     */
-  private def categoricalColumnEmbeddings(vocabularyAmalgam: DataFrame): Map[String, DataFrame] =
+  private def categoricalColumnVocabularies(categoricalFeatureValueCounts: DataFrame):
+  Map[String, DataFrame] =
     features.categoricalRawLabels.map(label => {
       (label, spark.createDataFrame(
-        vocabularyAmalgam.
+        categoricalFeatureValueCounts.
           filter($"feature" === label).
           rdd.
           map(row => row.get(1)).
@@ -65,16 +65,15 @@ trait CriteoIndexer {
           StructField("value-" ++ label, StringType),
           StructField("index-" ++ label, LongType)))
       ))
-    }).
-      toMap
+    }).toMap
 
-  def getEmbeddings(resource: IndexerResource): Map[String, DataFrame] = {
-    val vocabularies = categoricalColumnVocabularies(resource)
-    categoricalColumnEmbeddings(vocabularies)
+  def getCategoricalVocabularies(resource: IndexerResource): Map[String, DataFrame] = {
+    val vocabularies = categoricalFeatureValueCounts(resource)
+    categoricalColumnVocabularies(vocabularies)
   }
 
   def transform(rawDf: DataFrame, resource: IndexerResource): DataFrame = {
-    val embeddings = getEmbeddings(resource)
+    val embeddings = getCategoricalVocabularies(resource)
     features.categoricalRawLabels.foldLeft(rawDf)((df, col) => {
       df.withColumnRenamed(col, features.categoricalLabelMap(col))
     })
@@ -92,7 +91,7 @@ class TrainingIndexer(val features: CriteoFeatures, val exporter: ArtifactExport
 
   type IndexerResource = DataFrame
 
-  def categoricalColumnVocabularies(df: DataFrame): DataFrame = {
+  def categoricalFeatureValueCounts(df: DataFrame): DataFrame = {
     val categoricalRawLabels = spark.sparkContext.broadcast(features.categoricalRawLabels)
 
     // categoricalValues tabulates each observed feature value tagged by feature, with repetition
@@ -121,7 +120,7 @@ class IndexApplier(val features: CriteoFeatures, val importer: CriteoImporter)
   extends CriteoIndexer {
   type IndexerResource = CriteoImporter
 
-  def categoricalColumnVocabularies(resource: CriteoImporter): DataFrame = {
+  def categoricalFeatureValueCounts(resource: CriteoImporter): DataFrame = {
     resource.criteoImport
   }
 
