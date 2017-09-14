@@ -41,7 +41,6 @@ class EmptyArtifactExporter
   var exported: Option[Array[Seq[Any]]] = None
 
   override def export(column: String, df: DataFrame): Unit = {
-    println("EXPORTED!")
     exported = Some(df.collect.map(_.toSeq.map(_.toString)))
   }
 }
