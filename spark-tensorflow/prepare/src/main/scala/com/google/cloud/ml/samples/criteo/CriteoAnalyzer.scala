@@ -16,13 +16,14 @@
 
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class CriteoAnalyzer(val inputPath: String,
                      val schema: StructType,
                      val features: CriteoFeatures,
-                    val numPartitions: Integer,
+                     val numPartitions: Integer,
+                     val indexer: CriteoIndexer,
                      val artifactExporter: ArtifactExporter)
                     (implicit val spark: SparkSession) {
 
@@ -38,6 +39,11 @@ class CriteoAnalyzer(val inputPath: String,
     val averages = missingReplacer.getAverageIntegerFeatures(
       filledDf, features.integerFeatureLabels)
     averages.foreach {
+      case (col: String, df: DataFrame) =>
+        artifactExporter.export(col, df)
+    }
+    val embeddings = indexer.getCategoricalVocabularies(cleanedDf)
+    embeddings.foreach {
       case (col: String, df: DataFrame) =>
         artifactExporter.export(col, df)
     }
