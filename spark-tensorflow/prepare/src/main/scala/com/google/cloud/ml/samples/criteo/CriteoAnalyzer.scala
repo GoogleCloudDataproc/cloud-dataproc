@@ -16,21 +16,21 @@
 
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.StructType
+
 
 class CriteoAnalyzer(val inputPath: String,
                      val schema: StructType,
                      val features: CriteoFeatures,
                      val numPartitions: Integer,
-                     val indexer: CriteoIndexer,
+                     val indexer: TrainingIndexer,
                      val artifactExporter: ArtifactExporter)
                     (implicit val spark: SparkSession) {
 
   def analyze() {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
     val missingReplacer = new CriteoMissingReplacer(artifactExporter)
-    val indexer = new TrainingIndexer(features, artifactExporter)
 
     val cleanedDf = importer.criteoImport
     val noNonNullDf = cleanedDf.na.fill("null")

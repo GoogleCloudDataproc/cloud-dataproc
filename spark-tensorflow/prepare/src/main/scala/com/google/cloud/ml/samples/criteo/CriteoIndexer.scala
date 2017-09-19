@@ -83,7 +83,7 @@ trait CriteoIndexer {
 }
 
 
-class TrainingIndexer(val features: CriteoFeatures, val exporter: ArtifactExporter)
+class TrainingIndexer(val features: CriteoFeatures)
                      (implicit val spark: SparkSession)
   extends CriteoIndexer {
 

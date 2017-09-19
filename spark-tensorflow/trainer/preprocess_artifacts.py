@@ -51,6 +51,8 @@ def preprocess_categorical_dirs(artifact_dir):
             features = [row[0] for row in csvreader]
         with open(os.path.join(full_dir, 'index.txt'), 'w') as index_file:
             for feature in features:
+                if not feature:
+                    feature = 'null'
                 index_file.write('{}\n'.format(feature))
         with open(os.path.join(full_dir, 'count.txt'), 'w') as count_file:
             count_file.write('{}\n'.format(len(features)))
