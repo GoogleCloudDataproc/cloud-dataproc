@@ -17,8 +17,16 @@ import os
 import shutil
 import csv
 
+from google.cloud import storage
 
-def preprocess_integer_dirs(artifact_dir):
+
+# TODO: would be better to figure out how to have Scala output it correctly
+
+integer_features = ['integer-feature-{}'.format(i) for i in range(1, 14)]
+categorical_features = ['categorical-feature-{}'.format(i)
+                        for i in range(1, 27)]
+
+def preprocess_integer_dirs_local(artifact_dir):
     dirs = os.listdir(artifact_dir)
     integer_dirs = filter(lambda dir: dir.startswith('integer-feature'), dirs)
     assert len(integer_dirs) == 13, 'Expected 13 integer feature directories'
@@ -27,7 +35,7 @@ def preprocess_integer_dirs(artifact_dir):
         files = os.listdir(full_dir)
         print('files are {}'.format(files))
         part_files = filter(lambda file: file.startswith('part'), files)
-        assert len(part_files) == 1, ('Did not find 1 {' 
+        assert len(part_files) == 1, ('Did not find 1 {'
                                       '}'.format(integer_dir))
         part_file = part_files[0]
         print('Part file is {}'.format(part_file))
@@ -35,7 +43,7 @@ def preprocess_integer_dirs(artifact_dir):
                     os.path.join(full_dir, 'mean.txt'))
 
 
-def preprocess_categorical_dirs(artifact_dir):
+def preprocess_categorical_dirs_local(artifact_dir):
     dirs = os.listdir(artifact_dir)
     categorical_dirs = filter(lambda dir: dir.startswith('categorical-feature'),
                           dirs)
@@ -58,15 +66,40 @@ def preprocess_categorical_dirs(artifact_dir):
             count_file.write('{}\n'.format(len(features)))
 
         # remove raw from name
-        # TODO: prob just should just have Scala output it correctly
         shutil.copytree(full_dir,
                         os.path.join(artifact_dir,
                         categorical_dir[:categorical_dir.rfind('-')]))
 
 
-def preprocess(artifact_dir):
-    preprocess_integer_dirs(artifact_dir)
-    preprocess_categorical_dirs(artifact_dir)
+def preprocess_integer_dirs_gcs(artifact_dir):
+    client = storage.Client()
+    bucket = client.get_bucket('waprin-spark')
+    blobs = list(bucket.list_blobs())
+
+    for ifeature in integer_features:
+        ifeature = ARTIFACTS_DIR + '/' + ifeature
+        files = filter(lambda b: b.name.startswith(ifeature), blobs)
+        csv = filter(lambda b: 'csv' in b.name, files)[0]
+        value = csv.download_as_string()
+        path = csv.name[:csv.name.rfind('/')]
+        new_name = path + '/mean.txt'
+        print('Renaming {} to {}'.format(csv.name, new_name))
+        new_blob = bucket.blob(new_name)
+        new_blob.upload_from_string(value)
+
+
+
+def preprocess_categorical_dirs_local(artifact_dir):
+    pass
+
+
+def preprocess_local(artifact_dir):
+    preprocess_integer_dirs_local(artifact_dir)
+    preprocess_categorical_dirs_local(artifact_dir)
+
+
+def preprocess_gcs(artifact_dir):
+    pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -75,4 +108,7 @@ if __name__ == '__main__':
 
     parser.add_argument('artifact_dir')
     args = parser.parse_args()
-    preprocess(args.artifact_dir)
+    if args.artifact_dir.starts_with('gs://'):
+        preprocess_gcs(args.artifact_dir)
+    else:
+        preprocess_local(args.artifact_dir)

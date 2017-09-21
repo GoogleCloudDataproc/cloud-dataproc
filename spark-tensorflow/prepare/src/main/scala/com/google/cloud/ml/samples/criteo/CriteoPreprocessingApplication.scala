@@ -95,7 +95,6 @@ object CriteoPreprocessingApplication {
 
         val inputPath = config.basePath ++ config.relativeInputPath
         val outputPath = config.basePath ++ config.relativeOutputPath
-        println("Input path is " + inputPath)
 
         val features = CriteoFeatures()
 
