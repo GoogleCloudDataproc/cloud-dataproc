@@ -17,16 +17,11 @@ import os
 import shutil
 import csv
 
-from google.cloud import storage
 
 
 # TODO: would be better to figure out how to have Scala output it correctly
 
-integer_features = ['integer-feature-{}'.format(i) for i in range(1, 14)]
-categorical_features = ['categorical-feature-{}'.format(i)
-                        for i in range(1, 27)]
-
-def preprocess_integer_dirs_local(artifact_dir):
+def preprocess_integer_dirs(artifact_dir):
     dirs = os.listdir(artifact_dir)
     integer_dirs = filter(lambda dir: dir.startswith('integer-feature'), dirs)
     assert len(integer_dirs) == 13, 'Expected 13 integer feature directories'
@@ -43,7 +38,7 @@ def preprocess_integer_dirs_local(artifact_dir):
                     os.path.join(full_dir, 'mean.txt'))
 
 
-def preprocess_categorical_dirs_local(artifact_dir):
+def preprocess_categorical_dirs(artifact_dir):
     dirs = os.listdir(artifact_dir)
     categorical_dirs = filter(lambda dir: dir.startswith('categorical-feature'),
                           dirs)
@@ -71,36 +66,6 @@ def preprocess_categorical_dirs_local(artifact_dir):
                         categorical_dir[:categorical_dir.rfind('-')]))
 
 
-def preprocess_integer_dirs_gcs(artifact_dir):
-    client = storage.Client()
-    bucket = client.get_bucket('waprin-spark')
-    blobs = list(bucket.list_blobs())
-
-    for ifeature in integer_features:
-        ifeature = ARTIFACTS_DIR + '/' + ifeature
-        files = filter(lambda b: b.name.startswith(ifeature), blobs)
-        csv = filter(lambda b: 'csv' in b.name, files)[0]
-        value = csv.download_as_string()
-        path = csv.name[:csv.name.rfind('/')]
-        new_name = path + '/mean.txt'
-        print('Renaming {} to {}'.format(csv.name, new_name))
-        new_blob = bucket.blob(new_name)
-        new_blob.upload_from_string(value)
-
-
-
-def preprocess_categorical_dirs_local(artifact_dir):
-    pass
-
-
-def preprocess_local(artifact_dir):
-    preprocess_integer_dirs_local(artifact_dir)
-    preprocess_categorical_dirs_local(artifact_dir)
-
-
-def preprocess_gcs(artifact_dir):
-    pass
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -108,7 +73,5 @@ if __name__ == '__main__':
 
     parser.add_argument('artifact_dir')
     args = parser.parse_args()
-    if args.artifact_dir.starts_with('gs://'):
-        preprocess_gcs(args.artifact_dir)
-    else:
-        preprocess_local(args.artifact_dir)
+    preprocess_integer_dirs(args.artifact_dir)
+    preprocess_categorical_dirs(args.artifact_dir)
