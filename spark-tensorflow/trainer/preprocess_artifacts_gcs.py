@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import csv
+import tempfile
+import StringIO
+
+
 from google.cloud import storage
 
 
@@ -20,9 +26,9 @@ categorical_features = ['categorical-feature-{}'.format(i)
                         for i in range(1, 27)]
 
 
-def preprocess_integer_dirs(artifact_dir):
+def preprocess_integer_dirs(bucket, artifact_dir):
     client = storage.Client()
-    bucket = client.get_bucket('waprin-spark')
+    bucket = client.get_bucket(bucket)
     blobs = list(bucket.list_blobs())
 
     for ifeature in integer_features:
@@ -36,8 +42,44 @@ def preprocess_integer_dirs(artifact_dir):
         new_blob = bucket.blob(new_name)
         new_blob.upload_from_string(value)
 
-def preprocess_categorical_dirs():
-    pass
+
+def preprocess_categorical_dirs(bucket, artifact_dir):
+    client = storage.Client()
+    bucket = client.get_bucket(bucket)
+    blobs = list(bucket.list_blobs())
+
+    for cfeature in categorical_features:
+        new_file, filename = tempfile.mkstemp()
+        print('hmm filename is {}'.format(filename))
+        cfeature = artifact_dir + '/' + cfeature
+        files = filter(lambda b: b.name.startswith(cfeature), blobs)
+        csv_file = filter(lambda b: 'csv' in b.name, files)[0]
+        csv_file.download_to_filename(filename)
+
+        path = csv_file.name[:csv_file.name.rfind('/')]
+
+        with open(filename, 'r') as part_file:
+            csvreader = csv.reader(part_file)
+            features = [row[0] for row in csvreader]
+
+        output = StringIO.StringIO()
+        for feature in features:
+            if not feature:
+                feature = 'null'
+            output.write('{}\n'.format(feature))
+
+        index_name = path + '/index.txt'
+        index_blob = bucket.blob(index_name)
+        index_blob.upload_from_string(output.getvalue())
+
+        output = StringIO.StringIO()
+        output.write('{}\n'.format(len(features)))
+        count_name = path + '/count.txt'
+        count_blob = bucket.blob(count_name)
+        count_blob.upload_from_string(output.getvalue())
+
+        print('Wrote feature in {}'.format(cfeature))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -48,5 +90,5 @@ if __name__ == '__main__':
     parser.add_argument('artifact_dir')
 
     args = parser.parse_args()
-    preprocess_integer_dirs(args.bucket, args.artifact_dir)
+#    preprocess_integer_dirs(args.bucket, args.artifact_dir)
     preprocess_categorical_dirs(args.bucket, args.artifact_dir)
