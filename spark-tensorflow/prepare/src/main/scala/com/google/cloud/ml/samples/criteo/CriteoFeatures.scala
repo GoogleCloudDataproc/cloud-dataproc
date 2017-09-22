@@ -29,6 +29,7 @@ case class CriteoFeatures() {
   val clickedLabel = Seq("clicked")
 
   val inputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
+  //val inputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
 
   val integralColumns: Seq[String] = inputLabels.
     filterNot(label => categoricalRawLabels.contains(label))

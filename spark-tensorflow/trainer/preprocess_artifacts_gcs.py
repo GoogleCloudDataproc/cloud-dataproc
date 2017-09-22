@@ -50,7 +50,6 @@ def preprocess_categorical_dirs(bucket, artifact_dir):
 
     for cfeature in categorical_features:
         new_file, filename = tempfile.mkstemp()
-        print('hmm filename is {}'.format(filename))
         cfeature = artifact_dir + '/' + cfeature
         files = filter(lambda b: b.name.startswith(cfeature), blobs)
         csv_file = filter(lambda b: 'csv' in b.name, files)[0]

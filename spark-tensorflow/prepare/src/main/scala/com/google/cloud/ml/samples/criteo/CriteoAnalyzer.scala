@@ -42,11 +42,13 @@ class CriteoAnalyzer(val inputPath: String,
       case (col: String, df: DataFrame) =>
         artifactExporter.export(col, df)
     }
+
     val embeddings = indexer.getCategoricalVocabularies(cleanedDf)
     embeddings.foreach {
       case (col: String, df: DataFrame) =>
-        artifactExporter.export(col, df)
+        artifactExporter.export(features.categoricalLabelMap(col), df)
     }
+
   }
 
   def apply(): Unit = analyze

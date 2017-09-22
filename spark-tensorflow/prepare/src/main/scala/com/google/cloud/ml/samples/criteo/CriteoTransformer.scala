@@ -26,7 +26,7 @@ class CriteoTransformer(inputPath: String,
 
   def transform(): Unit = {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
-    val exporter = new FileExporter(outputPath, "tfrecords")
+    val exporter = new FileExporter(outputPath, "csv")
     val cleanedDf = importer.criteoImport
 
     features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {

@@ -60,11 +60,6 @@ def preprocess_categorical_dirs(artifact_dir):
         with open(os.path.join(full_dir, 'count.txt'), 'w') as count_file:
             count_file.write('{}\n'.format(len(features)))
 
-        # remove raw from name
-        shutil.copytree(full_dir,
-                        os.path.join(artifact_dir,
-                        categorical_dir[:categorical_dir.rfind('-')]))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
