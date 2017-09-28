@@ -95,6 +95,7 @@ object CriteoPreprocessingApplication {
 
         val inputPath = config.basePath ++ config.relativeInputPath
         val outputPath = config.basePath ++ config.relativeOutputPath
+        val artifactPath = config.basePath ++ "artifacts/"
 
         val features = CriteoFeatures()
 
@@ -103,14 +104,15 @@ object CriteoPreprocessingApplication {
           case _ => new EmptyArtifactExporter()
         }
 
+        val indexer = new TrainingIndexer(features)
         if (config.mode == Analyze) {
-          val indexer = new TrainingIndexer(features)
+
           val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
             features, config.numPartitions, indexer, artifactExporter)
           analyzer()
         } else if (config.mode == Transform) {
           val transformer = new CriteoTransformer(inputPath,
-            features, config.numPartitions, outputPath)
+            features, config.numPartitions, indexer, artifactPath, outputPath)
           transformer.transform()
         }
     }

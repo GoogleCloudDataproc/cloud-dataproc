@@ -16,11 +16,14 @@
 package com.google.cloud.ml.samples.criteo
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types._
 
 
 class CriteoTransformer(inputPath: String,
                         features: CriteoFeatures,
-                       numPartitions: Integer,
+                        numPartitions: Integer,
+                        indexer: TrainingIndexer,
+                        artifactPath: String,
                         outputPath: String)
                        (implicit val spark: SparkSession) {
 
@@ -29,9 +32,45 @@ class CriteoTransformer(inputPath: String,
     val exporter = new FileExporter(outputPath, "csv")
     val cleanedDf = importer.criteoImport
 
+    val valueCounts = spark.read.format("csv").
+      schema(StructType(Seq(
+        StructField("feature", StringType),
+        StructField("value", StringType),
+        StructField("count", LongType)
+      ))).
+      load(artifactPath ++ "/feature_value_counts/*.csv")
+
+
+    /*
+     * vocabularies is map of column names to dataframe with feat
+     */
+    val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
+
+    println("Got vocabularies " ++ vocabularies.toString)
+    // add the ranking feature values to the cateogrical columns
+    val withCategoryRankings = features.categoricalRawLabels.
+      foldLeft(cleanedDf)((df, col) =>
+            df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col)).
+              withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
+          )
+
+    println("category rankings ")
+    withCategoryRankings.show()
+    // rename the columns from raw to non-raw
     features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
       df.withColumnRenamed(col, features.categoricalLabelMap(col))
     })
+
+    // select just the output  columns (removing the old categorical values)
+    val withTargetFeaturesDf = withCategoryRankings
+      .select(features.outputLabels.head, features.outputLabels.tail: _*).
+      toDF
+
+    // cast integer columns to floats
+    val floatCastDf = features.integralColumns.
+      foldLeft(withTargetFeaturesDf)((df, col) =>
+        df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
+
 
     exporter.criteoExport(cleanedDf)
   }

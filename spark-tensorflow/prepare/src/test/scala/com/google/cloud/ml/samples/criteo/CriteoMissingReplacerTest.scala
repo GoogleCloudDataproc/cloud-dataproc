@@ -41,7 +41,7 @@ class CriteoMissingReplacerTest
     case None =>
       val f = new TestFixture {
         val features = CriteoFeatures()
-        val replacer = new CriteoMissingReplacer(new EmptyArtifactExporter())
+        val replacer = new CriteoMissingReplacer()
       }
 
       _fixture = Some(f)

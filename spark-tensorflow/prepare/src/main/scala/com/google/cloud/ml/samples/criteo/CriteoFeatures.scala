@@ -40,4 +40,6 @@ case class CriteoFeatures() {
 
   // DataFrame schema of the input data
   val inputSchema: StructType = StructType(inputLabels.map(StructField(_, StringType)))
+
+  val outputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalFeatureLabels
 }

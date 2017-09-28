@@ -26,8 +26,7 @@ import org.apache.spark.sql.functions.avg
   *
   * @param spark Spark session
   */
-class CriteoMissingReplacer(val artifactExporter: ArtifactExporter)
-                           (implicit val spark: SparkSession) {
+class CriteoMissingReplacer()(implicit val spark: SparkSession) {
   import spark.implicits._
 
   /**

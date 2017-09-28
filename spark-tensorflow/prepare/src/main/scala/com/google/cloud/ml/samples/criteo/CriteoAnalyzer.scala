@@ -30,7 +30,7 @@ class CriteoAnalyzer(val inputPath: String,
 
   def analyze() {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
-    val missingReplacer = new CriteoMissingReplacer(artifactExporter)
+    val missingReplacer = new CriteoMissingReplacer()
 
     val cleanedDf = importer.criteoImport
     val noNonNullDf = cleanedDf.na.fill("null")
@@ -43,7 +43,15 @@ class CriteoAnalyzer(val inputPath: String,
         artifactExporter.export(col, df)
     }
 
-    val embeddings = indexer.getCategoricalVocabularies(cleanedDf)
+
+    val valueCounts = indexer.getCategoricalFeatureValueCounts(filledDf)
+
+
+    artifactExporter.export("feature_value_counts", valueCounts)
+
+    val embeddings = indexer.getCategoricalColumnVocabularies(valueCounts)
+
+
     embeddings.foreach {
       case (col: String, df: DataFrame) =>
         artifactExporter.export(features.categoricalLabelMap(col), df)

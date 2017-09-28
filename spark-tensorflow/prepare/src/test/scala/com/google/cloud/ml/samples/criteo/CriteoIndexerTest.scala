@@ -37,7 +37,7 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
       val f = new TestFixture {
         val features = CriteoFeatures()
         val artifactExporter = new EmptyArtifactExporter()
-        val indexer = new TrainingIndexer(features, artifactExporter)
+        val indexer = new TrainingIndexer(features)
 
         val firstCatInput: String = features.categoricalRawLabels.head
 
@@ -70,7 +70,7 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
         val importer = new TestImporter(trainingData, features.inputSchema)
         val trainingDf = importer.criteoImport
 
-        val result: DataFrame = indexer(trainingDf)
+        val result: DataFrame = indexer.getCategoricalFeatureValueCounts(trainingDf)
 
         val fakeExporter = new TestExporter
         fakeExporter.criteoExport(result)

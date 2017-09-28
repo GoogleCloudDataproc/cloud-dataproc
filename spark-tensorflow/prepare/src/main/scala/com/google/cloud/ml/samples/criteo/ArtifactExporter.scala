@@ -29,8 +29,8 @@ class FileArtifactExporter (val outputPath: String)
 extends ArtifactExporter
 {
 
-  def export(column: String, df: DataFrame): Unit = {
-    val fullOutputPath = outputPath + "/" + column
+  def export(prefix: String, df: DataFrame): Unit = {
+    val fullOutputPath = outputPath + "/" + prefix
     df.repartition(1).write.format("csv").save(fullOutputPath)
   }
 }
