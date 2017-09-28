@@ -42,7 +42,7 @@ class CriteoTransformer(inputPath: String,
 
   def transform(): Unit = {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
-    val exporter = new FileExporter(outputPath, "csv")
+    val exporter = new FileExporter(outputPath, "tfrecords")
     val cleanedDf = importer.criteoImport
 
     val valueCounts = spark.read.format("csv").
