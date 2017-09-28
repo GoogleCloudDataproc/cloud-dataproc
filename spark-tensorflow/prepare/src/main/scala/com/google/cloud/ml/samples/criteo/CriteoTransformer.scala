@@ -30,13 +30,13 @@ class CriteoTransformer(inputPath: String,
   /**
     *
     */
-  private def addRankFeatures(cleanedDf: DataFrame,
+  def addRankFeatures(cleanedDf: DataFrame,
                               vocabularies: Map[String, DataFrame]): DataFrame = {
     // add the ranking feature values to the cateogrical columns
     features.categoricalRawLabels.
       foldLeft(cleanedDf)((df, col) =>
-        df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col)).
-          withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
+        df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col))
+          .withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
       )
   }
 
@@ -53,21 +53,16 @@ class CriteoTransformer(inputPath: String,
       ))).
       load(artifactPath ++ "/feature_value_counts/*.csv")
 
-
     /*
      * vocabularies is map of column names to dataframe with feat
      */
     val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)    // add the ranking feature values to the cateogrical columns
 
-    val withCategoryRankings = addRankFeatures(withCategoryRankings, vocabularies)
+    val withCategoryRankings = addRankFeatures(cleanedDf, vocabularies)
 
-    // rename the columns from raw to non-raw
-    val renamed = features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
-      df.withColumnRenamed(col, features.categoricalLabelMap(col))
-    })
 
     // select just the output  columns (removing the old categorical values)
-    val withTargetFeaturesDf = renamed
+    val withTargetFeaturesDf = withCategoryRankings
       .select(features.outputLabels.head, features.outputLabels.tail: _*).
       toDF
 
@@ -77,7 +72,7 @@ class CriteoTransformer(inputPath: String,
         df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
 
 
-    exporter.criteoExport(cleanedDf)
+    exporter.criteoExport(floatCastDf)
   }
 
 }

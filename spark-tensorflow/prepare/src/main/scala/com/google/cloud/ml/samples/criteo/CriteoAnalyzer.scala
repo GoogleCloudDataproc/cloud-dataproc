@@ -49,10 +49,10 @@ class CriteoAnalyzer(val inputPath: String,
 
     artifactExporter.export("feature_value_counts", valueCounts)
 
-    val embeddings = indexer.getCategoricalColumnVocabularies(valueCounts)
+    val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
 
 
-    embeddings.foreach {
+    vocabularies.foreach {
       case (col: String, df: DataFrame) =>
         artifactExporter.export(features.categoricalLabelMap(col), df)
     }
