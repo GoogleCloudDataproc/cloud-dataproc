@@ -35,9 +35,11 @@ class FileStreamExporter(val outputPath: String, val format: String)
                         (implicit val spark: SparkSession)
 extends CriteoExporter
 {
-  def criteoExport(df: DataFrame): Unit = df.writeStream.format(format).
-    option("checkpointLocation", outputPath ++ "/checkpoints").
-    start(outputPath).awaitTermination()
+  def criteoExport(df: DataFrame): Unit = {
+    df.writeStream.format(format).
+      option("checkpointLocation", outputPath ++ "/checkpoints").
+      start(outputPath).awaitTermination()
+  }
 }
 
 

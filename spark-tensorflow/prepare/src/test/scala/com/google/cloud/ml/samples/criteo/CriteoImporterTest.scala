@@ -21,7 +21,7 @@ import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 class CleanTSVImporterTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers {
   "criteoImport" should "import clean training data from a TSV file" in {
     val inputPath = "src/test/resources/test_train.csv"
-    val trainFeatures = CriteoFeatures(Train)
+    val trainFeatures = CriteoFeatures()
     val importer = new CleanTSVImporter(inputPath, trainFeatures.inputSchema, 1)
 
     val df = importer.criteoImport
