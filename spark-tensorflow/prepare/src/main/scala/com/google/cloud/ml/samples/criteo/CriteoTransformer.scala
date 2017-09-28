@@ -15,7 +15,7 @@
  */
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types._
 
 
@@ -26,6 +26,19 @@ class CriteoTransformer(inputPath: String,
                         artifactPath: String,
                         outputPath: String)
                        (implicit val spark: SparkSession) {
+
+  /**
+    *
+    */
+  private def addRankFeatures(cleanedDf: DataFrame,
+                              vocabularies: Map[String, DataFrame]): DataFrame = {
+    // add the ranking feature values to the cateogrical columns
+    features.categoricalRawLabels.
+      foldLeft(cleanedDf)((df, col) =>
+        df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col)).
+          withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
+      )
+  }
 
   def transform(): Unit = {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
@@ -44,25 +57,17 @@ class CriteoTransformer(inputPath: String,
     /*
      * vocabularies is map of column names to dataframe with feat
      */
-    val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
+    val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)    // add the ranking feature values to the cateogrical columns
 
-    println("Got vocabularies " ++ vocabularies.toString)
-    // add the ranking feature values to the cateogrical columns
-    val withCategoryRankings = features.categoricalRawLabels.
-      foldLeft(cleanedDf)((df, col) =>
-            df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col)).
-              withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
-          )
+    val withCategoryRankings = addRankFeatures(withCategoryRankings, vocabularies)
 
-    println("category rankings ")
-    withCategoryRankings.show()
     // rename the columns from raw to non-raw
-    features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
+    val renamed = features.categoricalRawLabels.foldLeft(cleanedDf)((df, col) => {
       df.withColumnRenamed(col, features.categoricalLabelMap(col))
     })
 
     // select just the output  columns (removing the old categorical values)
-    val withTargetFeaturesDf = withCategoryRankings
+    val withTargetFeaturesDf = renamed
       .select(features.outputLabels.head, features.outputLabels.tail: _*).
       toDF
 
