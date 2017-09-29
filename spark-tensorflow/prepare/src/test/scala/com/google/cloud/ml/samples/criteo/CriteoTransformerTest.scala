@@ -16,17 +16,20 @@
 
 package com.google.cloud.ml.samples.criteo
 
-import org.scalatest._
+import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 
-import org.apache.spark.sql._
+import org.apache.spark.sql.{DataFrame, Row}
 
-class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers {
+class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen with Matchers{
 
   trait TestFixture {
-    val indexer: CriteoIndexer
+    val indexer: TrainingIndexer
     val trainingDf: DataFrame
-    val featureValueCountResult: DataFrame
+    val result: DataFrame
+    val transformedData: Array[Seq[Any]]
     val artifactExporter: EmptyArtifactExporter
+    val features: CriteoFeatures
+    val transformer: CriteoTransformer
   }
 
   private var _fixture: Option[TestFixture] = None
@@ -35,11 +38,6 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
     case None =>
       val f = new TestFixture {
         val features = CriteoFeatures()
-        val artifactExporter = new EmptyArtifactExporter()
-        val indexer = new TrainingIndexer(features)
-
-        val firstCatInput: String = features.categoricalRawLabels.head
-
         // Creating training data as a Seq of Row objects.
         // First five rows will have "abc" as value of first categorical column and "0" in every
         // other column
@@ -48,6 +46,7 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
           case `firstCatInput` => "abc"
           case _ => "0"
         }))
+
 
         // The next three rows will have "xyz" as value of first categorical column and "0" in every
         // other column
@@ -69,8 +68,26 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
         val importer = new TestImporter(trainingData, features.inputSchema)
         val trainingDf = importer.criteoImport
 
-        val featureValueCountResult: DataFrame = indexer.
-          getCategoricalFeatureValueCounts(trainingDf)
+
+        val artifactExporter = new EmptyArtifactExporter()
+        val indexer = new TrainingIndexer(features)
+
+        val valueCounts = indexer.getCategoricalFeatureValueCounts(trainingDf)
+        val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
+        val vocabularyImporter = new TestVocabularyImporter(vocabularies)
+
+        val transformer = new CriteoTransformer("", features, 1,
+          indexer, "", importer, vocabularyImporter, "")
+
+        val firstCatInput: String = features.categoricalRawLabels.head
+
+
+
+        val result: DataFrame = transformer.transform(trainingDf)
+
+        val fakeExporter = new TestExporter
+        fakeExporter.criteoExport(result)
+        val transformedData = fakeExporter.exported.get
       }
 
       _fixture = Some(f)
@@ -80,11 +97,24 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
     case Some(f) => f
   }
 
-  behavior of "TrainingIndexer"
+  behavior of "CriteoTransformer"
 
-
-  it should "correctly create the feature counts" in {
+  it should "yield a DataFrame with the same number of rows as its input DataFrame" in {
     val f = fixture
-    f.featureValueCountResult.first().length should equal(3)
+    assert(f.result.count == f.trainingDf.count)
   }
+
+  it should "verify add rank features works" in {
+    val f = fixture
+
+    val headLabel = f.features.categoricalRawLabels.head
+    val valueCounts = f.indexer.getCategoricalFeatureValueCounts(f.trainingDf)
+    val vocabularies = f.indexer.getCategoricalColumnVocabularies(valueCounts)
+
+
+    val withRank = f.transformer.addRankFeatures(f.trainingDf, vocabularies)
+      //withRank.select(f.features.categoricalRawLabels
+    }
+
+
 }

@@ -105,15 +105,20 @@ object CriteoPreprocessingApplication {
         }
 
         val indexer = new TrainingIndexer(features)
-        if (config.mode == Analyze) {
+        val importer = new CleanTSVImporter(inputPath,
+          features.inputSchema,
+          config.numPartitions)
 
+        if (config.mode == Analyze) {
           val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
-            features, config.numPartitions, indexer, artifactExporter)
+            features, config.numPartitions, indexer, importer, artifactExporter)
           analyzer()
         } else if (config.mode == Transform) {
+          val vocabularyImporter = new ArtifactVocabularyImporter(features, inputPath)
           val transformer = new CriteoTransformer(inputPath,
-            features, config.numPartitions, indexer, artifactPath, outputPath)
-          transformer.transform()
+            features, config.numPartitions, indexer,
+            artifactPath, importer, vocabularyImporter, outputPath)
+          transformer()
         }
     }
   }

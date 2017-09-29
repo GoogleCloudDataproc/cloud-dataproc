@@ -96,7 +96,5 @@ class TrainingIndexer(val features: CriteoFeatures)
 
     vocabularies
   }
-
-  //def apply(rawData: DataFrame): DataFrame = transform(rawData, rawData)
 }
 

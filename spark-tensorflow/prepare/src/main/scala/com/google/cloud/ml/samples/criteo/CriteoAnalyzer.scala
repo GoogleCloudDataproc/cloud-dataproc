@@ -25,11 +25,11 @@ class CriteoAnalyzer(val inputPath: String,
                      val features: CriteoFeatures,
                      val numPartitions: Integer,
                      val indexer: TrainingIndexer,
+                     val importer: CriteoImporter,
                      val artifactExporter: ArtifactExporter)
                     (implicit val spark: SparkSession) {
 
   def analyze() {
-    val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
     val missingReplacer = new CriteoMissingReplacer()
 
     val cleanedDf = importer.criteoImport
@@ -43,14 +43,8 @@ class CriteoAnalyzer(val inputPath: String,
         artifactExporter.export(col, df)
     }
 
-
     val valueCounts = indexer.getCategoricalFeatureValueCounts(filledDf)
-
-
-    artifactExporter.export("feature_value_counts", valueCounts)
-
     val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
-
 
     vocabularies.foreach {
       case (col: String, df: DataFrame) =>

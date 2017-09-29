@@ -24,6 +24,8 @@ class CriteoTransformer(inputPath: String,
                         numPartitions: Integer,
                         indexer: TrainingIndexer,
                         artifactPath: String,
+                        importer: CriteoImporter,
+                        vocabularyImporter: VocabularyImporter,
                         outputPath: String)
                        (implicit val spark: SparkSession) {
 
@@ -37,21 +39,9 @@ class CriteoTransformer(inputPath: String,
       )
   }
 
-  def transform(): Unit = {
-    val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
-    val exporter = new FileExporter(outputPath, "csv")
-    val cleanedDf = importer.criteoImport
-
-    val vocabularies = features.categoricalRawLabels.map(catFeature => {
-      val schema = StructType(Seq(
-        StructField("value-" ++ catFeature, StringType),
-        StructField("index-" ++ catFeature, LongType)))
-      (catFeature, spark.read.format("csv").schema(schema).load(artifactPath ++ "/" +
-        features.categoricalLabelMap(catFeature) + "/*.csv"
-      ))
-    }).toMap
-
-    val withCategoryRankings = addRankFeatures(cleanedDf, vocabularies)
+  def transform(df: DataFrame): DataFrame = {
+    val vocabularies = vocabularyImporter.loadFeatureVocabularies()
+    val withCategoryRankings = addRankFeatures(df, vocabularies)
 
     // select just the output  columns (removing the old categorical values)
     val withTargetFeaturesDf = withCategoryRankings
@@ -62,8 +52,16 @@ class CriteoTransformer(inputPath: String,
     val floatCastDf = features.integralColumns.
       foldLeft(withTargetFeaturesDf)((df, col) =>
         df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
-
-    exporter.criteoExport(floatCastDf)
+    floatCastDf
   }
+
+  def importTransformAndExport(): Unit = {
+    val exporter = new FileExporter(outputPath, "tfrecords")
+    val cleanedDf = importer.criteoImport
+    val result = transform(cleanedDf)
+    exporter.criteoExport(result)
+  }
+
+  def apply(): Unit = importTransformAndExport()
 
 }
