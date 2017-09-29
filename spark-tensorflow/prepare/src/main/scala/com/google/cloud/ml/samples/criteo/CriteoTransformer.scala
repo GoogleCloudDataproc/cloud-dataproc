@@ -15,7 +15,7 @@
  */
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types._
 
 
@@ -57,8 +57,17 @@ class CriteoTransformer(inputPath: String,
 
   def importTransformAndExport(): Unit = {
     val exporter = new FileExporter(outputPath, "tfrecords")
-    val cleanedDf = importer.criteoImport
-    val result = transform(cleanedDf)
+    val df = importer.criteoImport
+    val noNonNullDf = df.na.fill("null")
+    val filledDf = noNonNullDf.na.replace(noNonNullDf.columns, Map("" -> "null"))
+
+    val missingReplacer = new CriteoMissingReplacer()
+    val averages = missingReplacer.getAverageIntegerFeatures(
+      filledDf, features.integerFeatureLabels)
+    val replacedDf = missingReplacer.replaceIntegerFeatures(
+      filledDf, features.integerFeatureLabels, averages)
+
+    val result = transform(replacedDf)
     exporter.criteoExport(result)
   }
 

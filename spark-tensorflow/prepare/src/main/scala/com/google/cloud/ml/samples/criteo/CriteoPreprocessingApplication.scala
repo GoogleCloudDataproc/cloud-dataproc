@@ -114,7 +114,7 @@ object CriteoPreprocessingApplication {
             features, config.numPartitions, indexer, importer, artifactExporter)
           analyzer()
         } else if (config.mode == Transform) {
-          val vocabularyImporter = new ArtifactVocabularyImporter(features, inputPath)
+          val vocabularyImporter = new ArtifactVocabularyImporter(features, artifactPath)
           val transformer = new CriteoTransformer(inputPath,
             features, config.numPartitions, indexer,
             artifactPath, importer, vocabularyImporter, outputPath)
