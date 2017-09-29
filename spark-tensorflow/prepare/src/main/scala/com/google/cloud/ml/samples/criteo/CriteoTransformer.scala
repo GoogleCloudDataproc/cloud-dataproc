@@ -15,7 +15,7 @@
  */
 package com.google.cloud.ml.samples.criteo
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.types._
 
 
@@ -27,11 +27,8 @@ class CriteoTransformer(inputPath: String,
                         outputPath: String)
                        (implicit val spark: SparkSession) {
 
-  /**
-    *
-    */
   def addRankFeatures(cleanedDf: DataFrame,
-                              vocabularies: Map[String, DataFrame]): DataFrame = {
+                      vocabularies: Map[String, DataFrame]): DataFrame = {
     // add the ranking feature values to the cateogrical columns
     features.categoricalRawLabels.
       foldLeft(cleanedDf)((df, col) =>
@@ -42,24 +39,19 @@ class CriteoTransformer(inputPath: String,
 
   def transform(): Unit = {
     val importer = new CleanTSVImporter(inputPath, features.inputSchema, numPartitions)
-    val exporter = new FileExporter(outputPath, "tfrecords")
+    val exporter = new FileExporter(outputPath, "csv")
     val cleanedDf = importer.criteoImport
 
-    val valueCounts = spark.read.format("csv").
-      schema(StructType(Seq(
-        StructField("feature", StringType),
-        StructField("value", StringType),
-        StructField("count", LongType)
-      ))).
-      load(artifactPath ++ "/feature_value_counts/*.csv")
-
-    /*
-     * vocabularies is map of column names to dataframe with feat
-     */
-    val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)    // add the ranking feature values to the cateogrical columns
+    val vocabularies = features.categoricalRawLabels.map(catFeature => {
+      val schema = StructType(Seq(
+        StructField("value-" ++ catFeature, StringType),
+        StructField("index-" ++ catFeature, LongType)))
+      (catFeature, spark.read.format("csv").schema(schema).load(artifactPath ++ "/" +
+        features.categoricalLabelMap(catFeature) + "/*.csv"
+      ))
+    }).toMap
 
     val withCategoryRankings = addRankFeatures(cleanedDf, vocabularies)
-
 
     // select just the output  columns (removing the old categorical values)
     val withTargetFeaturesDf = withCategoryRankings
@@ -70,7 +62,6 @@ class CriteoTransformer(inputPath: String,
     val floatCastDf = features.integralColumns.
       foldLeft(withTargetFeaturesDf)((df, col) =>
         df.withColumn(col, withTargetFeaturesDf(col).cast(FloatType)))
-
 
     exporter.criteoExport(floatCastDf)
   }

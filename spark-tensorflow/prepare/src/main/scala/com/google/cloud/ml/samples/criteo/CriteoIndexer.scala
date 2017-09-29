@@ -66,17 +66,6 @@ trait CriteoIndexer {
           StructField("index-" ++ label, LongType)))
       ))
     }).toMap
-
-/*
-
-  def transform(rawDf: DataFrame, resource: IndexerResource): DataFrame = {
-    val embeddings = getCategoricalVocabularies(resource)
-    features.categoricalRawLabels.foldLeft(rawDf)((df, col) => {
-      df.withColumnRenamed(col, features.categoricalLabelMap(col))
-    })
-  }
-
-  def apply(df: DataFrame): DataFrame*/
 }
 
 
