@@ -78,7 +78,7 @@ packaged with the TensorFlow models. The analyzer preprocessing components,
 however, are much better suited to implementation in Spark.
 
 Therefore, we will impose a demarcation between Spark and TensorFlow at the
-preprocessing phase with all Analyzers being implemented and Spark and all
+preprocessing phase with all Analyzers being implemented with Spark and all
 Transformers being implemented in TensorFlow. We will load artifacts produced
 by Spark into TensorFlow to inform the Transformers.
 
