@@ -4,14 +4,15 @@ Let us assume that the input data is stored under the path
 `$BASE_DIR/$CRITEO_DATASET` and that we want the `.tfrecords` files to be
 written to `$BASE_DIR/$OUTPUT_DIR`.
 
-Let us set `MODE=train`, `MODE=evaluate`, or `MODE=predict` depending on whether
-the data set in question is intended for training, evaluation, or prediction.
+Let us set `MODE=analyze`, `MODE=transform`
 
-Note: If you set `MODE=train`, then the preprocessor will construct embeddings
-for each of the categorical features in the data set and store artifacts used to
-load these embeddings into the `$MODEL` directory. For any other value of `$MODE`,
-the preprocessor will expect to find these artifacts in the specified `$MODEL`
-directory.
+Mode `analyze` use training data to preprocess the data and create
+artifacts for either the `transform` step or to be fed directly 
+into the TF graph. The artifacts created are the average value
+of each integer feature (which is used to replace nulls), or the
+rank of each feature value for the categorical features, which 
+is used as the categorical value in the TF graph.
+
 
 ### Local preprocessing
 
@@ -20,7 +21,7 @@ $ spark-submit --master local --class \
 com.google.cloud.ml.samples.criteo.CriteoPreprocessingApplication \
 --packages com.github.scopt:scopt_2.11:3.6.0 --jars \
 "$SPARK_TF_CONNECTOR_JAR" $CRITEO_JAR --base $BASE_DIR \
---in $CRITEO_DATASET --out $OUTPUT_DIR -m $MODE -x $MODEL $@
+--in $CRITEO_DATASET --out $OUTPUT_DIR -m $MODE 
 ```
 
 ### Cloud preprocessing
@@ -44,7 +45,7 @@ $ gcloud dataproc jobs submit spark --cluster $CLUSTER \
 --jars "$SPARK_TF_CONNECTOR_JAR,$CRITEO_JAR" \
 --class "com.google.cloud.ml.samples.criteo.CriteoPreprocessingApplication" \
 -- \
--b $BUCKET -i $CRITEO_DATASET -o $OUTPUT_DIR -m $MODE -x $MODEL $@
+-b $BUCKET -i $CRITEO_DATASET -o $OUTPUT_DIR -m $MODE -x 
 ```
 
 - - -

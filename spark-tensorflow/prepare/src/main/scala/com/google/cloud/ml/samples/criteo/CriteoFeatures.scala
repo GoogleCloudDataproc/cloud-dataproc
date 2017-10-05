@@ -21,28 +21,18 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 /**
  * CriteoFeatures objects maintain information about the features to be preprocessed in a Criteo
  * data set.
- *
- * @param mode Specifies whether the data set in question is intended for training, evaluation, or
- *             prediction.
  */
-case class CriteoFeatures(mode: PreprocessingMode) {
+case class CriteoFeatures() {
   val integerFeatureLabels: Seq[String] = (1 to 13).map(index => s"integer-feature-$index")
   val categoricalFeatureLabels: Seq[String] = (1 to 26).map(index => s"categorical-feature-$index")
   val categoricalRawLabels: Seq[String] = categoricalFeatureLabels.map({label => label + "-raw"})
   val clickedLabel = Seq("clicked")
 
-  val inputLabels: Seq[String] = mode match {
-    case Predict => integerFeatureLabels ++ categoricalRawLabels
-    case _ => clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
-  }
+  val inputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
+  //val inputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalRawLabels
 
   val integralColumns: Seq[String] = inputLabels.
     filterNot(label => categoricalRawLabels.contains(label))
-
-  val outputLabels: Seq[String] = mode match {
-    case Predict => integerFeatureLabels ++ categoricalFeatureLabels
-    case _ => clickedLabel ++ integerFeatureLabels ++ categoricalFeatureLabels
-  }
 
   // Correspondence between labels in the input data and labels in the preprocessed data
   val categoricalLabelMap: Map[String, String] =
@@ -51,4 +41,5 @@ case class CriteoFeatures(mode: PreprocessingMode) {
   // DataFrame schema of the input data
   val inputSchema: StructType = StructType(inputLabels.map(StructField(_, StringType)))
 
+  val outputLabels: Seq[String] = clickedLabel ++ integerFeatureLabels ++ categoricalFeatureLabels
 }
