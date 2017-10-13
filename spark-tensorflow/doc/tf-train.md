@@ -13,11 +13,17 @@ they are ready for consumption by the Tensorflow graph. Specifically, they
 need to be renamed and the count of the categorical feature value files must
 be created.
 
-This preprocessing can be done on either a local file or on a GCS bucket 
-with the `preprocess_artifacts.py` command:
+This preprocessing can be done on either a local directory with the `preprocess_artifacts_local.py` command:
 
-  ```
-  $ python preprocess_artifacts.py --artifact-dir=<your local artifact directory or GCS bucket>
+```
+  $ python preprocess_artifacts_local.py <your local artifact directory>
+``` 
+
+or on a GCS bucket with the `preprocess_artifacts_gcs.py` command:
+
+```
+  $ python preprocess_artifacts_gcs.py <your GCS artifacts>
+```  
 
 ## Command line arguments
 
