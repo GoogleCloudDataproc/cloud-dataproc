@@ -77,7 +77,7 @@ job, and store it under the `JOB` environment variable. Then:
 gcloud ml-engine jobs submit training $JOB --stream-logs --runtime-version 1.2 \
   --job-dir $JOB_DIR \
   --module-name trainer.task --package-path trainer --region "us-central1" \
-  -- --train-dir $TRAIN_DIR --eval-dir $EVAL_DIR
+  -- --train-dir $TRAIN_DIR --eval-dir $EVAL_DIR --artifact-dir $ARTIFACT_DIR
 ```
 
 (Note, the extra `--` on the last line of the command above is not a typo. That

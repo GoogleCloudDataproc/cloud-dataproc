@@ -89,5 +89,5 @@ if __name__ == '__main__':
     parser.add_argument('artifact_dir')
 
     args = parser.parse_args()
-#    preprocess_integer_dirs(args.bucket, args.artifact_dir)
+    preprocess_integer_dirs(args.bucket, args.artifact_dir)
     preprocess_categorical_dirs(args.bucket, args.artifact_dir)

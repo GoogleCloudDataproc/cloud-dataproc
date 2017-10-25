@@ -24,21 +24,29 @@ class CriteoTransformer(inputPath: String,
                         numPartitions: Integer,
                         indexer: TrainingIndexer,
                         artifactPath: String,
-                        importer: CriteoImporter,
-                        vocabularyImporter: VocabularyImporter,
-                        outputPath: String)
+                        vocabularyImporter: VocabularyImporter)
                        (implicit val spark: SparkSession) {
 
   def addRankFeatures(cleanedDf: DataFrame,
                       vocabularies: Map[String, DataFrame]): DataFrame = {
     // add the ranking feature values to the cateogrical columns
-    features.categoricalRawLabels.
-      foldLeft(cleanedDf)((df, col) =>
+    val result = features.categoricalRawLabels.
+      foldLeft(cleanedDf)((df, col) => {
         df.join(vocabularies(col), df(col) === vocabularies(col)("value-" ++ col))
           .withColumnRenamed("index-" ++ col, features.categoricalLabelMap(col))
+      }
       )
+    result
   }
 
+  /**
+    * Transforms the input training data into a format appropriate for
+    * training. This includes a conversion of categorical value to their
+    * frequency rank for each values, and a replacement of missing numeric
+    * features with the mean of that feature's value.
+    * @param df The input DataFrame as read by the TSV.
+    * @return
+    */
   def transform(df: DataFrame): DataFrame = {
     val vocabularies = vocabularyImporter.loadFeatureVocabularies()
     val withCategoryRankings = addRankFeatures(df, vocabularies)
@@ -55,22 +63,22 @@ class CriteoTransformer(inputPath: String,
     floatCastDf
   }
 
-  def importTransformAndExport(): Unit = {
-    val exporter = new FileExporter(outputPath, "tfrecords")
-    val df = importer.criteoImport
-    val noNonNullDf = df.na.fill("null")
-    val filledDf = noNonNullDf.na.replace(noNonNullDf.columns, Map("" -> "null"))
+  def replaceNulls(df: DataFrame): DataFrame = {
+    // val noNonNullDf = df.na.fill("null")
+    val cleanedDf = df.na.replace(features.categoricalRawLabels, Map("" -> "null"))
 
-    val missingReplacer = new CriteoMissingReplacer()
+      val missingReplacer = new CriteoMissingReplacer()
     val averages = missingReplacer.getAverageIntegerFeatures(
-      filledDf, features.integerFeatureLabels)
-    val replacedDf = missingReplacer.replaceIntegerFeatures(
-      filledDf, features.integerFeatureLabels, averages)
+      cleanedDf, features.integerFeatureLabels)
 
-    val result = transform(replacedDf)
-    exporter.criteoExport(result)
+    missingReplacer.replaceIntegerFeatures(
+      cleanedDf, features.integerFeatureLabels, averages)
   }
 
-  def apply(): Unit = importTransformAndExport()
+  def replaceNullsAndTransform(df: DataFrame): DataFrame = {
+    transform(replaceNulls(df))
+  }
+
+  def apply(df: DataFrame): DataFrame = replaceNullsAndTransform(df: DataFrame)
 
 }
