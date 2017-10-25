@@ -66,8 +66,8 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
         val trainingDataSeq = rows1to5 ++ rows6to8 ++ rows9and10
         val trainingData: Seq[Row] = trainingDataSeq map {v => Row.fromSeq(v)}
 
-        val importer = new TestImporter(trainingData, features.inputSchema)
-        val trainingDf = importer.criteoImport
+        val trainingDf = spark.createDataFrame(spark.sparkContext.parallelize(trainingData),
+          features.inputSchema)
 
         val featureValueCountResult: DataFrame = indexer.
           getCategoricalFeatureValueCounts(trainingDf)

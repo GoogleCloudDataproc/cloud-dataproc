@@ -115,10 +115,14 @@ object CriteoPreprocessingApplication {
           analyzer()
         } else if (config.mode == Transform) {
           val vocabularyImporter = new ArtifactVocabularyImporter(features, artifactPath)
+          val exporter = new FileExporter(outputPath, "tfrecords")
+
           val transformer = new CriteoTransformer(inputPath,
             features, config.numPartitions, indexer,
-            artifactPath, importer, vocabularyImporter, outputPath)
-          transformer()
+            artifactPath, vocabularyImporter)
+
+          val resultDf = transformer(importer.criteoImport)
+          exporter.criteoExport(resultDf)
         }
     }
   }

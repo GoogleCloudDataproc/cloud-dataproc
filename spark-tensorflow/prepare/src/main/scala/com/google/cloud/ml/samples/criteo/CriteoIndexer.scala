@@ -44,7 +44,7 @@ trait CriteoIndexer {
 
   /**
     * Constructs an embedding from the set of feature values to the positive integers for each of
-    * the feature columns in a C=riteo data set. Expects to be provided with value counts for each
+    * the feature columns in a Criteo data set. Expects to be provided with value counts for each
     * of the features.
     *
     * @param categoricalFeatureValueCounts Value counts as provided by the
@@ -97,4 +97,3 @@ class TrainingIndexer(val features: CriteoFeatures)
     vocabularies
   }
 }
-
