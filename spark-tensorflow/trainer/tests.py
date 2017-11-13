@@ -16,11 +16,13 @@
 
 import argparse
 import data
+import os
 import task
 import tensorflow as tf
 
-ARTIFACT_DIR = './test/artifacts/'
-DATA_DIR = './test/'
+THIS_DIR = os.path.dirname(__file__)
+ARTIFACT_DIR = os.path.join(THIS_DIR, 'test/artifacts/')
+DATA_DIR = os.path.join(THIS_DIR, 'test/')
 
 
 class SampleTests(tf.test.TestCase):
