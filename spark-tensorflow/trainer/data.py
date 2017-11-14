@@ -57,7 +57,7 @@ def generate_labelled_input_fn(fmt, batch_size, data_glob, artifact_dir):
         features[feature] = tf.FixedLenFeature([1], dtype=tf.float32)
 
     for feature in CATEGORICAL_FEATURES:
-        features[feature] = tf.FixedLenFeature([1], dtype=tf.string)
+        features[feature] = tf.FixedLenFeature([1], dtype=tf.int64)
 
     def tfrecords_input_fn():
         """input_fn for TFRecords files.
