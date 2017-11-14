@@ -16,19 +16,20 @@
 
 package com.google.cloud.ml.samples.criteo
 
-import scala.collection.JavaConverters._
-
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
+
 
 trait CriteoImporter {
   def criteoImport: DataFrame
+
 }
 
-class CleanTSVImporter(val inputPath: String, val schema: StructType, val numPartitions: Int)
+class CleanTSVImporter(val inputPath: String,
+                       val schema: StructType,
+                       val numPartitions: Int)
                       (implicit val spark: SparkSession)
-  extends CriteoImporter
-{
+  extends CriteoImporter {
   def criteoImport: DataFrame = {
     val rawDf = spark.read.format("csv").
       option("sep", "\t").
@@ -40,23 +41,30 @@ class CleanTSVImporter(val inputPath: String, val schema: StructType, val numPar
   }
 }
 
-class CleanTSVStreamImporter(val inputPath: String, val schema: StructType)
-                            (implicit val spark: SparkSession)
-  extends CriteoImporter
-{
-  def criteoImport: DataFrame = {
-    val rawDf = spark.readStream.format("csv").
-      option("sep", "\t").
-      schema(schema).
-      load(inputPath)
 
-    rawDf.na.fill("", rawDf.columns)
+trait VocabularyImporter {
+  def loadFeatureVocabularies(): Map[String, DataFrame]
+}
+
+class ArtifactVocabularyImporter(features: CriteoFeatures,
+                                 inputPath: String)
+                                (implicit val spark: SparkSession)
+  extends VocabularyImporter {
+
+  def loadFeatureVocabularies(): Map[String, DataFrame] = {
+    features.categoricalRawLabels.map(catFeature => {
+      val schema = StructType(Seq(
+        StructField("value-" ++ catFeature, StringType),
+        StructField("index-" ++ catFeature, LongType)))
+      (catFeature, spark.read.format("csv").schema(schema)
+        .load(inputPath ++ "/" + features.categoricalLabelMap(catFeature) +
+          "/*.csv"
+        ))
+    }).toMap
   }
 }
 
-class TestImporter(val data: Seq[Row], val schema: StructType)
-                  (implicit val spark: SparkSession)
-  extends CriteoImporter
-{
-  def criteoImport: DataFrame = spark.createDataFrame(data.asJava, schema)
+class TestVocabularyImporter(vocabularies: Map[String, DataFrame])(implicit val spark: SparkSession)
+  extends VocabularyImporter {
+  override def loadFeatureVocabularies(): Map[String, DataFrame] = vocabularies
 }

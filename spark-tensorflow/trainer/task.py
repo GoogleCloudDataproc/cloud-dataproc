@@ -17,8 +17,8 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-import data
-import model
+from . import data
+from . import model
 import tensorflow as tf
 
 
@@ -239,7 +239,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--min-eval-frequency',
         type=int,
-        default=0,
+        default=100,
         help='The minimum number of training steps between evaluations. If 0, '
         'evaluation takes place only after training. Default is 0.'
     )

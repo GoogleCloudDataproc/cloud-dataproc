@@ -16,17 +16,19 @@
 
 package com.google.cloud.ml.samples.criteo
 
-import org.scalatest._
+import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 
-import org.apache.spark.sql._
+import org.apache.spark.sql.{DataFrame, Row}
 
-class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers {
+class CriteoTransformerTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers{
 
   trait TestFixture {
-    val indexer: CriteoIndexer
+    val indexer: TrainingIndexer
     val trainingDf: DataFrame
-    val featureValueCountResult: DataFrame
+    val result: DataFrame
     val artifactExporter: EmptyArtifactExporter
+    val features: CriteoFeatures
+    val transformer: CriteoTransformer
   }
 
   private var _fixture: Option[TestFixture] = None
@@ -35,31 +37,33 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
     case None =>
       val f = new TestFixture {
         val features = CriteoFeatures()
-        val artifactExporter = new EmptyArtifactExporter()
-        val indexer = new TrainingIndexer(features)
-
-        val firstCatInput: String = features.categoricalRawLabels.head
 
         // Creating training data as a Seq of Row objects.
         // First five rows will have "abc" as value of first categorical column and "0" in every
         // other column
+        val firstCatInput: String = features.categoricalRawLabels.head
+        val firstIntInput: String = features.integerFeatureLabels.head
 
         val rows1to5 = (1 to 5).map(_ => features.inputLabels.map(_ match {
           case `firstCatInput` => "abc"
+          case `firstIntInput` => "3"
           case _ => "0"
         }))
+
 
         // The next three rows will have "xyz" as value of first categorical column and "0" in every
         // other column
         val rows6to8 = (1 to 3).map(_ => features.inputLabels.map({
           case `firstCatInput` => "xyz"
+          case `firstIntInput` => ""
           case _ => "0"
         }))
 
         // The final two rows will have empty values in the first categorical column and have "0" in
         // every other column
         val rows9and10 = (1 to 2).map(_ => features.inputLabels.map({
-          case `firstCatInput` => ""
+          case `firstCatInput` => "null"
+          case `firstIntInput` => "3"
           case _ => "0"
         }))
 
@@ -69,8 +73,17 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
         val trainingDf = spark.createDataFrame(spark.sparkContext.parallelize(trainingData),
           features.inputSchema)
 
-        val featureValueCountResult: DataFrame = indexer.
-          getCategoricalFeatureValueCounts(trainingDf)
+        val artifactExporter = new EmptyArtifactExporter()
+        val indexer = new TrainingIndexer(features)
+
+        val valueCounts = indexer.getCategoricalFeatureValueCounts(trainingDf)
+        val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
+        val vocabularyImporter = new TestVocabularyImporter(vocabularies)
+        val transformer = new CriteoTransformer("", features, 1,
+          indexer, "", vocabularyImporter)
+
+
+        val result: DataFrame = transformer(trainingDf)
       }
 
       _fixture = Some(f)
@@ -80,11 +93,27 @@ class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen wit
     case Some(f) => f
   }
 
-  behavior of "TrainingIndexer"
+  behavior of "CriteoTransformer"
 
-
-  it should "correctly create the feature counts" in {
+  it should "yield a DataFrame with the same number of rows as its input DataFrame" in {
     val f = fixture
-    f.featureValueCountResult.first().length should equal(3)
+    assert(f.result.count == f.trainingDf.count)
   }
+
+  it should "verify add rank features works" in {
+    val f = fixture
+
+    val headLabel = f.features.categoricalRawLabels.head
+    val valueCounts = f.indexer.getCategoricalFeatureValueCounts(f.trainingDf)
+    val vocabularies = f.indexer.getCategoricalColumnVocabularies(valueCounts)
+
+    val withRank = f.transformer.addRankFeatures(f.trainingDf, vocabularies)
+    }
+
+  it should "replace missing integer features" in {
+    val f = fixture
+    val intFeature = f.features.integerFeatureLabels.head
+    f.result.filter(s"`$intFeature` is null").count() should equal(0)
+  }
+
 }
