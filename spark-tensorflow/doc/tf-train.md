@@ -13,11 +13,17 @@ they are ready for consumption by the Tensorflow graph. Specifically, they
 need to be renamed and the count of the categorical feature value files must
 be created.
 
-This preprocessing can be done on either a local file or on a GCS bucket 
-with the `preprocess_artifacts.py` command:
+This preprocessing can be done on either a local directory with the `preprocess_artifacts_local.py` command:
 
-  ```
-  $ python preprocess_artifacts.py --artifact-dir=<your local artifact directory or GCS bucket>
+```
+  $ python preprocess_artifacts_local.py <your local artifact directory>
+``` 
+
+or on a GCS bucket with the `preprocess_artifacts_gcs.py` command:
+
+```
+  $ python preprocess_artifacts_gcs.py <your GCS artifacts>
+```  
 
 ## Command line arguments
 
@@ -71,7 +77,7 @@ job, and store it under the `JOB` environment variable. Then:
 gcloud ml-engine jobs submit training $JOB --stream-logs --runtime-version 1.2 \
   --job-dir $JOB_DIR \
   --module-name trainer.task --package-path trainer --region "us-central1" \
-  -- --train-dir $TRAIN_DIR --eval-dir $EVAL_DIR
+  -- --train-dir $TRAIN_DIR --eval-dir $EVAL_DIR --artifact-dir $ARTIFACT_DIR
 ```
 
 (Note, the extra `--` on the last line of the command above is not a typo. That

@@ -20,13 +20,12 @@ import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 
 import org.apache.spark.sql.{DataFrame, Row}
 
-class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen with Matchers{
+class CriteoTransformerTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers{
 
   trait TestFixture {
     val indexer: TrainingIndexer
     val trainingDf: DataFrame
     val result: DataFrame
-    val transformedData: Array[Seq[Any]]
     val artifactExporter: EmptyArtifactExporter
     val features: CriteoFeatures
     val transformer: CriteoTransformer
@@ -38,12 +37,16 @@ class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen 
     case None =>
       val f = new TestFixture {
         val features = CriteoFeatures()
+
         // Creating training data as a Seq of Row objects.
         // First five rows will have "abc" as value of first categorical column and "0" in every
         // other column
+        val firstCatInput: String = features.categoricalRawLabels.head
+        val firstIntInput: String = features.integerFeatureLabels.head
 
         val rows1to5 = (1 to 5).map(_ => features.inputLabels.map(_ match {
           case `firstCatInput` => "abc"
+          case `firstIntInput` => "3"
           case _ => "0"
         }))
 
@@ -52,22 +55,23 @@ class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen 
         // other column
         val rows6to8 = (1 to 3).map(_ => features.inputLabels.map({
           case `firstCatInput` => "xyz"
+          case `firstIntInput` => ""
           case _ => "0"
         }))
 
         // The final two rows will have empty values in the first categorical column and have "0" in
         // every other column
         val rows9and10 = (1 to 2).map(_ => features.inputLabels.map({
-          case `firstCatInput` => ""
+          case `firstCatInput` => "null"
+          case `firstIntInput` => "3"
           case _ => "0"
         }))
 
         val trainingDataSeq = rows1to5 ++ rows6to8 ++ rows9and10
         val trainingData: Seq[Row] = trainingDataSeq map {v => Row.fromSeq(v)}
 
-        val importer = new TestImporter(trainingData, features.inputSchema)
-        val trainingDf = importer.criteoImport
-
+        val trainingDf = spark.createDataFrame(spark.sparkContext.parallelize(trainingData),
+          features.inputSchema)
 
         val artifactExporter = new EmptyArtifactExporter()
         val indexer = new TrainingIndexer(features)
@@ -75,19 +79,11 @@ class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen 
         val valueCounts = indexer.getCategoricalFeatureValueCounts(trainingDf)
         val vocabularies = indexer.getCategoricalColumnVocabularies(valueCounts)
         val vocabularyImporter = new TestVocabularyImporter(vocabularies)
-
         val transformer = new CriteoTransformer("", features, 1,
-          indexer, "", importer, vocabularyImporter, "")
-
-        val firstCatInput: String = features.categoricalRawLabels.head
+          indexer, "", vocabularyImporter)
 
 
-
-        val result: DataFrame = transformer.transform(trainingDf)
-
-        val fakeExporter = new TestExporter
-        fakeExporter.criteoExport(result)
-        val transformedData = fakeExporter.exported.get
+        val result: DataFrame = transformer(trainingDf)
       }
 
       _fixture = Some(f)
@@ -111,10 +107,13 @@ class CriteoTransformerTest  extends FlatSpec with SparkSpec with GivenWhenThen 
     val valueCounts = f.indexer.getCategoricalFeatureValueCounts(f.trainingDf)
     val vocabularies = f.indexer.getCategoricalColumnVocabularies(valueCounts)
 
-
     val withRank = f.transformer.addRankFeatures(f.trainingDf, vocabularies)
-      //withRank.select(f.features.categoricalRawLabels
     }
 
+  it should "replace missing integer features" in {
+    val f = fixture
+    val intFeature = f.features.integerFeatureLabels.head
+    f.result.filter(s"`$intFeature` is null").count() should equal(0)
+  }
 
 }

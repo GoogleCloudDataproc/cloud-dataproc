@@ -28,12 +28,10 @@ def preprocess_integer_dirs(artifact_dir):
     for integer_dir in integer_dirs:
         full_dir = os.path.join(artifact_dir, integer_dir)
         files = os.listdir(full_dir)
-        print('files are {}'.format(files))
         part_files = filter(lambda file: file.startswith('part'), files)
         assert len(part_files) == 1, ('Did not find 1 {'
                                       '}'.format(integer_dir))
         part_file = part_files[0]
-        print('Part file is {}'.format(part_file))
         shutil.copy(os.path.join(full_dir, part_file),
                     os.path.join(full_dir, 'mean.txt'))
 
@@ -68,5 +66,8 @@ if __name__ == '__main__':
 
     parser.add_argument('artifact_dir')
     args = parser.parse_args()
+    print('Processing integer dirs.')
     preprocess_integer_dirs(args.artifact_dir)
+    print('Processing categorical dirs.')
     preprocess_categorical_dirs(args.artifact_dir)
+    print('Done processing categories.')

@@ -19,7 +19,6 @@ package com.google.cloud.ml.samples.criteo
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
-import scala.collection.JavaConverters._
 
 trait CriteoImporter {
   def criteoImport: DataFrame
@@ -40,14 +39,6 @@ class CleanTSVImporter(val inputPath: String,
 
     rawDf.na.fill("", rawDf.columns)
   }
-}
-
-class TestImporter(val data: Seq[Row],
-                   val schema: StructType)
-                  (implicit val spark: SparkSession)
-  extends CriteoImporter {
-
-  def criteoImport: DataFrame = spark.createDataFrame(data.asJava, schema)
 }
 
 
