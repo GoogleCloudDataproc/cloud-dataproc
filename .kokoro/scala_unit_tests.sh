@@ -16,5 +16,5 @@
 
 set -eo pipefail
 
-cd github/cloud-dataproc-prepare
+cd github/cloud-dataproc/spark-tensorflow/prepare
 sbt test
