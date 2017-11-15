@@ -14,10 +14,7 @@
 
 from setuptools import setup
 
-REQUIRED_PACKAGES = [
-  'numpy>=1.13.0',
-  'tensorflow>=1.2.0'
-]
+REQUIRED_PACKAGES = []
 
 setup(
     name='spark-tf-example',
@@ -27,4 +24,3 @@ setup(
     description='Spark preprocessing for TensorFlow',
     packages=['trainer']
 )
-
