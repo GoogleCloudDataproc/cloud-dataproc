@@ -21,8 +21,7 @@ putting it in Google Cloud Storage:
        b. [Create a project](https://cloud.google.com/resource-manager/docs/creating-managing-projects).
        c. Store your data set(s) into a [Google Cloud Storage
        bucket](https://cloud.google.com/storage/) associated with your project.
-       [TODO: Include instructions for how to do this.]
-
+       
 7. If you plan to do use [Dataproc](https://cloud.google.com/dataproc/docs/) for
    preprocessing or [Machine Learning
    Engine](https://cloud.google.com/ml-engine/docs/) for training/prediction,
