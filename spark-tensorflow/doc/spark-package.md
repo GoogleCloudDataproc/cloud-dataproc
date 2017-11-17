@@ -6,7 +6,7 @@ a JAR file, as well as the `spark-tensorflow-connector` and the
 to our Spark script. We will submit the JAR files for these three components to
 our Spark cluster together in order to run preprocessing jobs.
 
-This is as simple as going to the [preprocessor directory](./prepare) and
+This is as simple as going to the [preprocessor directory](../prepare) and
 running:
 `$ sbt clean package`
 
@@ -34,7 +34,7 @@ $ SPARK_TF_CONNECTOR_JAR=<path to spark-tensorflow-connector JAR you just built>
 
 ## scopt
 
-We will use [scopt](https://github.com/scopt/scopta) to process arguments to our
+We will use [scopt](https://github.com/scopt/scopt) to process arguments to our
 Spark script. We will provide the package information to Spark when we run the
 job.
 
