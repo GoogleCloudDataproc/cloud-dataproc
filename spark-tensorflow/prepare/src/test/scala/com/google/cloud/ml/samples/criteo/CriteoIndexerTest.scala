@@ -20,6 +20,10 @@ import org.scalatest._
 
 import org.apache.spark.sql._
 
+/**
+  * This class tests that the training indexer correctly creates the artifacts
+  * to be used by TensorFlow.
+  */
 class TrainingIndexerTest extends FlatSpec with SparkSpec with GivenWhenThen with Matchers {
 
   trait TestFixture {
