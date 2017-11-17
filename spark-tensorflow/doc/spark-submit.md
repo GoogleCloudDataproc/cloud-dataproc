@@ -34,7 +34,7 @@ cluster](https://cloud.google.com/dataproc/docs/guides/create-cluster). Store
 its name as `CLUSTER=<name of your Dataproc cluster>`.
 
 Make sure that your data lives in a Google Cloud Storage bucket accessible to
-your Dataproc cluster as described in the [Prerequisites](#prerequisites). Store
+your Dataproc cluster as described in the [Prerequisites](./prereqs.md). Store
 the bucket URL under the `BUCKET` variable, and let the `CRITEO_DATASET` and
 `OUTPUT_DIR` variables be defined above relative to the GCS bucket URL.
 

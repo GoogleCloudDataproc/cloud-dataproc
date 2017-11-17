@@ -4,7 +4,7 @@ Once you have preprocessed your training data in training mode and some
 evaluation data in evaluation mode, you can use it to train the
 TensorFlow classifier. For this, whether your run your training
 job locally or on Google Cloud Platform, you will be using [this
-code](./trainer/task.py).
+code](../trainer/task.py).
 
 ## Preprocess your artifacts
 
