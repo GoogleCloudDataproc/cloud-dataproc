@@ -109,20 +109,23 @@ object CriteoPreprocessingApplication {
           features.inputSchema,
           config.numPartitions)
 
-        if (config.mode == Analyze) {
-          val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
+        config.mode.match {
+          case Analyze => {
+            val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
             features, config.numPartitions, indexer, importer, artifactExporter)
-          analyzer()
-        } else if (config.mode == Transform) {
-          val vocabularyImporter = new ArtifactVocabularyImporter(features, artifactPath)
-          val exporter = new FileExporter(outputPath, "tfrecords")
+            analyzer()
+          }
+          case Transform => {
+            val vocabularyImporter = new ArtifactVocabularyImporter(features, artifactPath)
+            val exporter = new FileExporter(outputPath, "tfrecords")
 
-          val transformer = new CriteoTransformer(inputPath,
-            features, config.numPartitions, indexer,
-            artifactPath, vocabularyImporter)
+            val transformer = new CriteoTransformer(inputPath,
+              features, config.numPartitions, indexer,
+              artifactPath, vocabularyImporter)
 
-          val resultDf = transformer(importer.criteoImport)
-          exporter.criteoExport(resultDf)
+            val resultDf = transformer(importer.criteoImport)
+            exporter.criteoExport(resultDf)
+          }
         }
     }
   }
