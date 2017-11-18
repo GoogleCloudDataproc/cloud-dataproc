@@ -109,13 +109,12 @@ object CriteoPreprocessingApplication {
           features.inputSchema,
           config.numPartitions)
 
-        config.mode.match {
-          case Analyze => {
+        config.mode match {
+          case Analyze =>
             val analyzer = new CriteoAnalyzer(inputPath, features.inputSchema,
             features, config.numPartitions, indexer, importer, artifactExporter)
             analyzer()
-          }
-          case Transform => {
+          case Transform =>
             val vocabularyImporter = new ArtifactVocabularyImporter(features, artifactPath)
             val exporter = new FileExporter(outputPath, "tfrecords")
 
@@ -125,7 +124,6 @@ object CriteoPreprocessingApplication {
 
             val resultDf = transformer(importer.criteoImport)
             exporter.criteoExport(resultDf)
-          }
         }
     }
   }
