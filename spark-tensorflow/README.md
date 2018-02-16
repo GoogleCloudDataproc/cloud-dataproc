@@ -169,5 +169,5 @@ missing values for that feature with this average.
 
 + [Training the TensorFlow model](doc/tf-train.md)
 
-+ [Serving the TensorFlow model on Cloud ML Engine](tf-serve.md)
++ [Serving the TensorFlow model on Cloud ML Engine](doc/tf-serve.md)
 
