@@ -20,21 +20,23 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions.avg
 
 /**
-  * Missing replacer replaces all null values in a Datframe with empty strings,
-  * and replaces missing integer values with the average of all integer
-  * in that column.
-  *
-  * @param spark Spark session
-  */
+ * Missing replacer replaces all null values in a Dataframe with empty strings,
+ * and replaces missing integer values with the average of all integer
+ * in that column.
+ *
+ * @param spark Spark session
+ */
 class CriteoMissingReplacer()(implicit val spark: SparkSession) {
+
   import spark.implicits._
 
   /**
-    * Calculates a map of integer columns to their average values.
-    * @param to_average_df  The DataFrame with integer columns to get averages of
-    * @param features The column names of the integer features
-    * @return A map from integer column names to their averages
-    */
+   * Calculates a map of integer columns to their average values.
+   *
+   * @param to_average_df The DataFrame with integer columns to get averages of
+   * @param features      The column names of the integer features
+   * @return A map from integer column names to their averages
+   */
   def getAverageIntegerFeatures(to_average_df: DataFrame,
                                 features: Seq[String]): Map[String, DataFrame] = {
     val integerFeaturesDf = to_average_df.
@@ -50,12 +52,13 @@ class CriteoMissingReplacer()(implicit val spark: SparkSession) {
   }
 
   /**
-    * Replaces the integer values with their averages.
-    * @param toReplaceDf Dataframe with values to replace.
-    * @param features Set of integer features column names.
-    * @param averages Map of integer feature column names to their averages.
-    * @return The DataFrame with null values replaced with the averages.
-    */
+   * Replaces the integer values with their averages.
+   *
+   * @param toReplaceDf Dataframe with values to replace.
+   * @param features    Set of integer features column names.
+   * @param averages    Map of integer feature column names to their averages.
+   * @return The DataFrame with null values replaced with the averages.
+   */
   def replaceIntegerFeatures(toReplaceDf: DataFrame,
                              features: Seq[String],
                              averages: Map[String, DataFrame]): DataFrame = {
