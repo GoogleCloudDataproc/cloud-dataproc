@@ -35,23 +35,24 @@ trait CriteoIndexer {
   import spark.implicits._
 
   /**
-    * Creates a DataFrame containing the count of each value for each feature
-    * @return A DataFrame with three columns: "feature" (specifies categorical feature), "value"
-    *         (specifies a particular value for that feature), and "count" (specifies number of times
-    *         that value appeared for that feature in the training data).
-    */
+   * Creates a DataFrame containing the count of each value for each feature
+   *
+   * @return A DataFrame with three columns: "feature" (specifies categorical feature), "value"
+   *         (specifies a particular value for that feature), and "count" (specifies number of times
+   *         that value appeared for that feature in the training data).
+   */
   def getCategoricalFeatureValueCounts(resource: IndexerResource): DataFrame
 
   /**
-    * Constructs an embedding from the set of feature values to the positive integers for each of
-    * the feature columns in a Criteo data set. Expects to be provided with value counts for each
-    * of the features.
-    *
-    * @param categoricalFeatureValueCounts Value counts as provided by the
-    *                                      `categoricalColumnValueCounts` method.
-    * @return Map from feature name to embedding table DataFrame. Columns in each DataFrame are
-    *         "value", "index".
-    */
+   * Constructs an embedding from the set of feature values to the positive integers for each of
+   * the feature columns in a Criteo data set. Expects to be provided with value counts for each
+   * of the features.
+   *
+   * @param categoricalFeatureValueCounts Value counts as provided by the
+   *                                      `categoricalColumnValueCounts` method.
+   * @return Map from feature name to embedding table DataFrame. Columns in each DataFrame are
+   *         "value", "index".
+   */
   def getCategoricalColumnVocabularies(categoricalFeatureValueCounts: DataFrame):
   Map[String, DataFrame] =
     features.categoricalRawLabels.map(label => {
