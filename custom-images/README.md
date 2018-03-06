@@ -13,7 +13,7 @@ This page describes how to generate a custom Dataproc image.
     *   Please make sure the daisy binary have execution permission: `chmod +x
         daisy`.
 4.  A GCE project with billing, Google Cloud Dataproc API, Google Compute Engine
-    API, and Google CLoud Storage APIs enabled.
+    API, and Google Cloud Storage APIs enabled.
 5.  Use `gcloud config set project <your-project>` to specify which project to
     use to create and save your custom image.
 
