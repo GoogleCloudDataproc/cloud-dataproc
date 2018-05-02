@@ -87,25 +87,25 @@ python generate_custom_image.py \
 
 ### Example
 
-Create a custom image with name `custom_image_1_2_3` with Dataproc version
+Create a custom image with name `custom-image-1-2-3` with Dataproc version
 `1.12.11`:
 ```shell
 python generate_custom_image.py \ --image-name
-custom_image_1_2_3 --dataproc-version 1.2.11 --customization-script
+custom-image-1-2-3 --dataproc-version 1.2.11 --customization-script
 ~/custom-script.sh --daisy-path ~/daisy --zone us-central1-f --gcs-bucket
 gs://my-test-bucket
 ```
 
 Create a custom image with name `custom_image` and disables smoke test:
 ```shell
-python generate_custom_image.py \ --image-name custom_image_1_2_3
+python generate_custom_image.py \ --image-name custom-image-1-2-3
 --dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
 ~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --no-smoke-test
 ```
 
 Create a custom image with name `custom_image` and upload extra sources to the image:
 ```shell
-python generate_custom_image.py \ --image-name custom_image_1_2_3
+python generate_custom_image.py \ --image-name custom-image-1-2-3
 --dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
 ~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --extra-sources "{\"requirements.txt\": \"/path/to/requirements.txt\"}"
 ```
