@@ -34,6 +34,7 @@ Once this script is completed, the custom Dataproc image should be ready to use.
 
 import argparse
 import datetime
+import json
 import logging
 import os
 import re
@@ -350,6 +351,20 @@ def run():
       that builds the custom image. If not specified, Daisy would use the
       default service account under the GCE project. The scope of this service
       account is defaulted to /auth/cloud-platform.""")
+  parser.add_argument(
+      "--extra-sources",
+      type=json.loads,
+      required=False,
+      default={},
+      help=
+      """(Optional) Additional files/directories which will be uploaded along 
+      with customization script. 
+      Pass this argument as string which will evaluate to a json dictionary.
+      Read more about sources in daisy https://googlecloudplatform.github.io/
+      compute-image-tools/daisy-workflow-config-spec.html#sources
+      Example: 
+      
+      """)
 
   args = parser.parse_args()
 
@@ -367,13 +382,21 @@ def run():
     oauth = "\n    \"OAuthPath\": \"{}\",".format(
         os.path.abspath(args.oauth))
 
+  daisy_sources = {
+    "run.sh": run_script_path,
+    "init_actions.sh": os.path.abspath(args.customization_script)
+  }
+  daisy_sources.update(args.extra_sources)
+
+  sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
+                        for source, path in daisy_sources.items()])
+
   # create daisy workflow
   _LOG.info("Created Daisy workflow...")
   workflow = constants.daisy_wf.format(
       image_name=args.image_name,
       project_id=project_id,
-      install_script=os.path.abspath(args.customization_script),
-      run_script=run_script_path,
+      sources=sources,
       zone=args.zone,
       oauth=oauth,
       gcs_bucket=args.gcs_bucket,
