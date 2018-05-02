@@ -15,8 +15,8 @@
 # get daisy-sources-path
 DAISY_SOURCES_PATH=$(curl "http://metadata.google.internal/computeMetadata/v1/instance/attributes/daisy-sources-path" -H "Metadata-Flavor: Google")
 
-# copy down init actions script
-gsutil cp "${DAISY_SOURCES_PATH}/init_actions.sh" ./init_actions.sh
+# copy down all sources (along with init_actions.sh script)
+gsutil -m cp -r "${DAISY_SOURCES_PATH}/*" ./
 
 # run init actions
 bash ./init_actions.sh
