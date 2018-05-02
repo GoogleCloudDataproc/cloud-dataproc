@@ -362,8 +362,8 @@ def run():
       Pass this argument as string which will evaluate to a json dictionary.
       Read more about sources in daisy https://googlecloudplatform.github.io/
       compute-image-tools/daisy-workflow-config-spec.html#sources
-      Example: 
-      
+      Example:
+      '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
 
   args = parser.parse_args()

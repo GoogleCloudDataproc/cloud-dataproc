@@ -78,6 +78,12 @@ python generate_custom_image.py \
     the access to all cloud platform services that is granted by IAM roles.
     Note: IAM role must allow the VM instance to access GCS bucket in order to
     access scripts and write logs.
+*   **--extra-sources**: Additional files/directories which will be uploaded along 
+    with customization script. 
+    Pass this argument as string which will evaluate to a json dictionary.
+    Read more about (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
+
+
 
 ### Example
 
@@ -95,4 +101,11 @@ Create a custom image with name `custom_image` and disables smoke test:
 python generate_custom_image.py \ --image-name custom_image_1_2_3
 --dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
 ~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --no-smoke-test
+```
+
+Create a custom image with name `custom_image` and upload extra sources to the image:
+```shell
+python generate_custom_image.py \ --image-name custom_image_1_2_3
+--dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
+~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --extra-sources "{\"requirements.txt\": \"/path/to/requirements.txt\"}"
 ```
