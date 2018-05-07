@@ -210,11 +210,11 @@ def _create_workflow_template(workflow_name, image_name, project_id, zone):
                        workflow_name)
 
 
-def _instantiate_workflow_template(workflow_name):
+def _instantiate_workflow_template(workflow_name, project_id):
   """Run a Dataproc workflow template to test the newly built custom image."""
   command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "instantiate",
-      workflow_name
+      workflow_name, "--project", project_id
   ]
   pipe = subprocess.Popen(command)
   pipe.wait()
@@ -222,11 +222,11 @@ def _instantiate_workflow_template(workflow_name):
     raise RuntimeError("Unable to instantiate workflow template.")
 
 
-def _delete_workflow_template(workflow_name):
+def _delete_workflow_template(workflow_name, project_id):
   """Delete a Dataproc workflow template."""
   command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "delete",
-      workflow_name, "-q"
+      workflow_name, "-q", "--project", project_id
   ]
   pipe = subprocess.Popen(command)
   pipe.wait()
@@ -249,7 +249,7 @@ def verify_custom_image(image_name, project_id, zone):
         "Successfully created Dataproc workflow-template %s with image %s...",
         workflow_name, image_name)
     _LOG.info("Smoke testing Dataproc workflow-template %s...")
-    _instantiate_workflow_template(workflow_name)
+    _instantiate_workflow_template(workflow_name, project_id)
     _LOG.info("Successfully smoke tested Dataproc workflow-template %s...",
               workflow_name)
   except RuntimeError as e:
@@ -259,7 +259,7 @@ def verify_custom_image(image_name, project_id, zone):
   finally:
     try:
       _LOG.info("Deleting Dataproc workflow-template %s...", workflow_name)
-      _delete_workflow_template(workflow_name)
+      _delete_workflow_template(workflow_name, project_id)
       _LOG.info("Successfully deleted Dataproc workflow-template %s...",
                 workflow_name)
     except RuntimeError:
