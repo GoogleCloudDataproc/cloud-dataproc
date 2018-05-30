@@ -49,7 +49,6 @@ logging.basicConfig()
 _LOG = logging.getLogger(__name__)
 _LOG.setLevel(logging.INFO)
 
-
 def _version_regex_type(s):
   """Check if version string matches regex."""
   if not _VERSION_REGEX.match(s):
@@ -69,7 +68,7 @@ def get_project_id():
     # get proejct id
     temp_file.seek(0)
     stdout = temp_file.read()
-    return stdout.strip()
+    return stdout.decode('utf-8').strip()
 
 
 def get_dataproc_base_image(version):
@@ -94,8 +93,8 @@ def get_dataproc_base_image(version):
     temp_file.seek(0)  # go to start of the stdout
     stdout = temp_file.read()
     # parse the first ready image with the dataproc version attached in labels
-    if stdout and isinstance(stdout, basestring):
-      parsed_line = stdout.strip().split(",")  # should only be one image
+    if stdout:
+      parsed_line = stdout.decode('utf-8').strip().split(",")  # should only be one image
       if len(parsed_line) == 2 and parsed_line[0] and parsed_line[1] == "READY":
         return _IMAGE_URI.format(parsed_line[0])
 
@@ -162,7 +161,7 @@ def get_custom_image_creation_timestamp(image_name, project_id):
     # get creation timestamp
     temp_file.seek(0)
     stdout = temp_file.read()
-    return stdout.strip()
+    return stdout.decode('utf-8').strip()
 
 
 def _parse_date_time(timestamp_string):
