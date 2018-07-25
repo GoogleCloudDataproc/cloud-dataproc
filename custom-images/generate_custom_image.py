@@ -326,9 +326,10 @@ def run():
       "--network",
       type=str,
       required=False,
-      default="global/networks/default",
+      default="",
       help="""(Optional) Network interface used to launch the VM instance that
-      builds the custom image. Default network is 'global/networks/default'.
+      builds the custom image. Default network is 'global/networks/default'
+      when no network and subnetwork arguments are provided.
       If the default network does not exist in your project, please specify
       a valid network interface.""")
   parser.add_argument(
@@ -338,7 +339,8 @@ def run():
       default="",
       help="""(Optional) The subnetwork that is used to launch the VM instance
       that builds the custom image. A full subnetwork URL is required.
-      Default subnetwork is None.""")
+      Default subnetwork is None. For shared VPC only provide this parameter and
+      do not use the --network switch.""")
   parser.add_argument(
       "--service-account",
       type=str,
@@ -375,6 +377,13 @@ def run():
     oauth = "\n    \"OAuthPath\": \"{}\",".format(
         os.path.abspath(args.oauth))
 
+  network = args.network
+  # When the user wants to create a VM in a shared VPC,
+  # only the subnetwork argument has to be provided whereas
+  # the network one has to be left empty.
+  if not args.network and not args.subnetwork:
+    network = 'global/networks/default'
+
   # create daisy workflow
   _LOG.info("Created Daisy workflow...")
   workflow = constants.daisy_wf.format(
@@ -387,7 +396,7 @@ def run():
       gcs_bucket=args.gcs_bucket,
       dataproc_base_image=dataproc_base_image,
       machine_type=args.machine_type,
-      network=args.network,
+      network=network,
       subnetwork=args.subnetwork,
       service_account=args.service_account,
       disk_size=args.disk_size)
