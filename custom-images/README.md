@@ -48,6 +48,8 @@ python generate_custom_image.py \
 
 #### Optional Arguments
 
+*   **--family**: The family of the source image. This will cause the latest
+    non-deprecated image in the family to be used as the source image.
 *   **--project-id**: The project Id of the project where the custom image is
     created and saved. The default project Id is the current project id
     specified in `gcloud config get-value project`.
