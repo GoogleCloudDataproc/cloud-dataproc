@@ -299,6 +299,11 @@ def run():
       help="""GCS bucket used by daisy to store files and logs when
       building custom image.""")
   parser.add_argument(
+      "--family",
+      type=str,
+      required=False,
+      help="""(Optional) The family of the image.""")
+  parser.add_argument(
       "--project-id",
       type=str,
       required=False,
@@ -377,6 +382,7 @@ def run():
       zone=args.zone,
       oauth=oauth,
       gcs_bucket=args.gcs_bucket,
+      family=args.family,
       dataproc_base_image=dataproc_base_image,
       machine_type=args.machine_type,
       network=args.network,

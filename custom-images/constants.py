@@ -96,7 +96,8 @@ daisy_wf = """\
                     "Name": "{image_name}",
                     "SourceDisk": "{image_name}-install",
                     "NoCleanup": true,
-                    "ExactName": true
+                    "ExactName": true,
+                    "Family": "{family}"
                 }}
             ]
         }},
