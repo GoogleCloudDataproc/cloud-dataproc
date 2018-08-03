@@ -25,40 +25,39 @@ object TranslateExample {
   val translateService = TranslateOptions.getDefaultInstance().getService()
 
   def translate(word: String, language: String): String = {
-    val translation =
-	    translateService.translate(
-	      word,
-	      TranslateOption.sourceLanguage("en"),
-	      TranslateOption.targetLanguage(language))
-	return translation.getTranslatedText()
+    val translation = translateService.translate(
+	    word,
+	    TranslateOption.sourceLanguage("en"),
+	    TranslateOption.targetLanguage(language))
+	  return translation.getTranslatedText()
   }
 
   def main(args: Array[String]): Unit = {
   	if (args.length != 4) {
       System.err.println(
         """
-          | Usage: TranslateExample <source>
+          | Usage: TranslateExample <language> <bucket> <input> <output>
           |
-          |   <language>: Language to translate the input to
-          |     <bucket>: Bucket's URI
-          |      <input>: Name of the input text file
-          |     <output>: Name of the output folder
+          | <language>: Target language code for the translation (e.g. "fr" for French). See the list of supported languages: https://cloud.google.com/translate/docs/languages
+          | <bucket>: Bucket's URI
+          | <input>: Name of the input text file
+          | <output>: Name of the output folder
           |
         """.stripMargin)
       System.exit(1)
     }
-  	
+
     val Seq(language, bucket, input, output) = args.toSeq
-  	
+
     val spark = SparkSession.builder.appName("Simple Application").getOrCreate()
-    
+
     // Import Dataset encoders
     import spark.implicits._
 
     val words = spark.read.textFile(bucket + "/" + input)
 
     val translated = words.map(word => translate(word, language))
-    
+
     translated.write.mode("overwrite").text(bucket + "/" + output)
   }
 }

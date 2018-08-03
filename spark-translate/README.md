@@ -1,6 +1,20 @@
 This repository contains a simple demo Spark application that translates words using
 Google's Translation API and running on Cloud Dataproc.
 
+## Prerequesites
+
+1. You are familiar with [scala](http://scala-lang.org/) and have [Maven](https://maven.apache.org/) and/or [SBT](http://www.scala-sbt.org/) installed. We will use scala to communicate with Spark.
+
+2. You have the [Cloud SDK](https://cloud.google.com/sdk/) installed.
+
+3. You have a Google Cloud project and have [enabled billing](https://cloud.google.com/billing/docs/how-to/modify-project).
+
+- - -
+
+[Home](../README.md)
+
+## Running the code
+
 1. Record the project ID in an environment variable for later use:
    ```
    export PROJECT=$(gcloud info --format='value(config.project)')
