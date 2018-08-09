@@ -78,6 +78,8 @@ python generate_custom_image.py \
     the access to all cloud platform services that is granted by IAM roles.
     Note: IAM role must allow the VM instance to access GCS bucket in order to
     access scripts and write logs.
+*   **--disk-size**: The size in GB of the disk attached to the VM instance
+    used to build custom image. The default is `10` GB.
 
 ### Example
 
