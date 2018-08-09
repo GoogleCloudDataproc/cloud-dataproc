@@ -399,7 +399,7 @@ def run():
   # perform test on the newly built image
   if not args.no_smoke_test:
     _LOG.info("Verifying the custom image...")
-    verify_custom_image(args.image_name, project_id, args.zone,args.subnetwork)
+    verify_custom_image(args.image_name, project_id, args.zone, args.subnetwork)
     _LOG.info("Successfully verified the custom image...")
 
   _LOG.info("Successfully built Dataproc custom image: %s",
