@@ -350,6 +350,15 @@ def run():
       that builds the custom image. If not specified, Daisy would use the
       default service account under the GCE project. The scope of this service
       account is defaulted to /auth/cloud-platform.""")
+  parser.add_argument(
+      "--disk-size",
+      type=int,
+      required=False,
+      default=10,
+      help=
+      """(Optional) The size in GB of the disk attached to the VM instance
+      that builds the custom image. If not specified, the default value of
+      10 GB will be used.""")
 
   args = parser.parse_args()
 
@@ -381,7 +390,8 @@ def run():
       machine_type=args.machine_type,
       network=args.network,
       subnetwork=args.subnetwork,
-      service_account=args.service_account)
+      service_account=args.service_account,
+      disk_size=args.disk_size)
 
   _LOG.info("Successfully created Daisy workflow...")
 
