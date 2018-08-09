@@ -171,7 +171,7 @@ def _parse_date_time(timestamp_string):
                                     "%Y-%m-%dT%H:%M:%S.%f")
 
 
-def _create_workflow_template(workflow_name, image_name, project_id, zone,subnet):
+def _create_workflow_template(workflow_name, image_name, project_id, zone, subnet):
   """Create a Dataproc workflow template for testing."""
 
   create_command = [
