@@ -358,12 +358,11 @@ def run():
       required=False,
       default={},
       help=
-      """(Optional) Additional files/directories which will be uploaded along 
-      with customization script. 
-      Pass this argument as string which will evaluate to a json dictionary.
+      """(Optional) Additional files/directories uploaded along with
+      customization script. This argument is evaluated to a json dictionary.
       Read more about sources in daisy https://googlecloudplatform.github.io/
-      compute-image-tools/daisy-workflow-config-spec.html#sources
-      Example:
+      compute-image-tools/daisy-workflow-config-spec.html#sources.
+      For example:
       '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
 parser.add_argument(
