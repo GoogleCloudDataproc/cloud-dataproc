@@ -340,7 +340,7 @@ def run():
       help="""(Optional) The subnetwork that is used to launch the VM instance
       that builds the custom image. A full subnetwork URL is required.
       Default subnetwork is None. For shared VPC only provide this parameter and
-      do not use the --network switch.""")
+      do not use the --network argument.""")
   parser.add_argument(
       "--service-account",
       type=str,
