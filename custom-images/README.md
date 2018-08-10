@@ -78,9 +78,9 @@ python generate_custom_image.py \
     the access to all cloud platform services that is granted by IAM roles.
     Note: IAM role must allow the VM instance to access GCS bucket in order to
     access scripts and write logs.
-*   **--extra-sources**: Additional files/directories which will be uploaded along 
-    with customization script. Pass this argument as string which will evaluate to
-    a json dictionary. Read more about
+*   **--extra-sources**: Additional files/directories uploaded along with
+    customization script. This argument is evaluated to a json dictionary.
+    Read more about
     (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `10` GB.
