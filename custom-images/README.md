@@ -78,23 +78,34 @@ python generate_custom_image.py \
     the access to all cloud platform services that is granted by IAM roles.
     Note: IAM role must allow the VM instance to access GCS bucket in order to
     access scripts and write logs.
+*   **--extra-sources**: Additional files/directories uploaded along with
+    customization script. This argument is evaluated to a json dictionary.
+    Read more about
+    (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `10` GB.
 
 ### Example
 
-Create a custom image with name `custom_image_1_2_3` with Dataproc version
+Create a custom image with name `custom-image-1-2-3` with Dataproc version
 `1.12.11`:
 ```shell
 python generate_custom_image.py \ --image-name
-custom_image_1_2_3 --dataproc-version 1.2.11 --customization-script
+custom-image-1-2-3 --dataproc-version 1.2.11 --customization-script
 ~/custom-script.sh --daisy-path ~/daisy --zone us-central1-f --gcs-bucket
 gs://my-test-bucket
 ```
 
 Create a custom image with name `custom_image` and disables smoke test:
 ```shell
-python generate_custom_image.py \ --image-name custom_image_1_2_3
+python generate_custom_image.py \ --image-name custom-image-1-2-3
 --dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
 ~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --no-smoke-test
+```
+
+Create a custom image with name `custom_image` and upload extra sources to the image:
+```shell
+python generate_custom_image.py \ --image-name custom-image-1-2-3
+--dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
+~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --extra-sources "{\"requirements.txt\": \"/path/to/requirements.txt\"}"
 ```
