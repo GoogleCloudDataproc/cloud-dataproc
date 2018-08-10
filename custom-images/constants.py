@@ -51,7 +51,8 @@ daisy_wf = """\
                 {{
                     "Name": "{image_name}-install",
                     "SourceImage": "{dataproc_base_image}",
-                    "Type": "pd-ssd"
+                    "Type": "pd-ssd",
+                    "SizeGb": "{disk_size}"
                 }}
             ]
         }},
