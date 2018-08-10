@@ -34,6 +34,7 @@ Once this script is completed, the custom Dataproc image should be ready to use.
 
 import argparse
 import datetime
+import json
 import logging
 import os
 import re
@@ -352,6 +353,19 @@ def run():
       default service account under the GCE project. The scope of this service
       account is defaulted to /auth/cloud-platform.""")
   parser.add_argument(
+      "--extra-sources",
+      type=json.loads,
+      required=False,
+      default={},
+      help=
+      """(Optional) Additional files/directories uploaded along with
+      customization script. This argument is evaluated to a json dictionary.
+      Read more about sources in daisy https://googlecloudplatform.github.io/
+      compute-image-tools/daisy-workflow-config-spec.html#sources.
+      For example:
+      '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
+      """)
+parser.add_argument(
       "--disk-size",
       type=int,
       required=False,
@@ -377,6 +391,14 @@ def run():
     oauth = "\n    \"OAuthPath\": \"{}\",".format(
         os.path.abspath(args.oauth))
 
+  daisy_sources = {
+    "run.sh": run_script_path,
+    "init_actions.sh": os.path.abspath(args.customization_script)
+  }
+  daisy_sources.update(args.extra_sources)
+
+  sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
+                        for source, path in daisy_sources.items()])
   network = args.network
   # When the user wants to create a VM in a shared VPC,
   # only the subnetwork argument has to be provided whereas
@@ -389,8 +411,7 @@ def run():
   workflow = constants.daisy_wf.format(
       image_name=args.image_name,
       project_id=project_id,
-      install_script=os.path.abspath(args.customization_script),
-      run_script=run_script_path,
+      sources=sources,
       zone=args.zone,
       oauth=oauth,
       gcs_bucket=args.gcs_bucket,

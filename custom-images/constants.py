@@ -41,8 +41,7 @@ daisy_wf = """\
     "Name": "{image_name}",
     "Project": "{project_id}",
     "Sources": {{
-        "run.sh": "{run_script}",
-        "init_actions.sh": "{install_script}"
+        {sources}
     }},
     "Zone": "{zone}",{oauth}
     "GCSPath": "{gcs_bucket}",
