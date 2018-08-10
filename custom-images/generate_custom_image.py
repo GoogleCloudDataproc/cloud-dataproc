@@ -50,7 +50,6 @@ logging.basicConfig()
 _LOG = logging.getLogger(__name__)
 _LOG.setLevel(logging.INFO)
 
-
 def _version_regex_type(s):
   """Check if version string matches regex."""
   if not _VERSION_REGEX.match(s):
@@ -70,7 +69,7 @@ def get_project_id():
     # get proejct id
     temp_file.seek(0)
     stdout = temp_file.read()
-    return stdout.strip()
+    return stdout.decode('utf-8').strip()
 
 
 def get_dataproc_base_image(version):
@@ -95,8 +94,8 @@ def get_dataproc_base_image(version):
     temp_file.seek(0)  # go to start of the stdout
     stdout = temp_file.read()
     # parse the first ready image with the dataproc version attached in labels
-    if stdout and isinstance(stdout, basestring):
-      parsed_line = stdout.strip().split(",")  # should only be one image
+    if stdout:
+      parsed_line = stdout.decode('utf-8').strip().split(",")  # should only be one image
       if len(parsed_line) == 2 and parsed_line[0] and parsed_line[1] == "READY":
         return _IMAGE_URI.format(parsed_line[0])
 
@@ -163,7 +162,7 @@ def get_custom_image_creation_timestamp(image_name, project_id):
     # get creation timestamp
     temp_file.seek(0)
     stdout = temp_file.read()
-    return stdout.strip()
+    return stdout.decode('utf-8').strip()
 
 
 def _parse_date_time(timestamp_string):
@@ -172,7 +171,7 @@ def _parse_date_time(timestamp_string):
                                     "%Y-%m-%dT%H:%M:%S.%f")
 
 
-def _create_workflow_template(workflow_name, image_name, project_id, zone):
+def _create_workflow_template(workflow_name, image_name, project_id, zone, subnet):
   """Create a Dataproc workflow template for testing."""
 
   create_command = [
@@ -182,7 +181,7 @@ def _create_workflow_template(workflow_name, image_name, project_id, zone):
   set_cluster_command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "set-managed-cluster",
       workflow_name, "--project", project_id, "--image", image_name, "--zone",
-      zone
+      zone, "--subnet", subnet
   ]
   add_job_command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "add-job", "spark",
@@ -211,11 +210,11 @@ def _create_workflow_template(workflow_name, image_name, project_id, zone):
                        workflow_name)
 
 
-def _instantiate_workflow_template(workflow_name):
+def _instantiate_workflow_template(workflow_name, project_id):
   """Run a Dataproc workflow template to test the newly built custom image."""
   command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "instantiate",
-      workflow_name
+      workflow_name, "--project", project_id
   ]
   pipe = subprocess.Popen(command)
   pipe.wait()
@@ -223,11 +222,11 @@ def _instantiate_workflow_template(workflow_name):
     raise RuntimeError("Unable to instantiate workflow template.")
 
 
-def _delete_workflow_template(workflow_name):
+def _delete_workflow_template(workflow_name, project_id):
   """Delete a Dataproc workflow template."""
   command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "delete",
-      workflow_name, "-q"
+      workflow_name, "-q", "--project", project_id
   ]
   pipe = subprocess.Popen(command)
   pipe.wait()
@@ -235,7 +234,7 @@ def _delete_workflow_template(workflow_name):
     raise RuntimeError("Error deleting workfloe template %s.", workflow_name)
 
 
-def verify_custom_image(image_name, project_id, zone):
+def verify_custom_image(image_name, project_id, zone, subnetwork):
   """Verifies if custom image works with Dataproc."""
 
   date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -245,12 +244,12 @@ def verify_custom_image(image_name, project_id, zone):
   try:
     _LOG.info("Creating Dataproc workflow-template %s with image %s...",
               workflow_name, image_name)
-    _create_workflow_template(workflow_name, image_name, project_id, zone)
+    _create_workflow_template(workflow_name, image_name, project_id, zone, subnetwork)
     _LOG.info(
         "Successfully created Dataproc workflow-template %s with image %s...",
         workflow_name, image_name)
     _LOG.info("Smoke testing Dataproc workflow-template %s...")
-    _instantiate_workflow_template(workflow_name)
+    _instantiate_workflow_template(workflow_name, project_id)
     _LOG.info("Successfully smoke tested Dataproc workflow-template %s...",
               workflow_name)
   except RuntimeError as e:
@@ -260,7 +259,7 @@ def verify_custom_image(image_name, project_id, zone):
   finally:
     try:
       _LOG.info("Deleting Dataproc workflow-template %s...", workflow_name)
-      _delete_workflow_template(workflow_name)
+      _delete_workflow_template(workflow_name, project_id)
       _LOG.info("Successfully deleted Dataproc workflow-template %s...",
                 workflow_name)
     except RuntimeError:
@@ -365,6 +364,15 @@ def run():
       Example:
       '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
+parser.add_argument(
+      "--disk-size",
+      type=int,
+      required=False,
+      default=10,
+      help=
+      """(Optional) The size in GB of the disk attached to the VM instance
+      that builds the custom image. If not specified, the default value of
+      10 GB will be used.""")
 
   args = parser.parse_args()
 
@@ -404,7 +412,8 @@ def run():
       machine_type=args.machine_type,
       network=args.network,
       subnetwork=args.subnetwork,
-      service_account=args.service_account)
+      service_account=args.service_account,
+      disk_size=args.disk_size)
 
   _LOG.info("Successfully created Daisy workflow...")
 
@@ -422,7 +431,7 @@ def run():
   # perform test on the newly built image
   if not args.no_smoke_test:
     _LOG.info("Verifying the custom image...")
-    verify_custom_image(args.image_name, project_id, args.zone)
+    verify_custom_image(args.image_name, project_id, args.zone, args.subnetwork)
     _LOG.info("Successfully verified the custom image...")
 
   _LOG.info("Successfully built Dataproc custom image: %s",
