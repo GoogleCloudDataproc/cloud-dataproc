@@ -302,7 +302,8 @@ def run():
       "--family",
       type=str,
       required=False,
-      help="""(Optional) The family of the image.""")
+      help="""(Optional) The family of the image.""",
+      default="")
   parser.add_argument(
       "--project-id",
       type=str,
@@ -370,7 +371,7 @@ def run():
       For example:
       '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
-parser.add_argument(
+  parser.add_argument(
       "--disk-size",
       type=int,
       required=False,
