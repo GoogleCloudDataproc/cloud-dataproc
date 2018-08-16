@@ -86,7 +86,7 @@ python generate_custom_image.py \
     Read more about
     (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
-    used to build custom image. The default is `10` GB.
+    used to build custom image. The default is `15` GB.
 
 ### Example
 
