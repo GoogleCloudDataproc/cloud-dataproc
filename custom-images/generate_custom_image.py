@@ -370,7 +370,7 @@ def run():
       For example:
       '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
-parser.add_argument(
+  parser.add_argument(
       "--disk-size",
       type=int,
       required=False,
