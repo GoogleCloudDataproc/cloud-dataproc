@@ -16,7 +16,8 @@ This page describes how to generate a custom Dataproc image.
     API, and Google Cloud Storage APIs enabled.
 5.  Use `gcloud config set project <your-project>` to specify which project to
     use to create and save your custom image.
-
+6.  Before execute python generate_custom_image.py , run 
+    `$ gcloud auth application-default login`
 ## Generate custom image
 
 To generate a custom image, run the following command:
