@@ -302,7 +302,8 @@ def run():
       "--family",
       type=str,
       required=False,
-      help="""(Optional) The family of the image.""")
+      help="""(Optional) The family of the image.""",
+      default="")
   parser.add_argument(
       "--project-id",
       type=str,
