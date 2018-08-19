@@ -304,6 +304,7 @@ def run():
       "--family",
       type=str,
       required=False,
+      default='dataproc-custom-image',
       help="""(Optional) The family of the image.""")
   parser.add_argument(
       "--project-id",
