@@ -87,6 +87,7 @@ python generate_custom_image.py \
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `15` GB.
 
+
 ### Example
 
 Create a custom image with name `custom-image-1-2-3` with Dataproc version
