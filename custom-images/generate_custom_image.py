@@ -44,7 +44,9 @@ import uuid
 
 import constants
 
-_VERSION_REGEX = re.compile(r"^\d+\.\d+\.\d+$")
+# Old style images: 1.2.3
+# New style images: 1.2.3-deb8
+_VERSION_REGEX = re.compile(r"^\d+\.\d+\.\d+(-.{4})?$")
 _IMAGE_URI = "projects/cloud-dataproc/global/images/{}"
 logging.basicConfig()
 _LOG = logging.getLogger(__name__)
