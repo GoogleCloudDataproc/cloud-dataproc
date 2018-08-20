@@ -377,11 +377,11 @@ def run():
       "--disk-size",
       type=int,
       required=False,
-      default=10,
+      default=15,
       help=
       """(Optional) The size in GB of the disk attached to the VM instance
       that builds the custom image. If not specified, the default value of
-      10 GB will be used.""")
+      15 GB will be used.""")
 
   args = parser.parse_args()
 
