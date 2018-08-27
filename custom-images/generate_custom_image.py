@@ -48,6 +48,7 @@ import constants
 # New style images: 1.2.3-deb8
 _VERSION_REGEX = re.compile(r"^\d+\.\d+\.\d+(-.{4})?$")
 _IMAGE_URI = "projects/cloud-dataproc/global/images/{}"
+_PARTIAL_IMAGE_URI = re.compile(r"^projects\/.+\/global\/images\/.+$")
 logging.basicConfig()
 _LOG = logging.getLogger(__name__)
 _LOG.setLevel(logging.INFO)
@@ -58,6 +59,11 @@ def _version_regex_type(s):
     raise argparse.ArgumentTypeError
   return s
 
+def _partial_image_uri_regex_type(s):
+  """Check if the partial image uri string matches regex."""
+  if not _PARTIAL_IMAGE_URI.match(s):
+    raise argparse.ArgumentTypeError
+  return s
 
 def get_project_id():
   """Get project id from gcloud config."""
@@ -382,13 +388,27 @@ def run():
       """(Optional) The size in GB of the disk attached to the VM instance
       that builds the custom image. If not specified, the default value of
       15 GB will be used.""")
+  parser.add_argument(
+      "--base-image-uri",
+      type=_partial_image_uri_regex_type,
+      help=
+      """(Optional) The partial image URI for the base Dataproc image. The
+      customiziation script will be executed on top of this image instead of
+      an out-of-the-box Dataproc image. This image must be a valid Dataproc
+      image. The format of the partial image URI is the following:
+      "projects/<project_id>/global/images/<image_name>"
+      """)
+
 
   args = parser.parse_args()
 
   # get dataproc base image from dataproc version
   project_id = get_project_id() if not args.project_id else args.project_id
   _LOG.info("Getting Dataproc base image name...")
-  dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
+  if args.base_image_uri:
+    dataproc_base_image = args.base_image_uri
+  else:
+    dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
   _LOG.info("Returned Dataproc base image: %s", dataproc_base_image)
 
   run_script_path = os.path.join(
