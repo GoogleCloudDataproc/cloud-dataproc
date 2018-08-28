@@ -9,10 +9,6 @@ Google's Translation API and running on Cloud Dataproc.
 
 3. You have a Google Cloud project and have [enabled billing](https://cloud.google.com/billing/docs/how-to/modify-project).
 
-- - -
-
-[Home](../README.md)
-
 ## Running the code
 
 1. Record the project ID in an environment variable for later use:
