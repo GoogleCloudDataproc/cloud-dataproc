@@ -1,4 +1,4 @@
-This repository contains a simple demo Spark application that translates words using
+This example is a simple demo Spark application that translates words using
 Google's Translation API and running on Cloud Dataproc.
 
 ## Prerequesites
