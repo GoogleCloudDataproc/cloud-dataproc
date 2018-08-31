@@ -407,7 +407,9 @@ def run():
 
   sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
                         for source, path in daisy_sources.items()])
-  network = args.network
+
+  network = args.network.lstrip("/")
+  subnetwork = args.subnetwork.lstrip("/")
   # When the user wants to create a VM in a shared VPC,
   # only the subnetwork argument has to be provided whereas
   # the network one has to be left empty.
@@ -427,7 +429,7 @@ def run():
       dataproc_base_image=dataproc_base_image,
       machine_type=args.machine_type,
       network=network,
-      subnetwork=args.subnetwork,
+      subnetwork=subnetwork,
       service_account=args.service_account,
       disk_size=args.disk_size)
 
