@@ -6,7 +6,8 @@ This repository contains code and documentation for use with
 ## Samples in this Repository
  * `codelabs/opencv-haarcascade` provides the source code for the [OpenCV Dataproc Codelab](https://codelabs.developers.google.com/codelabs/cloud-dataproc-opencv/index.html), which demonstrates a Spark job that adds facial detection to a set of images. 
  * `spark-tensorflow` provides an example of using Spark as a preprocessing toolchain for Tensorflow jobs. Optionally,
- it demonstrates the [spark-tensorflow-connector](https://github.com/tensorflow/ecosystem/tree/master/spark/spark-tensorflow-connector) to convert CSV files to TFRecords. 
+ it demonstrates the [spark-tensorflow-connector](https://github.com/tensorflow/ecosystem/tree/master/spark/spark-tensorflow-connector) to convert CSV files to TFRecords.
+ * `spark-translate` provides a simple demo Spark application that translates words using Google's Translation API and running on Cloud Dataproc.
 
 See each directories README for more information.
 
