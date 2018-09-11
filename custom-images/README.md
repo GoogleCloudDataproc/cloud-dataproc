@@ -40,6 +40,11 @@ python generate_custom_image.py \
     notes](https://cloud.google.com/dataproc/docs/release-notes). To understand
     Dataproc versioning, please refer to
     [documentation](https://cloud.google.com/dataproc/docs/concepts/versioning/overview).
+    **This argument is mutually exclusive with --base-image-uri**.
+*   **--base-image-uri**: The full image URI for the base Dataproc image. The
+    customiziation script will be executed on top of this image instead of
+    an out-of-the-box Dataproc image. This image must be a valid Dataproc
+    image. **This argument is mutually exclusive with --dataproc-version.**
 *   **--customization-script**: The script used to install custom packages on
     the image.
 *   **--daisy-path**: The path to Daisy binary.
