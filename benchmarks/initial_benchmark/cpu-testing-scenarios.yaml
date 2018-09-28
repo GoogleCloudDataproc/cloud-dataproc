@@ -1,0 +1,79 @@
+# Memory size for a 4 vCPU instance must be between 3840MiB and 26624MiB, while 30720MiB was provided.
+# Test below will fail
+#scenario_cpu_4:
+#  jobs:
+#    pysparkJob:
+#      args:
+#        - gs://bucket-name/bigbench
+#        - scenario_cpu_4
+#        - -f 1
+#  placement:
+#    managedCluster:
+#      config:
+#        masterConfig:
+#          machineTypeUri: custom-4-30720
+#        workerConfig:
+#          machineTypeUri: custom-4-51200
+#
+
+scenario_cpu_8:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://bucket-name/bigbench
+        - scenario_cpu_8
+        - -f 1
+  placement:
+    managedCluster:
+      config:
+        masterConfig:
+          machineTypeUri: custom-8-30720
+        workerConfig:
+          machineTypeUri: custom-8-51200
+
+scenario_cpu_16:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://bucket-name/bigbench
+        - scenario_cpu_16
+        - -f 1
+  placement:
+    managedCluster:
+      config:
+        masterConfig:
+          machineTypeUri: custom-16-30720
+        workerConfig:
+          machineTypeUri: custom-16-51200
+
+scenario_cpu_32:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://bucket-name/bigbench
+        - scenario_cpu_16
+        - -f 1
+  placement:
+    managedCluster:
+      config:
+        masterConfig:
+          machineTypeUri: custom-32-30720
+        workerConfig:
+          machineTypeUri: custom-32-51200
+
+# Memory size for a 64 vCPU instance must be between 58880MiB and 425984MiB
+# Test below will fail
+#scenario_cpu_64:
+#  jobs:
+#    pysparkJob:
+#      args:
+#        - gs://bucket-name/bigbench
+#        - scenario_cpu_64
+#        - -f 1
+#  placement:
+#    managedCluster:
+#      config:
+#        masterConfig:
+#          machineTypeUri: custom-64-30720
+#        workerConfig:
+#          machineTypeUri: custom-64-51200
