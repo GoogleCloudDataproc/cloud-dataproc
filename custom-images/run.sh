@@ -14,6 +14,8 @@
 
 # get daisy-sources-path
 DAISY_SOURCES_PATH=$(curl "http://metadata.google.internal/computeMetadata/v1/instance/attributes/daisy-sources-path" -H "Metadata-Flavor: Google")
+# get time to wait for stdout to flush
+SHUTDOWN_TIMER_IN_SEC=$(curl "http://metadata.google.internal/computeMetadata/v1/instance/attributes/shutdown-timer-in-sec" -H "Metadata-Flavor: Google")
 
 # copy down all sources (along with init_actions.sh script)
 gsutil -m cp -r "${DAISY_SOURCES_PATH}/*" ./
@@ -31,6 +33,6 @@ else
   echo "BuildSucceeded: Dataproc Initialization Actions Succeeded."
 fi
 
-sleep 20 # wait for stdout to flush
+sleep ${SHUTDOWN_TIMER_IN_SEC} # wait for stdout to flush
 
 shutdown -h now

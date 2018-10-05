@@ -64,7 +64,8 @@ daisy_wf = """\
                     "MachineType": "{machine_type}",
                     "NetworkInterfaces": [{{"network": "{network}", "subnetwork": "{subnetwork}"}}],
                     "ServiceAccounts": [{{"Email": "{service_account}", "Scopes": ["https://www.googleapis.com/auth/cloud-platform"]}}],
-                    "StartupScript": "run.sh"
+                    "StartupScript": "run.sh",
+                    "Metadata": {{"shutdown-timer-in-sec" : "{shutdown_timer_in_sec}"}}
                 }}
             ]
         }},

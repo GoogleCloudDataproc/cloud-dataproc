@@ -438,6 +438,16 @@ def run():
       """(Optional) The size in GB of the disk attached to the VM instance
       that builds the custom image. If not specified, the default value of
       15 GB will be used.""")
+  parser.add_argument(
+      "--shutdown-instance-timer-sec",
+      type=int,
+      required=False,
+      default=300,
+      help=
+      """(Optional) The time to wait in seconds before shutting down the VM
+      instance. This value may need to be increased if your init script
+      generates a lot of output on stdout. If not specified, the default value
+      of 300 seconds will be used.""")
 
 
   args = parser.parse_args()
@@ -492,7 +502,8 @@ def run():
       network=network,
       subnetwork=args.subnetwork,
       service_account=args.service_account,
-      disk_size=args.disk_size)
+      disk_size=args.disk_size,
+      shutdown_timer_in_sec=args.shutdown_instance_timer_sec)
 
   _LOG.info("Successfully created Daisy workflow...")
 
