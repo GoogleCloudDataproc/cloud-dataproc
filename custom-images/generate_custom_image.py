@@ -49,6 +49,7 @@ import constants
 _VERSION_REGEX = re.compile(r"^\d+\.\d+\.\d+(-.{4})?$")
 _IMAGE_URI = "projects/{}/global/images/{}"
 _FULL_IMAGE_URI = re.compile(r"https:\/\/www\.googleapis\.com\/compute\/([^\/]+)\/projects\/([^\/]+)\/global\/images\/([^\/]+)$")
+_METADATA_REGEX = re.compile(r"^[\w|\_|\-]+=[\w|\/|\_|\-]+(,[\w|\_|\-]+=[\w|\/|\_|\-]+)*$")
 logging.basicConfig()
 _LOG = logging.getLogger(__name__)
 _LOG.setLevel(logging.INFO)
@@ -63,6 +64,12 @@ def _full_image_uri_regex_type(s):
   """Check if the partial image uri string matches regex."""
   if not _FULL_IMAGE_URI.match(s):
     raise argparse.ArgumentTypeError("Invalid image URI: {}.".format(s))
+  return s
+
+def _metadata_regex_type(s):
+  """Check if the metadata string matches regex."""
+  if not _METADATA_REGEX.match(s):
+    raise argparse.ArgumentTypeError("Invalid metadata string: {}.".format(s))
   return s
 
 def get_project_id():
@@ -144,6 +151,13 @@ def get_dataproc_base_image(version):
 
   raise RuntimeError("Cannot find dataproc base image with "
                      "dataproc-version=%s.", version)
+
+def get_metadata(metadata):
+  """Construct a map of metadata based on user input"""
+  if not metadata:
+      return {}
+
+  return dict(item.split("=") for item in metadata.split(","))
 
 
 def run_daisy(daisy_path, workflow):
@@ -430,6 +444,19 @@ def run():
       '--extra-sources "{\\"notes.txt\\": \\"/path/to/notes.txt\\"}"'
       """)
   parser.add_argument(
+      "--metadata",
+      type=_metadata_regex_type,
+      required=False,
+      default='',
+      metavar='MY_KEY_1=VALUE_A,MY_KEY_2=VALUE_B',
+      help=
+      """(Optional) Additional metadata values to be set in the virtual
+      machine where the custom image script is executed.
+      This argument is evaluated as a comma separated list of key, value pairs.
+      For example:
+      '--metadata my_arg_1=123,my_arg_2=34/5'
+      """)
+  parser.add_argument(
       "--disk-size",
       type=int,
       required=False,
@@ -487,6 +514,11 @@ def run():
   if not args.network and not args.subnetwork:
     network = 'global/networks/default'
 
+  metadata = get_metadata(args.metadata)
+  metadata_as_string = ''
+  for k,v in metadata.iteritems():
+      metadata_as_string += ", \"{}\" : \"{}\"".format(k, v)
+
   # create daisy workflow
   _LOG.info("Created Daisy workflow...")
   workflow = constants.daisy_wf.format(
@@ -503,7 +535,8 @@ def run():
       subnetwork=args.subnetwork,
       service_account=args.service_account,
       disk_size=args.disk_size,
-      shutdown_timer_in_sec=args.shutdown_instance_timer_sec)
+      shutdown_timer_in_sec=args.shutdown_instance_timer_sec,
+      metadata=metadata_as_string)
 
   _LOG.info("Successfully created Daisy workflow...")
 
