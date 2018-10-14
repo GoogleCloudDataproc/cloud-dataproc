@@ -68,7 +68,7 @@ def _full_image_uri_regex_type(s):
 
 def _metadata_regex_type(s):
   """Check if the metadata string matches regex."""
-  if not _METADATA_REGEX.match(s):
+  if s and not _METADATA_REGEX.match(s):
     raise argparse.ArgumentTypeError("Invalid metadata string: {}.".format(s))
   return s
 
