@@ -89,6 +89,8 @@ python generate_custom_image.py \
     customization script. This argument is evaluated to a json dictionary.
     Read more about
     (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
+*   **--metadata**: A list of comma-separated key=value pairs that will be
+    set as metadata in the VM instance that builds the custom Dataproc image.
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `15` GB.
 *   **--base-image-uri**: The partial image URI for the base Dataproc image. The
