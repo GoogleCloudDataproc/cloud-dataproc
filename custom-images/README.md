@@ -86,6 +86,8 @@ python generate_custom_image.py \
     (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `15` GB.
+*   **--exipre-day**: The day of the custom image will expire. 
+    The default is `30` Days.
 
 ### Example
 

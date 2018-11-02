@@ -382,7 +382,15 @@ def run():
       """(Optional) The size in GB of the disk attached to the VM instance
       that builds the custom image. If not specified, the default value of
       15 GB will be used.""")
-
+  parser.add_argument(
+       "--expire-day",
+       type=int,
+       required=False,
+       default=30,
+       help=
+       """(Optional) The day of custom image will exipre. 
+       If not specified, the default value of
+       30 days will be use.""")
   args = parser.parse_args()
 
   # get dataproc base image from dataproc version
@@ -456,7 +464,7 @@ def run():
   # notify when the image will expire.
   creation_date = _parse_date_time(
       get_custom_image_creation_timestamp(args.image_name, project_id))
-  expiration_date = creation_date + datetime.timedelta(days=30)
+  expiration_date = creation_date + datetime.timedelta(days=args.expire_day)
   _LOG.info(
       constants.notify_expiration_text.format(args.image_name,
                                               str(expiration_date)))
