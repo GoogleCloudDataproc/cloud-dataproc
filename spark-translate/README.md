@@ -1,4 +1,4 @@
-This repository contains a simple demo Spark application that translates words using
+This example is a simple demo Spark application that translates words using
 Google's Translation API and running on Cloud Dataproc.
 
 ## Prerequesites
@@ -8,10 +8,6 @@ Google's Translation API and running on Cloud Dataproc.
 2. You have the [Cloud SDK](https://cloud.google.com/sdk/) installed.
 
 3. You have a Google Cloud project and have [enabled billing](https://cloud.google.com/billing/docs/how-to/modify-project).
-
-- - -
-
-[Home](../README.md)
 
 ## Running the code
 

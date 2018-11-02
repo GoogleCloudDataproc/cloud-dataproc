@@ -40,6 +40,11 @@ python generate_custom_image.py \
     notes](https://cloud.google.com/dataproc/docs/release-notes). To understand
     Dataproc versioning, please refer to
     [documentation](https://cloud.google.com/dataproc/docs/concepts/versioning/overview).
+    **This argument is mutually exclusive with --base-image-uri**.
+*   **--base-image-uri**: The full image URI for the base Dataproc image. The
+    customiziation script will be executed on top of this image instead of
+    an out-of-the-box Dataproc image. This image must be a valid Dataproc
+    image. **This argument is mutually exclusive with --dataproc-version.**
 *   **--customization-script**: The script used to install custom packages on
     the image.
 *   **--daisy-path**: The path to Daisy binary.
@@ -86,6 +91,11 @@ python generate_custom_image.py \
     (sources in daisy)[https://googlecloudplatform.github.io/compute-image-tools/daisy-workflow-config-spec.html#sources] 
 *   **--disk-size**: The size in GB of the disk attached to the VM instance
     used to build custom image. The default is `15` GB.
+*   **--base-image-uri**: The partial image URI for the base Dataproc image. The
+    customization script will be executed on top of this image instead of an
+    out-of-the-box Dataproc image. This image must be a valid Dataproc image.
+    The format of the partial image URI is the following:
+    "projects/<project_id>/global/images/<image_name>".
 *   **--exipre-day**: The day of the custom image will expire. 
     The default is `30` Days.
 

@@ -47,7 +47,8 @@ import constants
 # Old style images: 1.2.3
 # New style images: 1.2.3-deb8
 _VERSION_REGEX = re.compile(r"^\d+\.\d+\.\d+(-.{4})?$")
-_IMAGE_URI = "projects/cloud-dataproc/global/images/{}"
+_IMAGE_URI = "projects/{}/global/images/{}"
+_FULL_IMAGE_URI = re.compile(r"https:\/\/www\.googleapis\.com\/compute\/([^\/]+)\/projects\/([^\/]+)\/global\/images\/([^\/]+)$")
 logging.basicConfig()
 _LOG = logging.getLogger(__name__)
 _LOG.setLevel(logging.INFO)
@@ -55,9 +56,14 @@ _LOG.setLevel(logging.INFO)
 def _version_regex_type(s):
   """Check if version string matches regex."""
   if not _VERSION_REGEX.match(s):
-    raise argparse.ArgumentTypeError
+    raise argparse.ArgumentTypeError("Invalid version: {}.".format(s))
   return s
 
+def _full_image_uri_regex_type(s):
+  """Check if the partial image uri string matches regex."""
+  if not _FULL_IMAGE_URI.match(s):
+    raise argparse.ArgumentTypeError("Invalid image URI: {}.".format(s))
+  return s
 
 def get_project_id():
   """Get project id from gcloud config."""
@@ -73,6 +79,41 @@ def get_project_id():
     stdout = temp_file.read()
     return stdout.decode('utf-8').strip()
 
+def _get_image_name_and_project(uri):
+  """Get Dataproc image name and project."""
+  m = _FULL_IMAGE_URI.match(uri)
+  return m.group(2), m.group(3) # project, image_name
+
+def get_dataproc_image_version(uri):
+  """Get Dataproc image version from image URI."""
+  project, image_name = _get_image_name_and_project(uri)
+  command = ["gcloud", "compute", "images", "describe",
+             image_name, "--project", project,
+             "--format=value(labels.goog-dataproc-version)"]
+
+  # get stdout from compute images list --filters
+  with tempfile.NamedTemporaryFile() as temp_file:
+    pipe = subprocess.Popen(command, stdout=temp_file)
+    pipe.wait()
+    if pipe.returncode != 0:
+      raise RuntimeError(
+          "Cannot find dataproc base image, please check and verify "
+          "the base image URI.")
+
+    temp_file.seek(0)  # go to start of the stdout
+    stdout = temp_file.read()
+    # parse the first ready image with the dataproc version attached in labels
+    if stdout:
+      parsed_line = stdout.decode('utf-8').strip()  # should be just one value
+      return parsed_line
+
+  raise RuntimeError("Cannot find dataproc base image: %s", uri)
+
+
+def get_partial_image_uri(uri):
+  """Get the partial image URI from the full image URI."""
+  project, image_name = _get_image_name_and_project(uri)
+  return _IMAGE_URI.format(project, image_name)
 
 def get_dataproc_base_image(version):
   """Get Dataproc base image name from version."""
@@ -99,7 +140,7 @@ def get_dataproc_base_image(version):
     if stdout:
       parsed_line = stdout.decode('utf-8').strip().split(",")  # should only be one image
       if len(parsed_line) == 2 and parsed_line[0] and parsed_line[1] == "READY":
-        return _IMAGE_URI.format(parsed_line[0])
+        return _IMAGE_URI.format('cloud-dataproc', parsed_line[0])
 
   raise RuntimeError("Cannot find dataproc base image with "
                      "dataproc-version=%s.", version)
@@ -130,12 +171,19 @@ def run_daisy(daisy_path, workflow):
       pass
 
 
-def set_custom_image_label(image_name, version, project_id):
+def set_custom_image_label(image_name, version, project_id, parsed=False):
   """Set Dataproc version label in the newly built custom image."""
-  # version regex already checked in arg parser
-  parsed_version = version.split(".")
-  filter_arg = "--labels=goog-dataproc-version={}-{}-{}".format(
-      parsed_version[0], parsed_version[1], parsed_version[2])
+  # parse the verions if version is still in the format of
+  # <major>.<minor>.<subminor>.
+  if not parsed:
+    # version regex already checked in arg parser
+    parsed_version = version.split(".")
+    filter_arg = "--labels=goog-dataproc-version={}-{}-{}".format(
+        parsed_version[0], parsed_version[1], parsed_version[2])
+  else:
+    # in this case, the version is already in the format of
+    # <major>-<minor>-<subminor>
+    filter_arg = "--labels=goog-dataproc-version={}".format(version)
   command = ["gcloud", "compute", "images", "add-labels",
              image_name, "--project", project_id, filter_arg]
 
@@ -277,11 +325,19 @@ def run():
       type=str,
       required=True,
       help="""The image name for the Dataproc custom image.""")
-  required_args.add_argument(
+  image_args = required_args.add_mutually_exclusive_group()
+  image_args.add_argument(
       "--dataproc-version",
       type=_version_regex_type,
-      required=True,
       help=constants.version_help_text)
+  image_args.add_argument(
+      "--base-image-uri",
+      type=_full_image_uri_regex_type,
+      help="""The full image URI for the base Dataproc image. The
+      customiziation script will be executed on top of this image instead of
+      an out-of-the-box Dataproc image. This image must be a valid Dataproc
+      image.
+      """)
   required_args.add_argument(
       "--customization-script",
       type=str,
@@ -383,6 +439,16 @@ def run():
       that builds the custom image. If not specified, the default value of
       15 GB will be used.""")
   parser.add_argument(
+      "--shutdown-instance-timer-sec",
+      type=int,
+      required=False,
+      default=300,
+      help=
+      """(Optional) The time to wait in seconds before shutting down the VM
+      instance. This value may need to be increased if your init script
+      generates a lot of output on stdout. If not specified, the default value
+      of 300 seconds will be used.""")
+ parser.add_argument(
        "--expire-day",
        type=int,
        required=False,
@@ -391,14 +457,21 @@ def run():
        """(Optional) The day of custom image will exipre. 
        If not specified, the default value of
        30 days will be use.""")
+
   args = parser.parse_args()
 
   # get dataproc base image from dataproc version
   project_id = get_project_id() if not args.project_id else args.project_id
   _LOG.info("Getting Dataproc base image name...")
-  dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
+  parsed_image_version = False
+  if args.base_image_uri:
+    dataproc_base_image = get_partial_image_uri(args.base_image_uri)
+    dataproc_version = get_dataproc_image_version(args.base_image_uri)
+    parsed_image_version = True
+  else:
+    dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
+    dataproc_version = args.dataproc_version
   _LOG.info("Returned Dataproc base image: %s", dataproc_base_image)
-
   run_script_path = os.path.join(
       os.path.dirname(os.path.realpath(__file__)), "run.sh")
 
@@ -437,7 +510,8 @@ def run():
       network=network,
       subnetwork=args.subnetwork,
       service_account=args.service_account,
-      disk_size=args.disk_size)
+      disk_size=args.disk_size,
+      shutdown_timer_in_sec=args.shutdown_instance_timer_sec)
 
   _LOG.info("Successfully created Daisy workflow...")
 
@@ -448,8 +522,8 @@ def run():
 
   # set custom image label
   _LOG.info("Setting label on custom image...")
-  set_custom_image_label(args.image_name, args.dataproc_version,
-                         project_id)
+  set_custom_image_label(args.image_name, dataproc_version,
+                         project_id, parsed_image_version)
   _LOG.info("Successfully set label on custom image...")
 
   # perform test on the newly built image
