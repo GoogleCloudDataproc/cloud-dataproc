@@ -53,8 +53,7 @@ You can pass following optional parameters:
         This option is available for both BigBench and HiBench. 
     1. placement - list of software and parameters to override in workflow template file. Placement contains object of [managed cluster](https://cloud.google.com/dataproc/docs/reference/rest/v1beta2/ClusterConfig). 
 
-Inside scenario placement section it can be specified which engine (instead of default hive) should be used for benchmark execution. This value should be held
-under `gceClusterConfig` section as metadata attribute:
+Inside scenario placement section it can be specified which engine (instead of default hive) should be used for benchmark execution. This value should be held under `gceClusterConfig` section as metadata attribute:
 ```
         metadata:
           benchmark_engine: spark_sql
@@ -62,8 +61,7 @@ under `gceClusterConfig` section as metadata attribute:
 In order to trigger specified engine, it should be also specified optional argument (3rd one) `-e spark_sql`.
 
 ### Overriding system properties
-1. There are two system properties supported that could be set in workflow: `swap_size` and `file_handle_limit`. You can specify their values in scenario file
-under config -> gceClusterConfig->metadata. Example in: testing_scenarios.yaml.tmpl.
+1. There are two system properties supported that could be set in workflow: `swap_size` and `file_handle_limit`. You can specify their values in scenario file under config -> gceClusterConfig->metadata. Example in: testing_scenarios.yaml.tmpl.
 Metadata value type must be an unicode, so please use quotes when passing numbers. For swap size parameter adding unit suffix is required.
 ```
     config:
