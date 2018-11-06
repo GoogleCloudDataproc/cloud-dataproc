@@ -86,8 +86,8 @@ class Benchmark:
 
     def merge_dicts(self, d1, d2):
         """
-        Recursively overrides items in d1 based on keys/values from d2
-        Input dictionaries must have common scheme
+        Recursively overrides items in d1 based on keys/values from d2.
+        Input dictionaries must have common scheme.
         """
         for override_key, override_item in d2.items():
             if override_key in d1:
@@ -101,7 +101,7 @@ class Benchmark:
                 d1[override_key] = override_item
 
     def merge_configs(self):
-        """Apply config from scenario to template"""
+        """Apply config from scenario to template."""
         scenarios_file = self.read_scenarios_yaml()
         for scenario in scenarios_file:
             base_config = self.read_template_yaml()
