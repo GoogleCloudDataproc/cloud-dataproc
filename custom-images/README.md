@@ -96,8 +96,8 @@ python generate_custom_image.py \
     out-of-the-box Dataproc image. This image must be a valid Dataproc image.
     The format of the partial image URI is the following:
     "projects/<project_id>/global/images/<image_name>".
-*   **--exipre-day**: The day of the custom image will expire. 
-    The default is `30` Days.
+*   **--expire-days**: The number of days from creation date when the custom
+    image will expire. The default is `30` Days.
 
 ### Example
 
