@@ -1,0 +1,423 @@
+q01:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q01
+        - -f 1 -j 1 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q02:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q02
+        - -f 1 -j 2 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q03:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q03
+        - -f 1 -j 3 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q04:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q04
+        - -f 1 -j 4 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q05:
+ jobs:
+   pysparkJob:
+     args:
+       - gs://dataproc-1-3-spark-sql
+       - q05
+       - -f 1 -j 5 -e spark_sql
+ placement:
+   managedCluster:
+     config:
+       gceClusterConfig:
+         metadata:
+           benchmark_engine: spark_sql
+
+ q06:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q06
+        - -f 1 -j 6 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+
+ q07:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q07
+        - -f 1 -j 7 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+
+ q08:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q08
+        - -f 1 -j 8 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q09:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q09
+        - -f 1 -j 9 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q10:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q10
+        - -f 1 -j 10 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+
+ q11:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q11
+        - -f 1 -j 11 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q12:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q12
+        - -f 1 -j 12 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q13:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q13
+        - -f 1 -j 13 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q14:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q14
+        - -f 1 -j 14 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q15:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q15
+        - -f 1 -j 15 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q16:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q16
+        - -f 1 -j 16 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q17:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q17
+        - -f 1 -j 17 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q18:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q18
+        - -f 1 -j 18 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q19:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q19
+        - -f 1 -j 19 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q20:
+ jobs:
+   pysparkJob:
+     args:
+       - gs://dataproc-1-3-spark-sql
+       - q20
+       - -f 1 -j 20 -e spark_sql
+ placement:
+   managedCluster:
+     config:
+       gceClusterConfig:
+         metadata:
+           benchmark_engine: spark_sql
+
+ q21:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q21
+        - -f 1 -j 21 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q22:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q22
+        - -f 1 -j 22 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q23:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q23
+        - -f 1 -j 23 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q24:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q24
+        - -f 1 -j 24 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q25:
+ jobs:
+   pysparkJob:
+     args:
+       - gs://dataproc-1-3-spark-sql
+       - q25
+       - -f 1 -j 25 -e spark_sql
+ placement:
+   managedCluster:
+     config:
+       gceClusterConfig:
+         metadata:
+           benchmark_engine: spark_sql
+
+q26:
+ jobs:
+   pysparkJob:
+     args:
+       - gs://dataproc-1-3-spark-sql
+       - q26
+       - -f 1 -j 26 -e spark_sql
+ placement:
+   managedCluster:
+     config:
+       gceClusterConfig:
+         metadata:
+           benchmark_engine: spark_sql
+
+ q27:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q27
+        - -f 1 -j 27 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+q28:
+ jobs:
+   pysparkJob:
+     args:
+       - gs://dataproc-1-3-spark-sql
+       - q28
+       - -f 1 -j 28 -e spark_sql
+ placement:
+   managedCluster:
+     config:
+       gceClusterConfig:
+         metadata:
+           benchmark_engine: spark_sql
+
+ q29:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q29
+        - -f 1 -j 29 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
+ q30:
+  jobs:
+    pysparkJob:
+      args:
+        - gs://dataproc-1-3-spark-sql
+        - q30
+        - -f 1 -j 30 -e spark_sql
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            benchmark_engine: spark_sql
+
