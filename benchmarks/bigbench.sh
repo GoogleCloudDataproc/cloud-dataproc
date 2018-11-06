@@ -65,8 +65,6 @@ function set_system_properties(){
   fi
 }
 
-
-
 function main(){
   local role
   role="$(/usr/share/google/get_metadata_value attributes/dataproc-role)"
