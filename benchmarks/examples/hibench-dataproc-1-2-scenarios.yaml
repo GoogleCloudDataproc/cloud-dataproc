@@ -1,0 +1,15 @@
+tiny:
+  jobs:
+    pysparkJob:
+      mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_hibench_benchmark.py
+      args:
+        - gs://dataproc-1-2-hibench
+        - tiny_scale_factor_scenario
+        - tiny
+  placement:
+    managedCluster:
+      config:
+        softwareConfig:
+          imageVersion: "1.2.45"
+        initializationActions:
+          executableFile: gs://dataproc-benchmarking/init-actions/hibench.sh

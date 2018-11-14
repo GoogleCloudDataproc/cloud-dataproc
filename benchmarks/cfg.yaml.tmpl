@@ -1,0 +1,26 @@
+id: test
+name: "projects/gcp-project-name/regions/global/workflowTemplates/id"
+placement:
+  managedCluster:
+    clusterName: example
+    config:
+      gceClusterConfig:
+        zoneUri: us-central1-f
+      masterConfig:
+        numInstances: 1
+        machineTypeUri: n1-standard-8
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+        imageUri:
+        minCpuPlatform: "Intel Ivy Bridge"
+      workerConfig:
+        numInstances: 2
+        machineTypeUri: n1-standard-8
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+        imageUri:
+        minCpuPlatform: "Intel Ivy Bridge"
+      softwareConfig:
+        imageVersion: "1.2.37"
