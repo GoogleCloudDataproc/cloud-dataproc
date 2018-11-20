@@ -18,7 +18,6 @@ placement:
         diskConfig:
           bootDiskType: pd-standard
           bootDiskSizeGb: 300
-        imageUri:
       workerConfig:
         numInstances: 5
         machineTypeUri: custom-32-102400
@@ -26,8 +25,7 @@ placement:
           bootDiskType: pd-standard
           bootDiskSizeGb: 500
           numLocalSsds: 5
-        imageUri:
       softwareConfig:
         imageVersion: "1.3.2"
       initializationActions:
-        executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh
+      - executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh
