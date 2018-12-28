@@ -19,9 +19,9 @@ def execute_shell(cmd):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    stdout, err = p.communicate()
+    stdout, stderr = p.communicate()
     return_code = p.returncode
-    return stdout, err, return_code
+    return stdout, stderr, return_code
 
 
 class Benchmark:
@@ -33,15 +33,16 @@ class Benchmark:
     def run_workflow(self, scenario):
         command = "gcloud dataproc workflow-templates instantiate-from-file --file {} --format json".format(
             scenario.config_file_name)
-        stdout, err, return_code = execute_shell(command)
+        stdout, stderr, return_code = execute_shell(command)
         if return_code != 0:
             print("Workflow execution failed - Error code is {}".format(return_code))
-            print("ERROR:\n {}\n".format(err))
+            print("STDOUT:\n {}\n".format(stdout))
+            print("STDERR:\n {}\n".format(stderr))
             yaml_config = yaml.safe_load(open(scenario.config_file_name, 'r'))
             prefix = yaml_config['placement']['managedCluster']['clusterName']
             pattern = re.compile(r"{}-.*.".format(prefix))
-            err = err.split()
-            for element in err:
+            stderr = stderr.split()
+            for element in stderr:
                 if pattern.findall(str(element)):
                     self.clusterName = re.compile(r"{}-.*.".format(prefix)).findall(str(element))[0][:-2]
                     break
@@ -51,8 +52,9 @@ class Benchmark:
 
     def upload_config_to_gs(self, scenario):
         yaml_config = yaml.safe_load(open(scenario.config_file_name, 'r'))
+        experiment_name = yaml_config['jobs'][0]['pysparkJob']['args'][0]
         scenario_destination_bucket_path = "{}/{}/{}/cfg.yaml".format(
-            yaml_config['jobs']['pysparkJob']['args'][0],
+            experiment_name,
             scenario.name,
             self.clusterName)
         command = "gsutil cp {} {} ".format(scenario.config_file_name,

@@ -1,6 +1,6 @@
 q01:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q01
@@ -14,7 +14,7 @@ q01:
 
 q02:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q02
@@ -28,7 +28,7 @@ q02:
 
 q03:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q03
@@ -42,7 +42,7 @@ q03:
 
 q04:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q04
@@ -56,7 +56,7 @@ q04:
 
 q05:
  jobs:
-   pysparkJob:
+ - pysparkJob:
      args:
        - gs://dataproc-1-3-spark-sql
        - q05
@@ -68,9 +68,9 @@ q05:
          metadata:
            benchmark_engine: spark_sql
 
- q06:
+q06:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q06
@@ -83,9 +83,9 @@ q05:
             benchmark_engine: spark_sql
 
 
- q07:
+q07:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q07
@@ -98,9 +98,9 @@ q05:
             benchmark_engine: spark_sql
 
 
- q08:
+q08:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q08
@@ -112,9 +112,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q09:
+q09:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q09
@@ -126,9 +126,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q10:
+q10:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q10
@@ -141,9 +141,9 @@ q05:
             benchmark_engine: spark_sql
 
 
- q11:
+q11:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q11
@@ -155,9 +155,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q12:
+q12:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q12
@@ -169,9 +169,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q13:
+q13:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q13
@@ -183,9 +183,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q14:
+q14:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q14
@@ -197,9 +197,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q15:
+q15:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q15
@@ -211,9 +211,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q16:
+q16:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q16
@@ -225,9 +225,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q17:
+q17:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q17
@@ -239,9 +239,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q18:
+q18:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q18
@@ -253,9 +253,9 @@ q05:
           metadata:
             benchmark_engine: spark_sql
 
- q19:
+q19:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q19
@@ -269,7 +269,7 @@ q05:
 
 q20:
  jobs:
-   pysparkJob:
+ - pysparkJob:
      args:
        - gs://dataproc-1-3-spark-sql
        - q20
@@ -281,9 +281,9 @@ q20:
          metadata:
            benchmark_engine: spark_sql
 
- q21:
+q21:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q21
@@ -295,9 +295,9 @@ q20:
           metadata:
             benchmark_engine: spark_sql
 
- q22:
+q22:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q22
@@ -309,9 +309,9 @@ q20:
           metadata:
             benchmark_engine: spark_sql
 
- q23:
+q23:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q23
@@ -323,9 +323,9 @@ q20:
           metadata:
             benchmark_engine: spark_sql
 
- q24:
+q24:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q24
@@ -339,7 +339,7 @@ q20:
 
 q25:
  jobs:
-   pysparkJob:
+ - pysparkJob:
      args:
        - gs://dataproc-1-3-spark-sql
        - q25
@@ -353,7 +353,7 @@ q25:
 
 q26:
  jobs:
-   pysparkJob:
+ - pysparkJob:
      args:
        - gs://dataproc-1-3-spark-sql
        - q26
@@ -365,9 +365,9 @@ q26:
          metadata:
            benchmark_engine: spark_sql
 
- q27:
+q27:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q27
@@ -381,7 +381,7 @@ q26:
 
 q28:
  jobs:
-   pysparkJob:
+ - pysparkJob:
      args:
        - gs://dataproc-1-3-spark-sql
        - q28
@@ -393,9 +393,9 @@ q28:
          metadata:
            benchmark_engine: spark_sql
 
- q29:
+q29:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q29
@@ -407,9 +407,9 @@ q28:
           metadata:
             benchmark_engine: spark_sql
 
- q30:
+q30:
   jobs:
-    pysparkJob:
+  - pysparkJob:
       args:
         - gs://dataproc-1-3-spark-sql
         - q30
