@@ -8,7 +8,7 @@ jobs:
   stepId: a111
 placement:
   managedCluster:
-    clusterName: example
+    clusterName: bigbench
     config:
       gceClusterConfig:
         zoneUri: us-central1-f
