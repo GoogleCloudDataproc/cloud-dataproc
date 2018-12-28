@@ -3,4 +3,4 @@ maven/dependency-reduced-pom.xml
 
 sbt/target/**
 sbt/project/**
-!sbt/project/plugins.sbt
+!sbt/project/assembly.sbt
