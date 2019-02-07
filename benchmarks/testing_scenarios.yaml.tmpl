@@ -1,12 +1,10 @@
 scenario_1:
   jobs:
-    pysparkJob:
-      mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
+  - pysparkJob:
       args:
         - gs://bucket-name/bigbench
         - scenario_1
         - -f 1
-    stepId: a111
   placement:
     managedCluster:
       config:
@@ -14,8 +12,6 @@ scenario_1:
           metadata:
             file_handle_limit: "10000000"
             swap_size: 5G
-        masterConfig:
-          minCpuPlatform: "Intel Ivy Bridge"
         workerConfig:
           numInstances: 10
         initializationActions:
@@ -23,18 +19,14 @@ scenario_1:
 
 scenario_2:
   jobs:
-    pysparkJob:
-      mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
+  - pysparkJob:
       args:
         - gs://bucket-name/bigbench
         - scenario_1
         - -f 1
-    stepId: a111
   placement:
     managedCluster:
       config:
-        masterConfig:
-          minCpuPlatform: "Intel Ivy Bridge"
         workerConfig:
           numInstances: 2
         softwareConfig:
