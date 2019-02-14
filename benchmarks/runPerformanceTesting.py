@@ -1,3 +1,5 @@
+#!/usr/bin/env python3.6
+
 '''
 This script triggers performance testing
 '''
