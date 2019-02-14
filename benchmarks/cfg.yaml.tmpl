@@ -2,13 +2,10 @@ jobs:
   - pysparkJob:
       mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
       args:
-        - gs://bucket-name/bigbench
-        - scenario_1
-        - -f 1
-    stepId: a111
+    stepId: bigbench
 placement:
   managedCluster:
-    clusterName: example
+    clusterName: benchmark
     config:
       gceClusterConfig:
         zoneUri: us-central1-f
@@ -24,7 +21,5 @@ placement:
         diskConfig:
           bootDiskType: pd-standard
           bootDiskSizeGb: 500
-        imageUri:
-        minCpuPlatform: "Intel Ivy Bridge"
       softwareConfig:
         imageVersion: "1.2.37"

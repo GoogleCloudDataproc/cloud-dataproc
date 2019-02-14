@@ -99,11 +99,14 @@ class Benchmark:
                     self.merge_dicts(original[override_key], override_item)
                 elif isinstance(override_item, list):
                     original_list = original[override_key]
-                    for idx, item in enumerate(override_item):
-                        if isinstance(item, dict):
-                            self.merge_dicts(original_list[idx], item)
-                        else:
-                            original_list[idx] = item
+                    if original_list is None:
+                      original[override_key] = override_item
+                    else:
+                      for idx, item in enumerate(override_item):
+                          if isinstance(item, dict):
+                              self.merge_dicts(original_list[idx], item)
+                          else:
+                              original_list[idx] = item
                 else:
                     original[override_key] = override_item
             else:

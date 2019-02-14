@@ -17,16 +17,17 @@ function install_bigbench(){
   cd Big-Data-Benchmark-for-Big-Bench
   if [ "${benchmark_engine}" == 'spark_sql' ]  ; then
     git checkout spark-sql
-    if [[ "${dataproc_version}" == 'dataproc-1-3' ]] ; then
-      # On Dataproc 1.3 we need to provide updated bigbench-ml-spark-2x.jar
-      git cherry-pick d543e9a748a6a17524c7420726f3dbb6bc19c108
-    fi
 
     if ! grep -q '^spark\.sql\.warehouse\.dir=' '/etc/spark/conf/spark-defaults.conf'; then
       echo 'spark.sql.warehouse.dir=/root/spark-warehouse' >> '/etc/spark/conf/spark-defaults.conf'
     fi
   else
     git checkout spark2
+  fi
+
+  if [[ "${dataproc_version}" == 'dataproc-1-3' || "${dataproc_version}" == 'dataproc-1-4' ]] ; then
+    # On Dataproc 1.3 and 1.4 we need to provide updated bigbench-ml-spark-2x.jar
+    git cherry-pick d543e9a748a6a17524c7420726f3dbb6bc19c108
   fi
 }
 
