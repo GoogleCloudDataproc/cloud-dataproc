@@ -1,0 +1,35 @@
+jobs:
+  pysparkJob:
+    mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
+    args:
+      - gs://bucket-name/bigbench
+      - scenario_1
+      - -f 1
+  stepId: a111
+id: test
+name: "projects/gcp-project-name/regions/global/workflowTemplates/id"
+placement:
+  managedCluster:
+    clusterName: example
+    config:
+      gceClusterConfig:
+        zoneUri: us-central1-f
+      masterConfig:
+        numInstances: 1
+        machineTypeUri: custom-6-30720
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 300
+        imageUri:
+      workerConfig:
+        numInstances: 10
+        machineTypeUri: custom-32-51200
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+          numLocalSsds: 5
+        imageUri:
+      softwareConfig:
+        imageVersion: "1.2.37"
+      initializationActions:
+        executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh

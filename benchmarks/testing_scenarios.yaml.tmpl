@@ -1,0 +1,37 @@
+scenario_1:
+  jobs:
+  - pysparkJob:
+      args:
+        - gs://bucket-name/bigbench
+        - scenario_1
+        - -f 1
+  placement:
+    managedCluster:
+      config:
+        gceClusterConfig:
+          metadata:
+            file_handle_limit: "10000000"
+            swap_size: 5G
+        workerConfig:
+          numInstances: 10
+        initializationActions:
+          executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh
+
+scenario_2:
+  jobs:
+  - pysparkJob:
+      args:
+        - gs://bucket-name/bigbench
+        - scenario_2
+        - -f 1
+  placement:
+    managedCluster:
+      config:
+        workerConfig:
+          numInstances: 2
+        softwareConfig:
+          properties:
+            mapred:mapreduce.map.cpu.vcores: '1'
+            yarn:yarn.app.mapreduce.am.resource.mb: '2048'
+        initializationActions:
+          executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh

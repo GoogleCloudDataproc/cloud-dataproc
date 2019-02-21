@@ -1,0 +1,25 @@
+jobs:
+  - pysparkJob:
+      mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
+      args:
+    stepId: bigbench
+placement:
+  managedCluster:
+    clusterName: benchmark
+    config:
+      gceClusterConfig:
+        zoneUri: us-central1-f
+      masterConfig:
+        numInstances: 1
+        machineTypeUri: n1-standard-8
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+      workerConfig:
+        numInstances: 2
+        machineTypeUri: n1-standard-8
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+      softwareConfig:
+        imageVersion: "1.2.37"

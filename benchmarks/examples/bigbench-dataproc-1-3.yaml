@@ -1,0 +1,31 @@
+jobs:
+- pysparkJob:
+    mainPythonFileUri: gs://dataproc-benchmarking/benchmarks/trigger_bigbench_benchmark.py
+    args:
+      - gs://dataproc-1-3-hive
+      - scenario_1
+      - -f 1
+  stepId: a111
+placement:
+  managedCluster:
+    clusterName: bigbench
+    config:
+      gceClusterConfig:
+        zoneUri: us-central1-f
+      masterConfig:
+        numInstances: 1
+        machineTypeUri: custom-6-30720
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 300
+      workerConfig:
+        numInstances: 5
+        machineTypeUri: custom-32-102400
+        diskConfig:
+          bootDiskType: pd-standard
+          bootDiskSizeGb: 500
+          numLocalSsds: 5
+      softwareConfig:
+        imageVersion: "1.3.2"
+      initializationActions:
+      - executableFile: gs://dataproc-benchmarking/init-actions/bigbench.sh
