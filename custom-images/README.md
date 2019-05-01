@@ -2,6 +2,8 @@
 
 This page describes how to generate a custom Dataproc image.
 
+Note that custom image will expire in [60 days](https://cloud.google.com/dataproc/docs/guides/dataproc-images).
+
 ## Requirements
 
 1.  Python 2.7+.
@@ -30,8 +32,6 @@ python generate_custom_image.py \
     --zone <zone to create instance to build custom image>
     --gcs-bucket <gcs bucket to write logs>
 ```
-
-PS. The  custom image will expire. The default is `60` Days
 
 ### Arguments
 
