@@ -18,6 +18,12 @@ You can find more Dataproc resources in these github repositories:
 
 * [Dataproc initialization
   actions](https://github.com/GoogleCloudPlatform/dataproc-initialization-actions)
+* [Hadoop/Spark GCS Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/gcs)
+* [Spark BigQuery Connector](https://github.com/GoogleCloudPlatform/spark-bigquery-connector)
+* [Hadoop BigQuery Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/bigquery)
+* [Spark Pubsub Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/pubsub)
+* [Spark Spanner Connector](https://github.com/GoogleCloudPlatform/cloud-spanner-spark-connector)
+* [GCP Token Broker](https://github.com/GoogleCloudPlatform/gcp-token-broker)
 * [Dataproc Python
   examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
 * [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/java/dataproc-wordcount)
