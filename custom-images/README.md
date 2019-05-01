@@ -31,8 +31,6 @@ python generate_custom_image.py \
     --gcs-bucket <gcs bucket to write logs>
 ```
 
-ps. The  custom image will expire. The default is `60` Days
-
 ### Arguments
 
 *   **--image-name**: The name for custom image.
@@ -98,6 +96,8 @@ ps. The  custom image will expire. The default is `60` Days
     out-of-the-box Dataproc image. This image must be a valid Dataproc image.
     The format of the partial image URI is the following:
     "projects/<project_id>/global/images/<image_name>".
+*   **--expire-days**: The number of days from creation date when the custom
+    image will expire. The default is `30` Days.
 
 ### Example
 

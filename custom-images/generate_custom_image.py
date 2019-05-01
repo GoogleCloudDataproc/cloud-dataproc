@@ -448,6 +448,15 @@ def run():
       instance. This value may need to be increased if your init script
       generates a lot of output on stdout. If not specified, the default value
       of 300 seconds will be used.""")
+  parser.add_argument(
+       "--expire-days",
+       type=int,
+       required=False,
+       default=30,
+       help=
+       """(Optional) The number of days from creation date when the custom image
+       will expire. If not specified, the default value of 30 days will be
+       used.""")
 
   args = parser.parse_args()
 
@@ -529,7 +538,7 @@ def run():
   # notify when the image will expire.
   creation_date = _parse_date_time(
       get_custom_image_creation_timestamp(args.image_name, project_id))
-  expiration_date = creation_date + datetime.timedelta(days=60)
+  expiration_date = creation_date + datetime.timedelta(days=args.expire_days)
   _LOG.info(
       constants.notify_expiration_text.format(args.image_name,
                                               str(expiration_date)))
