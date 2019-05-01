@@ -2,6 +2,8 @@
 
 This page describes how to generate a custom Dataproc image.
 
+Note that custom image will expire in [60 days](https://cloud.google.com/dataproc/docs/guides/dataproc-images).
+
 ## Requirements
 
 1.  Python 2.7+.
@@ -96,8 +98,6 @@ python generate_custom_image.py \
     out-of-the-box Dataproc image. This image must be a valid Dataproc image.
     The format of the partial image URI is the following:
     "projects/<project_id>/global/images/<image_name>".
-*   **--expire-days**: The number of days from creation date when the custom
-    image will expire. The default is `30` Days.
 
 ### Example
 
