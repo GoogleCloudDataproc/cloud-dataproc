@@ -17,22 +17,55 @@ DAISY_SOURCES_PATH=$(curl "http://metadata.google.internal/computeMetadata/v1/in
 # get time to wait for stdout to flush
 SHUTDOWN_TIMER_IN_SEC=$(curl "http://metadata.google.internal/computeMetadata/v1/instance/attributes/shutdown-timer-in-sec" -H "Metadata-Flavor: Google")
 
-# copy down all sources (along with init_actions.sh script)
-gsutil -m cp -r "${DAISY_SOURCES_PATH}/*" ./
+ready=""
 
-# run init actions
-bash ./init_actions.sh
+function wait_until_ready() {
+  # For Ubuntu, wait until /snap is mounted, so that gsutil is unavailable.
+  if [[ "$(. /etc/os-release && echo ${ID})" == 'ubuntu' ]]; then
+    for i in {0..10}; do
+      sleep 5
 
-# get return code
-RET_CODE=$?
+      if command -v gsutil >/dev/null; then
+        ready="true"
+        break
+      fi
 
-# print failure message if install fails
-if [[ $RET_CODE -ne 0 ]]; then
-  echo "BuildFailed: Dataproc Initialization Actions Failed. Please check your initialization script."
-else
-  echo "BuildSucceeded: Dataproc Initialization Actions Succeeded."
-fi
+      if (( $i == 10 )); then
+        echo "BuildFailed: timed out waiting for gsutil to be available on Ubuntu."
+      fi
+    done
+  else
+    ready="true"
+  fi
+}
 
-sleep ${SHUTDOWN_TIMER_IN_SEC} # wait for stdout to flush
+function run_custom_script() {
+  # copy down all sources (along with init_actions.sh script)
+  gsutil -m cp -r "${DAISY_SOURCES_PATH}/*" ./
 
-shutdown -h now
+  # run init actions
+  bash ./init_actions.sh
+
+  # get return code
+  RET_CODE=$?
+
+  # print failure message if install fails
+  if [[ $RET_CODE -ne 0 ]]; then
+    echo "BuildFailed: Dataproc Initialization Actions Failed. Please check your initialization script."
+  else
+    echo "BuildSucceeded: Dataproc Initialization Actions Succeeded."
+  fi
+}
+
+function main() {
+  wait_until_ready
+
+  if [[ "${ready}" == "true" ]]; then
+    run_custom_script
+  fi
+
+  sleep ${SHUTDOWN_TIMER_IN_SEC} # wait for stdout to flush
+  shutdown -h now
+}
+
+main "$@"
