@@ -221,7 +221,7 @@ def _parse_date_time(timestamp_string):
                                     "%Y-%m-%dT%H:%M:%S.%f")
 
 
-def _create_workflow_template(workflow_name, image_name, project_id, zone, subnet):
+def _create_workflow_template(workflow_name, image_name, project_id, zone, network, subnet):
   """Create a Dataproc workflow template for testing."""
 
   create_command = [
@@ -231,8 +231,12 @@ def _create_workflow_template(workflow_name, image_name, project_id, zone, subne
   set_cluster_command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "set-managed-cluster",
       workflow_name, "--project", project_id, "--image", image_name, "--zone",
-      zone, "--subnet", subnet
+      zone
   ]
+  if network and not subnet:
+    set_cluster_command.extend(["--network", network])
+  else:
+    set_cluster_command.extend(["--subnet", subnet])
   add_job_command = [
       "gcloud", "beta", "dataproc", "workflow-templates", "add-job", "spark",
       "--workflow-template", workflow_name, "--project", project_id,
@@ -284,7 +288,7 @@ def _delete_workflow_template(workflow_name, project_id):
     raise RuntimeError("Error deleting workfloe template %s.", workflow_name)
 
 
-def verify_custom_image(image_name, project_id, zone, subnetwork):
+def verify_custom_image(image_name, project_id, zone, network, subnetwork):
   """Verifies if custom image works with Dataproc."""
 
   date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -294,7 +298,8 @@ def verify_custom_image(image_name, project_id, zone, subnetwork):
   try:
     _LOG.info("Creating Dataproc workflow-template %s with image %s...",
               workflow_name, image_name)
-    _create_workflow_template(workflow_name, image_name, project_id, zone, subnetwork)
+    _create_workflow_template(
+        workflow_name, image_name, project_id, zone, network, subnetwork)
     _LOG.info(
         "Successfully created Dataproc workflow-template %s with image %s...",
         workflow_name, image_name)
@@ -520,7 +525,8 @@ def run():
   # perform test on the newly built image
   if not args.no_smoke_test:
     _LOG.info("Verifying the custom image...")
-    verify_custom_image(args.image_name, project_id, args.zone, args.subnetwork)
+    verify_custom_image(
+        args.image_name, project_id, args.zone, network, args.subnetwork)
     _LOG.info("Successfully verified the custom image...")
 
   _LOG.info("Successfully built Dataproc custom image: %s",
