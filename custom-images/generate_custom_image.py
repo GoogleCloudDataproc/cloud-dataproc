@@ -37,12 +37,13 @@ import logging
 import os
 import re
 import subprocess
-import sys 
+import sys
 import tempfile
 import uuid
 
 import args_parser
 import constants
+import workflow_generator
 
 
 _IMAGE_URI = "projects/{}/global/images/{}"
@@ -307,87 +308,82 @@ def verify_custom_image(image_name, project_id, zone, network, subnetwork):
       pass
 
 
-def run():
-  """Generate custom image."""
-  args = args_parser.parse_args(sys.argv[1:])
+def infer_args(args):
+  if not args.project_id:
+    args.project_id = get_project_id()
 
   # get dataproc base image from dataproc version
-  project_id = get_project_id() if not args.project_id else args.project_id
   _LOG.info("Getting Dataproc base image name...")
-  parsed_image_version = False
+  args.parsed_image_version = False
   if args.base_image_uri:
-    dataproc_base_image = get_partial_image_uri(args.base_image_uri)
-    dataproc_version = get_dataproc_image_version(args.base_image_uri)
-    parsed_image_version = True
+    args.dataproc_base_image = get_partial_image_uri(args.base_image_uri)
+    args.dataproc_version = get_dataproc_image_version(args.base_image_uri)
+    args.parsed_image_version = True
   else:
-    dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
-    dataproc_version = args.dataproc_version
-  _LOG.info("Returned Dataproc base image: %s", dataproc_base_image)
+    args.dataproc_base_image = get_dataproc_base_image(args.dataproc_version)
+    args.dataproc_version = args.dataproc_version
+  _LOG.info("Returned Dataproc base image: %s", args.dataproc_base_image)
+
+  if args.oauth:
+    args.oauth = "\n    \"OAuthPath\": \"{}\",".format(
+        os.path.abspath(args.oauth))
+  else:
+    args.oauth = ""
+
+  # Daisy sources
   run_script_path = os.path.join(
       os.path.dirname(os.path.realpath(__file__)), "run.sh")
-
-  oauth = ""
-  if args.oauth:
-    oauth = "\n    \"OAuthPath\": \"{}\",".format(
-        os.path.abspath(args.oauth))
-
   daisy_sources = {
     "run.sh": run_script_path,
     "init_actions.sh": os.path.abspath(args.customization_script)
   }
   daisy_sources.update(args.extra_sources)
-
-  sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
+  args.sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
                         for source, path in daisy_sources.items()])
 
-  network = args.network
   # When the user wants to create a VM in a shared VPC,
   # only the subnetwork argument has to be provided whereas
   # the network one has to be left empty.
   if not args.network and not args.subnetwork:
-    network = 'global/networks/default'
+    args.network = 'global/networks/default'
   # The --network flag requires format global/networks/<network>, which works
   # for Daisy but not for gcloud, here we convert it to
   # projects/<project>/global/networks/<network>, so that works for both.
-  if network.startswith('global/networks/'):
-    network = 'projects/{}/{}'.format(project_id, network)
+  if args.network.startswith('global/networks/'):
+    args.network = 'projects/{}/{}'.format(args.project_id, args.network)
+
+  args.shutdown_timer_in_sec = args.shutdown_instance_timer_sec
+
+def run():
+  """Generate custom image."""
+  # parse command line arguments
+  args = args_parser.parse_args(sys.argv[1:])
+  _LOG.info("Args: {}".format(args))
+  infer_args(args)
+  _LOG.info("Inferred args: {}".format(args))
 
   # create daisy workflow
-  _LOG.info("Created Daisy workflow...")
-  workflow = constants.daisy_wf.format(
-      image_name=args.image_name,
-      project_id=project_id,
-      sources=sources,
-      zone=args.zone,
-      oauth=oauth,
-      gcs_bucket=args.gcs_bucket,
-      family=args.family,
-      dataproc_base_image=dataproc_base_image,
-      machine_type=args.machine_type,
-      network=network,
-      subnetwork=args.subnetwork,
-      service_account=args.service_account,
-      disk_size=args.disk_size,
-      shutdown_timer_in_sec=args.shutdown_instance_timer_sec)
-
-  _LOG.info("Successfully created Daisy workflow...")
+  _LOG.info("Generating Daisy workflow script...")
+  workflow_script = workflow_generator.generate_workflow_script(vars(args))
+  _LOG.info(workflow_script)
+  _LOG.info("Successfully generated Daisy workflow script...")
 
   # run daisy to build custom image
   _LOG.info("Creating custom image with Daisy workflow...")
-  run_daisy(os.path.abspath(args.daisy_path), workflow)
+  run_daisy(os.path.abspath(args.daisy_path), workflow_script)
   _LOG.info("Successfully created custom image with Daisy workflow...")
 
   # set custom image label
   _LOG.info("Setting label on custom image...")
-  set_custom_image_label(args.image_name, dataproc_version,
-                         project_id, parsed_image_version)
+  set_custom_image_label(args.image_name, args.dataproc_version,
+                         args.project_id, args.parsed_image_version)
   _LOG.info("Successfully set label on custom image...")
 
   # perform test on the newly built image
   if not args.no_smoke_test:
     _LOG.info("Verifying the custom image...")
     verify_custom_image(
-        args.image_name, project_id, args.zone, network, args.subnetwork)
+        args.image_name, args.project_id, args.zone, args.network, args.subnetwork)
     _LOG.info("Successfully verified the custom image...")
 
   _LOG.info("Successfully built Dataproc custom image: %s",
@@ -395,7 +391,7 @@ def run():
 
   # notify when the image will expire.
   creation_date = _parse_date_time(
-      get_custom_image_creation_timestamp(args.image_name, project_id))
+      get_custom_image_creation_timestamp(args.image_name, args.project_id))
   expiration_date = creation_date + datetime.timedelta(days=60)
   _LOG.info(
       constants.notify_expiration_text.format(args.image_name,
