@@ -339,12 +339,18 @@ def run():
 
   sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
                         for source, path in daisy_sources.items()])
+
   network = args.network
   # When the user wants to create a VM in a shared VPC,
   # only the subnetwork argument has to be provided whereas
   # the network one has to be left empty.
   if not args.network and not args.subnetwork:
     network = 'global/networks/default'
+  # The --network flag requires format global/networks/<network>, which works
+  # for Daisy but not for gcloud, here we convert it to
+  # projects/<project>/global/networks/<network>, so that works for both.
+  if network.startswith('global/networks/'):
+    network = 'projects/{}/{}'.format(project_id, network)
 
   # create daisy workflow
   _LOG.info("Created Daisy workflow...")
