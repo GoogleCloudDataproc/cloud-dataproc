@@ -1,5 +1,4 @@
 import unittest
-
 import workflow_generator
 
 
@@ -109,3 +108,7 @@ class TestWorkflowGenerator(unittest.TestCase):
     formatted_workflow_script = ' '.join(workflow_script.split())
     formatted_expected_workflow_script = ' '.join(expected_workflow_script.split())
     self.assertEqual(formatted_workflow_script, formatted_expected_workflow_script)
+
+
+if __name__ == '__main__':
+    unittest.main()
