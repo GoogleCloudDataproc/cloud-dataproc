@@ -43,7 +43,7 @@ import uuid
 
 import args_parser
 import constants
-import workflow_generator
+import daisy_image_creator
 
 
 _IMAGE_URI = "projects/{}/global/images/{}"
@@ -354,48 +354,86 @@ def infer_args(args):
 
   args.shutdown_timer_in_sec = args.shutdown_instance_timer_sec
 
-def run():
-  """Generate custom image."""
-  # parse command line arguments
-  args = args_parser.parse_args(sys.argv[1:])
-  _LOG.info("Args: {}".format(args))
+
+def parse_args(raw_args):
+  """Parses and infers command line arguments."""
+
+  args = args_parser.parse_args(raw_args)
+  _LOG.info("Parsed args: {}".format(args))
   infer_args(args)
   _LOG.info("Inferred args: {}".format(args))
+  return args
 
-  # create daisy workflow
-  _LOG.info("Generating Daisy workflow script...")
-  workflow_script = workflow_generator.generate_workflow_script(vars(args))
-  _LOG.info(workflow_script)
-  _LOG.info("Successfully generated Daisy workflow script...")
 
-  # run daisy to build custom image
-  _LOG.info("Creating custom image with Daisy workflow...")
-  run_daisy(os.path.abspath(args.daisy_path), workflow_script)
-  _LOG.info("Successfully created custom image with Daisy workflow...")
+def perform_sanity_checks(args):
+  _LOG.info("Performing sanity checks...")
 
-  # set custom image label
-  _LOG.info("Setting label on custom image...")
-  set_custom_image_label(args.image_name, args.dataproc_version,
-                         args.project_id, args.parsed_image_version)
-  _LOG.info("Successfully set label on custom image...")
+  # Daisy binary
+  if not os.path.isfile(args.daisy_path):
+    raise Exception("Invalid path to Daisy binary: '{}' is not a file.".format(
+        args.daisy_path))
 
-  # perform test on the newly built image
-  if not args.no_smoke_test:
-    _LOG.info("Verifying the custom image...")
-    verify_custom_image(
-        args.image_name, args.project_id, args.zone, args.network, args.subnetwork)
-    _LOG.info("Successfully verified the custom image...")
+  # Customization script
+  if not os.path.isfile(args.customization_script):
+    raise Exception("Invalid path to customization script: '{}' is not a file.".format(
+        args.customization_script))
 
-  _LOG.info("Successfully built Dataproc custom image: %s",
-            args.image_name)
+  _LOG.info("Passed sanity checks...")
 
-  # notify when the image will expire.
+
+def add_label(args):
+  """Sets custom image label."""
+
+  if not args.dry_run:
+    _LOG.info("Setting label on custom image...")
+    set_custom_image_label(args.image_name, args.dataproc_version,
+                           args.project_id, args.parsed_image_version)
+    _LOG.info("Successfully set label on custom image...")
+  else:
+    _LOG.info("Skip setting label on custom image (dry run).")
+
+
+def run_smoke_test(args):
+  """Runs smoke test."""
+
+  if not args.dry_run:
+    if not args.no_smoke_test:
+      _LOG.info("Verifying the custom image...")
+      verify_custom_image(
+          args.image_name,
+          args.project_id,
+          args.zone,
+          args.network,
+          args.subnetwork)
+      _LOG.info("Successfully verified the custom image...")
+  else:
+    _LOG.info("Skip running smoke test (dry run).")
+
+
+def notify_expiration(args):
+  """Notifies when the image will expire."""
+
+  if not args.dry_run:
+    _LOG.info("Successfully built Dataproc custom image: %s", args.image_name)
+  else:
+    _LOG.info("Dry run succeeded.")
+
   creation_date = _parse_date_time(
       get_custom_image_creation_timestamp(args.image_name, args.project_id))
   expiration_date = creation_date + datetime.timedelta(days=60)
   _LOG.info(
       constants.notify_expiration_text.format(args.image_name,
                                               str(expiration_date)))
+
+def run():
+  """Generates custom image."""
+
+  args = parse_args(sys.argv[1:])
+  perform_sanity_checks(args)
+  daisy_image_creator.create(args)
+  add_label(args)
+  run_smoke_test(args)
+  notify_expiration(args)
 
 
 if __name__ == "__main__":

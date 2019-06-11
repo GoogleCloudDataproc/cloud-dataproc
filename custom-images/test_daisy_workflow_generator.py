@@ -1,10 +1,10 @@
 import unittest
-import workflow_generator
+import daisy_workflow_generator
 
 
-class TestWorkflowGenerator(unittest.TestCase):
+class TestDaisyWorkflowGenerator(unittest.TestCase):
 
-  def test_generate_workflow_script(self):
+  def test_generate_daisy_workflow(self):
     args = {
         'family' : 'debian9',
         'image_name' : 'my-image',
@@ -22,7 +22,7 @@ class TestWorkflowGenerator(unittest.TestCase):
         'shutdown_timer_in_sec': 500
     }
 
-    workflow_script = workflow_generator.generate_workflow_script(args)
+    workflow_script = daisy_workflow_generator.generate(args)
 
     expected_workflow_script = """\
     {
