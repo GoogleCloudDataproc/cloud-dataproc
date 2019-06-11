@@ -1,6 +1,6 @@
 import unittest
-
 import args_parser
+
 
 class TestArgsParser(unittest.TestCase):
 
@@ -165,3 +165,7 @@ class TestArgsParser(unittest.TestCase):
         shutdown_instance_timer_sec,
         subnetwork,
         zone)
+  
+  
+  if __name__ == '__main__':
+    unittest.main()
