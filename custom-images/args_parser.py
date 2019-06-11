@@ -174,5 +174,9 @@ def parse_args(args):
       instance. This value may need to be increased if your init script
       generates a lot of output on stdout. If not specified, the default value
       of 300 seconds will be used.""")
+  parser.add_argument(
+      "--dry-run",
+      action="store_true",
+      help="""(Optional) Only generates script without creating image.""")
 
   return parser.parse_args(args)

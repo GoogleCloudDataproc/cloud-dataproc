@@ -99,6 +99,6 @@ daisy_workflow_template = """\
 }}\
 """
 
-def generate_workflow_script(args):
+def generate(args):
   """Generates a Daisy workflow script based on the input arguments."""
   return daisy_workflow_template.format(**args)

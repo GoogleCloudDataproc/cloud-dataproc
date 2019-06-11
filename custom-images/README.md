@@ -98,6 +98,8 @@ python generate_custom_image.py \
     out-of-the-box Dataproc image. This image must be a valid Dataproc image.
     The format of the partial image URI is the following:
     "projects/<project_id>/global/images/<image_name>".
+*   **--dry-run**: Dry run mode which only validates input and generates
+    workflow script without creating image. Disabled by default.
 
 ### Example
 

@@ -30,6 +30,7 @@ class TestArgsParser(unittest.TestCase):
         daisy_path="'{}'".format(daisy_path),
         dataproc_version="None",
         disk_size="15",
+        dry_run=False,
         extra_sources="{}",
         family="'dataproc-custom-image'",
         gcs_bucket="'{}'".format(gcs_bucket),
@@ -62,6 +63,7 @@ class TestArgsParser(unittest.TestCase):
     network = 'my-network'
     subnetwork = 'my-subnetwork'
     no_smoke_test = True
+    dry_run = True
     service_account = "my-service-account"
     shutdown_instance_timer_sec = 567
 
@@ -70,6 +72,7 @@ class TestArgsParser(unittest.TestCase):
         '--daisy-path', daisy_path,
         '--dataproc-version', dataproc_version,
         '--disk-size', str(disk_size),
+        '--dry-run',
         '--family', family,
         '--gcs-bucket', gcs_bucket,
         '--image-name', image_name,
@@ -90,6 +93,7 @@ class TestArgsParser(unittest.TestCase):
         daisy_path="'{}'".format(daisy_path),
         dataproc_version="'{}'".format(dataproc_version),
         disk_size="{}".format(disk_size),
+        dry_run="{}".format(dry_run),
         extra_sources="{}",
         family="'{}'".format(family),
         gcs_bucket="'{}'".format(gcs_bucket),
@@ -113,6 +117,7 @@ class TestArgsParser(unittest.TestCase):
       daisy_path,
       dataproc_version,
       disk_size,
+      dry_run,
       extra_sources,
       family,
       gcs_bucket,
@@ -133,6 +138,7 @@ class TestArgsParser(unittest.TestCase):
         "daisy_path={}, "
         "dataproc_version={}, "
         "disk_size={}, "
+        "dry_run={}, "
         "extra_sources={}, "
         "family={}, "
         "gcs_bucket={}, "
@@ -152,6 +158,7 @@ class TestArgsParser(unittest.TestCase):
         daisy_path,
         dataproc_version,
         disk_size,
+        dry_run,
         extra_sources,
         family,
         gcs_bucket,
