@@ -32,8 +32,7 @@ def create(args):
 
   # Generate Shell script.
   _LOG.info("Generating Shell script...")
-  commands = shell_script_generator.Generator().generate(vars(args))
-  script = '\n'.join(commands)
+  script = shell_script_generator.Generator().generate(vars(args))
   _LOG.info("#" * 60)
   _LOG.info(script)
   _LOG.info("#" * 60)
