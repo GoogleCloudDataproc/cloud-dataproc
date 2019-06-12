@@ -70,7 +70,7 @@ def parse_args(args):
       required=True,
       help="""User's script to install custom packages.""")
   required_args.add_argument(
-      "--daisy-path", type=str, required=True, help="""Path to daisy binary.""")
+      "--daisy-path", type=str, required=False, help="""Path to daisy binary.""")
   required_args.add_argument(
       "--zone",
       type=str,
