@@ -25,10 +25,10 @@ To generate a custom image, you can run the following command:
 
 ```shell
 python generate_custom_image.py \
-    --image-name <new_custom_image_name>
-    --dataproc-version <Dataproc version>
-    --customization-script <custom script to install custom packages>
-    --zone <zone to create instance to build custom image>
+    --image-name <new_custom_image_name> \
+    --dataproc-version <Dataproc version> \
+    --customization-script <custom script to install custom packages> \
+    --zone <zone to create instance to build custom image> \
     --gcs-bucket <gcs bucket to write logs>
 ```
 
@@ -37,11 +37,11 @@ generate the image by specifying the `--daisy-path` flag:
 
 ```shell
 python generate_custom_image.py \
-    --image-name <new_custom_image_name>
-    --dataproc-version <Dataproc version>
-    --customization-script <custom script to install custom packages>
-    --daisy-path <path to local daisy binary>
-    --zone <zone to create instance to build custom image>
+    --image-name <new_custom_image_name> \
+    --dataproc-version <Dataproc version> \
+    --customization-script <custom script to install custom packages> \
+    --daisy-path <path to local daisy binary> \
+    --zone <zone to create instance to build custom image> \
     --gcs-bucket <gcs bucket to write logs>
 ```
 
