@@ -25,15 +25,15 @@ function exit_handler() {
   fi
 
   echo 'Uploading local logs to GCS bucket.'
-  gsutil -m rsync -r /tmp/custom-image-my-image-20190611-160823/logs gs://dagang-custom-images/custom-image-my-image-20190611-160823/logs/
+  gsutil -m rsync -r /tmp/custom-image-my-image-20190611-160823/logs gs://my-bucket/custom-image-my-image-20190611-160823/logs/
 
   sleep 5
 }
 
 function main() {
   echo 'Uploading files to GCS bucket.'
-  gsutil cp       /tmp/my-script.sh       gs://dagang-custom-images/custom-image-my-image-20190611-160823/sources/init_actions.sh
-  gsutil cp run.sh gs://dagang-custom-images/custom-image-my-image-20190611-160823/sources/
+  gsutil cp       /tmp/my-script.sh       gs://my-bucket/custom-image-my-image-20190611-160823/sources/init_actions.sh
+  gsutil cp run.sh gs://my-bucket/custom-image-my-image-20190611-160823/sources/
 
   echo 'Creating disk.'
   gcloud compute disks create my-image-install       --project=my-project       --zone=us-west1-a       --image=projects/cloud-dataproc/global/images/dataproc-1-4-deb9-20190510-000000-rc01       --type=pd-ssd       --size=40GB

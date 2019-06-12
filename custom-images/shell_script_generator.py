@@ -43,7 +43,7 @@ function exit_handler() {{
   fi
 
   echo 'Uploading local logs to GCS bucket.'
-  gsutil -m rsync -r /tmp/{run_id}/logs gs://dagang-custom-images/{run_id}/logs/
+  gsutil -m rsync -r /tmp/{run_id}/logs gs://{bucket_name}/{run_id}/logs/
 
   sleep 5
 }}
@@ -52,8 +52,8 @@ function main() {{
   echo 'Uploading files to GCS bucket.'
   gsutil cp \
       {customization_script} \
-      gs://dagang-custom-images/{run_id}/sources/init_actions.sh
-  gsutil cp run.sh gs://dagang-custom-images/{run_id}/sources/
+      gs://{bucket_name}/{run_id}/sources/init_actions.sh
+  gsutil cp run.sh gs://{bucket_name}/{run_id}/sources/
 
   echo 'Creating disk.'
   gcloud compute disks create {image_name}-install \
