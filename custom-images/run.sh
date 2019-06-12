@@ -44,7 +44,7 @@ function run_custom_script() {
   gsutil -m cp -r "${DAISY_SOURCES_PATH}/*" ./
 
   # run init actions
-  bash ./init_actions.sh
+  bash -x ./init_actions.sh
 
   # get return code
   RET_CODE=$?
