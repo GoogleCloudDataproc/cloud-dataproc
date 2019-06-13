@@ -96,7 +96,7 @@ function main() {{
   elif grep 'BuildSucceeded:' {log_dir}/startup-script.log; then
     echo -e "${{GREEN}}Customization script succeeded.${{NC}}"
   else
-    echo 'Unable to determine whether customization script result.'
+    echo 'Unable to determine the customization script result.'
     exit 1
   fi
 

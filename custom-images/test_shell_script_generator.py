@@ -59,7 +59,7 @@ function main() {
   elif grep 'BuildSucceeded:' /tmp/custom-image-my-image-20190611-160823/logs/startup-script.log; then
     echo -e "${GREEN}Customization script succeeded.${NC}"
   else
-    echo 'Unable to determine whether customization script result.'
+    echo 'Unable to determine the customization script result.'
     exit 1
   fi
 
