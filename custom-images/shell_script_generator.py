@@ -25,27 +25,33 @@ _template = """
 
 set -euxo pipefail
 
-disk_created="false"
-vm_created="false"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 
 function exit_handler() {{
   echo 'Cleaning up before exiting.'
+  exit_code=$?
 
-  if [[ "$vm_created" == "true" ]]; then
+  if [[ -f /tmp/{run_id}/vm_created ]]; then
     echo 'Deleting VM instance.'
     gcloud compute instances delete {image_name}-install \
         --project={project_id} --zone={zone} -q
-  fi
-
-  if [[ "$disk_created" == "true" && "$vm_created" == "false" ]]; then
+  elif [[ -f /tmp/{run_id}/disk_created ]]; then
     echo 'Deleting disk.'
     gcloud compute disks delete {image_name}-install --project={project_id} --zone={zone} -q
   fi
 
   echo 'Uploading local logs to GCS bucket.'
-  gsutil -m rsync -r /tmp/{run_id}/logs gs://{bucket_name}/{run_id}/logs/
+  gsutil -m rsync -r {log_dir}/ {gcs_log_dir}/
 
-  sleep 5
+  if [[ $exit_code -eq 0 ]]; then
+    echo -e "${{GREEN}}Workflow succeeded${{NC}}"
+    echo -e "${{GREEN}}Check logs at {log_dir}/ or {gcs_log_dir}/"
+  else
+    echo -e "${{RED}}Workflow failed${{NC}}."
+    echo -e "${{RED}}Check logs at {log_dir}/ or {gcs_log_dir}/"
+  fi
 }}
 
 function main() {{
@@ -62,7 +68,7 @@ function main() {{
       --image={dataproc_base_image} \
       --type=pd-ssd \
       --size={disk_size}GB
-  disk_created="true"
+  touch /tmp/{run_id}/disk_created
 
   echo 'Creating VM instance to run customization script.'
   gcloud compute instances create {image_name}-install \
@@ -72,23 +78,23 @@ function main() {{
       --disk=auto-delete=yes,boot=yes,mode=rw,name={image_name}-install \
       --scopes=cloud-platform \
       --metadata=shutdown-timer-in-sec={shutdown_timer_in_sec},daisy-sources-path={daisy_sources_path},startup-script-url={startup_script_url}
-  vm_created="true"
+  touch /tmp/{run_id}/vm_created
 
-  echo 'Waiting for VM instance to shutdown.'
+  echo 'Waiting for customization script to finish.'
   gcloud compute instances tail-serial-port-output {image_name}-install \
       --project={project_id} \
       --zone={zone} \
       --port=1 2>&1 \
       | grep 'startup-script' \
-      | tee /tmp/{run_id}/logs/startup-script.log \
+      | tee {log_dir}/startup-script.log \
       || true
 
   echo 'Checking customization script result.'
-  if grep 'BuildFailed:' /tmp/{run_id}/logs/startup-script.log; then
-    echo 'Customization script failed.'
+  if grep 'BuildFailed:' {log_dir}/startup-script.log; then
+    echo -e "${{RED}}Customization script failed.${{NC}}"
     exit 1
-  elif grep 'BuildSucceeded:' /tmp/{run_id}/logs/startup-script.log; then
-    echo 'Customization script succeeded.'
+  elif grep 'BuildSucceeded:' {log_dir}/startup-script.log; then
+    echo -e "${{GREEN}}Customization script succeeded.${{NC}}"
   else
     echo 'Unable to determine whether customization script result.'
     exit 1
@@ -103,8 +109,8 @@ function main() {{
 }}
 
 trap exit_handler EXIT
-mkdir -p /tmp/{run_id}/logs
-main "$@" 2>&1 | tee /tmp/{run_id}/logs/workflow.log
+mkdir -p {log_dir}
+main "$@" 2>&1 | tee {log_dir}/workflow.log
 """
 
 class Generator:
@@ -123,11 +129,7 @@ class Generator:
         "startup_script_url"] = "gs://{bucket_name}/{run_id}/sources/run.sh".format(
             **self.args)
     self.args["log_dir"] = "/tmp/{run_id}/logs".format(**self.args)
-    self.args["workflow_log_file"] = "{log_dir}/workflow.log".format(
-        **self.args)
-    self.args[
-        "startup_script_log_file"] = "{log_dir}/startup-script.log".format(
-            **self.args)
+    self.args["gcs_log_dir"] = "gs://{bucket_name}/{run_id}/logs".format(**self.args)
     if self.args["subnetwork"]:
       self.args["subnetwork_flag"] = "--subnet={subnetwork}".format(**self.args)
       self.args["network_flag"] = ""
