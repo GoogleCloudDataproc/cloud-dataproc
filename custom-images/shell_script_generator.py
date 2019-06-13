@@ -47,10 +47,10 @@ function exit_handler() {{
 
   if [[ $exit_code -eq 0 ]]; then
     echo -e "${{GREEN}}Workflow succeeded${{NC}}"
-    echo -e "${{GREEN}}Check logs at {log_dir}/ or {gcs_log_dir}/"
+    echo -e "${{GREEN}}Check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
   else
     echo -e "${{RED}}Workflow failed${{NC}}."
-    echo -e "${{RED}}Check logs at {log_dir}/ or {gcs_log_dir}/"
+    echo -e "${{RED}}Check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
   fi
 }}
 
