@@ -14,7 +14,6 @@ NC='\033[0m'
 
 function exit_handler() {
   echo 'Cleaning up before exiting.'
-  exit_code=$?
 
   if [[ -f /tmp/custom-image-my-image-20190611-160823/vm_created ]]; then
     echo 'Deleting VM instance.'
@@ -27,12 +26,12 @@ function exit_handler() {
   echo 'Uploading local logs to GCS bucket.'
   gsutil -m rsync -r /tmp/custom-image-my-image-20190611-160823/logs/ gs://my-bucket/custom-image-my-image-20190611-160823/logs/
 
-  if [[ $exit_code -eq 0 ]]; then
-    echo -e "${GREEN}Workflow succeeded${NC}"
-    echo -e "${GREEN}Check logs at /tmp/custom-image-my-image-20190611-160823/logs/ or gs://my-bucket/custom-image-my-image-20190611-160823/logs/"
+  if [[ -f /tmp/custom-image-my-image-20190611-160823/image_created ]]; then
+    echo -e "${GREEN}Workflow succeeded, check logs at /tmp/custom-image-my-image-20190611-160823/logs/ or gs://my-bucket/custom-image-my-image-20190611-160823/logs/${NC}"
+    exit 0
   else
-    echo -e "${RED}Workflow failed${NC}."
-    echo -e "${RED}Check logs at /tmp/custom-image-my-image-20190611-160823/logs/ or gs://my-bucket/custom-image-my-image-20190611-160823/logs/"
+    echo -e "${RED}Workflow failed, check logs at /tmp/custom-image-my-image-20190611-160823/logs/ or gs://my-bucket/custom-image-my-image-20190611-160823/logs/${NC}"
+    exit 1
   fi
 }
 
@@ -49,7 +48,7 @@ function main() {
   gcloud compute instances create my-image-install       --project=my-project       --zone=us-west1-a  --subnet=my-subnet       --machine-type=n1-standard-2       --disk=auto-delete=yes,boot=yes,mode=rw,name=my-image-install       --scopes=cloud-platform       --metadata=shutdown-timer-in-sec=500,daisy-sources-path=gs://my-bucket/custom-image-my-image-20190611-160823/sources,startup-script-url=gs://my-bucket/custom-image-my-image-20190611-160823/sources/run.sh
   touch /tmp/custom-image-my-image-20190611-160823/vm_created
 
-  echo 'Waiting for customization script to finish.'
+  echo 'Waiting for customization script to finish and VM shutdown.'
   gcloud compute instances tail-serial-port-output my-image-install       --project=my-project       --zone=us-west1-a       --port=1 2>&1       | grep 'startup-script'       | tee /tmp/custom-image-my-image-20190611-160823/logs/startup-script.log       || true
 
   echo 'Checking customization script result.'
@@ -65,6 +64,7 @@ function main() {
 
   echo 'Creating custom image.'
   gcloud compute images create my-image       --project=my-project       --source-disk-zone=us-west1-a       --source-disk=my-image-install       --family=debian9
+  touch /tmp/custom-image-my-image-20190611-160823/image_created
 }
 
 trap exit_handler EXIT
