@@ -21,15 +21,27 @@ Note that custom image will expire in [60 days](https://cloud.google.com/datapro
 
 ## Generate custom image
 
-To generate a custom image, run the following command:
+To generate a custom image, you can run the following command:
 
 ```shell
 python generate_custom_image.py \
-    --image-name <new_custom_image_name>
-    --dataproc-version <Dataproc version>
-    --customization-script <custom script to install custom packages>
-    --daisy-path <path to local daisy binary>
-    --zone <zone to create instance to build custom image>
+    --image-name <new_custom_image_name> \
+    --dataproc-version <Dataproc version> \
+    --customization-script <custom script to install custom packages> \
+    --zone <zone to create instance to build custom image> \
+    --gcs-bucket <gcs bucket to write logs>
+```
+
+For backwards compatiblity, you can also use the deprecated Daisy workflow to
+generate the image by specifying the `--daisy-path` flag:
+
+```shell
+python generate_custom_image.py \
+    --image-name <new_custom_image_name> \
+    --dataproc-version <Dataproc version> \
+    --customization-script <custom script to install custom packages> \
+    --daisy-path <path to local daisy binary> \
+    --zone <zone to create instance to build custom image> \
     --gcs-bucket <gcs bucket to write logs>
 ```
 
@@ -49,12 +61,13 @@ python generate_custom_image.py \
     image. **This argument is mutually exclusive with --dataproc-version.**
 *   **--customization-script**: The script used to install custom packages on
     the image.
-*   **--daisy-path**: The path to Daisy binary.
 *   **--zone**: The GCE zone for running your GCE instance.
 *   **--gcs-bucket**: A GCS bucket to store the logs of building custom image.
 
 #### Optional Arguments
 
+*   **--daisy-path**: The path to Daisy binary. If specified, Daisy workflow will
+    be used to create the image; otherwise, shell script will be used.
 *   **--family**: The family of the source image. This will cause the latest
     non-deprecated image in the family to be used as the source image.
 *   **--project-id**: The project Id of the project where the custom image is
