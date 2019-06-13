@@ -31,7 +31,6 @@ NC='\033[0m'
 
 function exit_handler() {{
   echo 'Cleaning up before exiting.'
-  exit_code=$?
 
   if [[ -f /tmp/{run_id}/vm_created ]]; then
     echo 'Deleting VM instance.'
@@ -45,12 +44,12 @@ function exit_handler() {{
   echo 'Uploading local logs to GCS bucket.'
   gsutil -m rsync -r {log_dir}/ {gcs_log_dir}/
 
-  if [[ $exit_code -eq 0 ]]; then
-    echo -e "${{GREEN}}Workflow succeeded${{NC}}"
-    echo -e "${{GREEN}}Check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
+  if [[ -f /tmp/{run_id}/image_created ]]; then
+    echo -e "${{GREEN}}Workflow succeeded, check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
+    exit 0
   else
-    echo -e "${{RED}}Workflow failed${{NC}}."
-    echo -e "${{RED}}Check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
+    echo -e "${{RED}}Workflow failed, check logs at {log_dir}/ or {gcs_log_dir}/${{NC}}"
+    exit 1
   fi
 }}
 
@@ -80,7 +79,7 @@ function main() {{
       --metadata=shutdown-timer-in-sec={shutdown_timer_in_sec},daisy-sources-path={daisy_sources_path},startup-script-url={startup_script_url}
   touch /tmp/{run_id}/vm_created
 
-  echo 'Waiting for customization script to finish.'
+  echo 'Waiting for customization script to finish and VM shutdown.'
   gcloud compute instances tail-serial-port-output {image_name}-install \
       --project={project_id} \
       --zone={zone} \
@@ -106,6 +105,7 @@ function main() {{
       --source-disk-zone={zone} \
       --source-disk={image_name}-install \
       --family={family}
+  touch /tmp/{run_id}/image_created
 }}
 
 trap exit_handler EXIT
