@@ -49,10 +49,10 @@ python generate_custom_image.py \
 
 *   **--image-name**: The name for custom image.
 *   **--dataproc-version**: The Dataproc version for this custom image to build
-    on. Example: `1.2.13`. For a complete list of Dataproc image versions,
-    please refer to Dataproc [release
-    notes](https://cloud.google.com/dataproc/docs/release-notes). To understand
-    Dataproc versioning, please refer to
+    on. Examples: `1.4.5-debian9`, `1.4.0-RC10-debian9`, `1.4.5-ubuntu18`.
+    For a complete list of Dataproc image versions, please refer to Dataproc
+    [release notes](https://cloud.google.com/dataproc/docs/release-notes).
+    To understand Dataproc versioning, please refer to
     [documentation](https://cloud.google.com/dataproc/docs/concepts/versioning/overview).
     **This argument is mutually exclusive with --base-image-uri**.
 *   **--base-image-uri**: The full image URI for the base Dataproc image. The
@@ -116,25 +116,56 @@ python generate_custom_image.py \
 
 ### Example
 
-Create a custom image with name `custom-image-1-2-3` with Dataproc version
-`1.12.11`:
+#### Create a custom image without Daisy (recommended)
+
+Create a custom image with name `custom-image-1-4-5` with Dataproc version
+`1.4.5-debian9`:
+
 ```shell
-python generate_custom_image.py \ --image-name
-custom-image-1-2-3 --dataproc-version 1.2.11 --customization-script
-~/custom-script.sh --daisy-path ~/daisy --zone us-central1-f --gcs-bucket
-gs://my-test-bucket
+python generate_custom_image.py \
+    --image-name custom-image-1-4-5 \
+    --dataproc-version 1.4.5-debian9 \
+    --customization-script ~/custom-script.sh \
+    --zone us-central1-f \
+    --gcs-bucket gs://my-test-bucket
 ```
 
-Create a custom image with name `custom_image` and disables smoke test:
+#### Create a custom image with Daisy (deprecated)
+
+Create a custom image with name `custom-image-1-4-5` with Dataproc version
+`1.4.5-debian9`:
+
 ```shell
-python generate_custom_image.py \ --image-name custom-image-1-2-3
---dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
-~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --no-smoke-test
+python generate_custom_image.py \
+    --image-name custom-image-1-4-5 \
+    --dataproc-version 1.4.5-debian9 \
+    --customization-script ~/custom-script.sh \
+    --daisy-path ~/daisy \
+    --zone us-central1-f \
+    --gcs-bucket gs://my-test-bucket
 ```
 
-Create a custom image with name `custom_image` and upload extra sources to the image:
+Create a custom image with extra sources for Daisy:
+
 ```shell
-python generate_custom_image.py \ --image-name custom-image-1-2-3
---dataproc-version 1.2.11 --customization-script ~/custom-script.sh --daisy-path
-~/daisy --zone us-central1-f --gcs-bucket gs://my-test-bucket --extra-sources "{\"requirements.txt\": \"/path/to/requirements.txt\"}"
+python generate_custom_image.py \
+    --image-name custom-image-1-4-5 \
+    --dataproc-version 1.4.5-debian9 \
+    --customization-script ~/custom-script.sh \
+    --daisy-path ~/daisy \
+    --zone us-central1-f \
+    --gcs-bucket gs://my-test-bucket \
+    --extra-sources '{"requirements.txt": "/path/to/requirements.txt"}'
+```
+
+#### Create a custom image without running smoke test
+
+```shell
+python generate_custom_image.py \
+    --image-name custom-image-1-4-5 \
+    --dataproc-version 1.4.5-debian9 \
+    --customization-script ~/custom-script.sh \
+    --zone us-central1-f \
+    --gcs-bucket gs://my-test-bucket \
+    --no-smoke-test
 ```
