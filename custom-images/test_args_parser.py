@@ -37,6 +37,7 @@ class TestArgsParser(unittest.TestCase):
         image_name="'{}'".format(image_name),
         machine_type="'n1-standard-1'",
         network="'{}'".format(''),
+        no_external_ip="False",
         no_smoke_test="False",
         oauth="None",
         project_id="None",
@@ -62,6 +63,7 @@ class TestArgsParser(unittest.TestCase):
     disk_size = 40
     network = 'my-network'
     subnetwork = 'my-subnetwork'
+    no_external_ip = True
     no_smoke_test = True
     dry_run = True
     service_account = "my-service-account"
@@ -78,6 +80,7 @@ class TestArgsParser(unittest.TestCase):
         '--image-name', image_name,
         '--machine-type', machine_type,
         '--network', network,
+        '--no-external-ip',
         '--no-smoke-test',
         '--oauth', oauth,
         '--project-id', project_id,
@@ -100,6 +103,7 @@ class TestArgsParser(unittest.TestCase):
         image_name="'{}'".format(image_name),
         machine_type="'{}'".format(machine_type),
         network="'{}'".format(network),
+        no_external_ip="{}".format(no_external_ip),
         no_smoke_test="{}".format(no_smoke_test),
         oauth="'{}'".format(oauth),
         project_id="'{}'".format(project_id),
@@ -124,6 +128,7 @@ class TestArgsParser(unittest.TestCase):
       image_name,
       machine_type,
       network,
+      no_external_ip,
       no_smoke_test,
       oauth,
       project_id,
@@ -145,6 +150,7 @@ class TestArgsParser(unittest.TestCase):
         "image_name={}, "
         "machine_type={}, "
         "network={}, "
+        "no_external_ip={}, "
         "no_smoke_test={}, "
         "oauth={}, "
         "project_id={}, "
@@ -165,6 +171,7 @@ class TestArgsParser(unittest.TestCase):
         image_name,
         machine_type,
         network,
+        no_external_ip,
         no_smoke_test,
         oauth,
         project_id,
@@ -172,7 +179,7 @@ class TestArgsParser(unittest.TestCase):
         shutdown_instance_timer_sec,
         subnetwork,
         zone)
-  
-  
+
+
   if __name__ == '__main__':
     unittest.main()

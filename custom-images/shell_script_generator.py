@@ -72,7 +72,10 @@ function main() {{
   echo 'Creating VM instance to run customization script.'
   gcloud compute instances create {image_name}-install \
       --project={project_id} \
-      --zone={zone} {network_flag} {subnetwork_flag} \
+      --zone={zone} \
+      {network_flag} \
+      {subnetwork_flag} \
+      {no_external_ip_flag} \
       --machine-type={machine_type} \
       --disk=auto-delete=yes,boot=yes,mode=rw,name={image_name}-install \
       --scopes=cloud-platform \
@@ -136,6 +139,11 @@ class Generator:
     elif self.args["network"]:
       self.args["network_flag"] = "--network={network}".format(**self.args)
       self.args["subnetwork_flag"] = ""
+    if self.args["no_external_ip"]:
+      self.args["no_external_ip_flag"] = "--no-address"
+    else:
+      self.args["no_external_ip_flag"] = ""
+
 
   def generate(self, args):
     self._init_args(args)
