@@ -139,10 +139,7 @@ class Generator:
     elif self.args["network"]:
       self.args["network_flag"] = "--network={network}".format(**self.args)
       self.args["subnetwork_flag"] = ""
-    if self.args["no_external_ip"]:
-      self.args["no_external_ip_flag"] = "--no-address"
-    else:
-      self.args["no_external_ip_flag"] = ""
+    self.args["no_external_ip_flag"] = "--no-address" if self.args["no_external_ip"] else ""
 
 
   def generate(self, args):
