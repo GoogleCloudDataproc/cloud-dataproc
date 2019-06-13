@@ -94,6 +94,12 @@ python generate_custom_image.py \
     subnetwork URL is required. The default subnetwork is None. For more
     information, please refer to (GCE VPC
     documentation)[https://cloud.google.com/vpc/docs/vpc].
+*   **--no-external-ip**: This parameter is used to disables external IP for the
+    image build VM. The VM will not be able to access the internet, but if
+    [Private Google Access](https://cloud.google.com/vpc/docs/configure-private-google-access)
+    is enabled for the subnetwork, it can still access Google services
+    (e.g., GCS) through internal IP of the VPC. This flag is ignored when
+    `--daisy-path` is specified.
 *   **--service-account**: The service account that is used to launch the VM
     instance that builds the custom Dataproc image. The scope of this service
     account is defaulted to "/auth/cloud-platform", which authorizes VM instance

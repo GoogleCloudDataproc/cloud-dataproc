@@ -45,7 +45,7 @@ function main() {
   touch /tmp/custom-image-my-image-20190611-160823/disk_created
 
   echo 'Creating VM instance to run customization script.'
-  gcloud compute instances create my-image-install       --project=my-project       --zone=us-west1-a  --subnet=my-subnet       --machine-type=n1-standard-2       --disk=auto-delete=yes,boot=yes,mode=rw,name=my-image-install       --scopes=cloud-platform       --metadata=shutdown-timer-in-sec=500,daisy-sources-path=gs://my-bucket/custom-image-my-image-20190611-160823/sources,startup-script-url=gs://my-bucket/custom-image-my-image-20190611-160823/sources/run.sh
+  gcloud compute instances create my-image-install       --project=my-project       --zone=us-west1-a              --subnet=my-subnet       --no-address       --machine-type=n1-standard-2       --disk=auto-delete=yes,boot=yes,mode=rw,name=my-image-install       --scopes=cloud-platform       --metadata=shutdown-timer-in-sec=500,daisy-sources-path=gs://my-bucket/custom-image-my-image-20190611-160823/sources,startup-script-url=gs://my-bucket/custom-image-my-image-20190611-160823/sources/run.sh
   touch /tmp/custom-image-my-image-20190611-160823/vm_created
 
   echo 'Waiting for customization script to finish and VM shutdown.'
@@ -84,12 +84,13 @@ class TestShellScriptGenerator(unittest.TestCase):
         'disk_size': 40,
         'gcs_bucket': 'gs://my-bucket',
         'network': 'my-network',
+        'subnetwork': 'my-subnet',
+        'no_external_ip': True,
         'zone': 'us-west1-a',
         'dataproc_base_image':
         'projects/cloud-dataproc/global/images/dataproc-1-4-deb9-20190510-000000-rc01',
         'service_account': 'my-service-account',
         'oauth': '',
-        'subnetwork': 'my-subnet',
         'project_id': 'my-project',
         'shutdown_timer_in_sec': 500
     }
