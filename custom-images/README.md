@@ -1,3 +1,9 @@
+# Important notes
+
+This project has been moved to [dataproc-custom-images](https://github.com/GoogleCloudPlatform/dataproc-custom-images).
+Please clone repo, file issues or create pull requests there. The code here is
+out-dated and unsupported, we might delete this folder in the future.
+
 # Build custom Dataproc images
 
 This page describes how to generate a custom Dataproc image.
