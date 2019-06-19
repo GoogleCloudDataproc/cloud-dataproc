@@ -25,10 +25,10 @@ months=(01 02 03 04 05 06 07 08 09 10 11 12)
 tables=$(bq ls fh-bigquery:reddit_posts) 
 
 year=${base_year}
-
+warm_up=true 
 # Iterate for every year / month pair starting from January 2016 up through the current year.
 while [[ ${year} -le $(date +%Y) ]]
-do}
+do
   for month in "${months[@]}"
   do
       # If the YYYY_MM table doesn't exist, we skip over it.
@@ -36,15 +36,21 @@ do}
       if [ -z "${exists}" ]; then
         continue
       fi
-      
+      echo "${year}_${month}"
+
       # Submit a PySpark job via the Cloud Dataproc Jobs API
       gcloud dataproc jobs submit pyspark \
-        --cluster ws-spark-7 \ 
-        --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \ # Provide path to jar for the spark-bigquery-connector
-        --driver-log-levels root=FATAL \ # Suppress all non-fatal logs
-        backfill.py \ # Local Python script to execute
-        -- ${year} ${month} & # These are passed into the Python script
-      sleep 5 
+        --cluster ws-spark-15 \
+        --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \
+        --driver-log-levels root=FATAL \
+        backfill.py \
+        -- ${year} ${month} &
+      sleep 5
+
+      if ${warm_up}; then 
+          sleep 10
+          warm_up=false 
+      fi
   done
   ((year ++))
 done

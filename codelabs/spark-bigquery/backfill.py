@@ -15,13 +15,16 @@
 
 # This code accompanies the codelab <NAME>. It contains a script for backfilling a set of data 
 
-# Basic Python Imports
+# Python Imports
 import re
 import time
 import sys
 
 # A Spark Session is how we interact with Spark SQL to create Dataframes
 from pyspark.sql import SparkSession
+
+# PySpark function for replacing characters using a regex. We'll use this to remove newline characters.
+from pyspark.sql.functions import regexp_replace, col
 
 # Library for interacting with Google Cloud Storage
 from google.cloud import storage
@@ -37,7 +40,7 @@ year = sys.argv[1]
 month = sys.argv[2]
           
 # Establish a subreddit to process
-subreddit = 'worldpolitics'
+subreddit = 'food'
 
 # Set Google Cloud Storage temp location          
 bucket_name = "bm_reddit"
@@ -59,10 +62,14 @@ except Py4JJavaError:
 
 print(f"Processing {table}.")
 
-# Select the "body" and "created_utc" columns of the designated subreddit
+# Select the "title", "selftext" and "created_utc" columns of the designated subreddit
 subreddit_timestamps = (
     df
-    .select("title", "selftext", "created_utc")
+    .select(
+        regexp_replace(col("title"), "\n", " "),
+        regexp_replace(col("selftext"), "\n", " "),
+        "created_utc"
+    )
     .where(df.subreddit == subreddit)
 )
         
