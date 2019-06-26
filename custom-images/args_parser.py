@@ -70,7 +70,7 @@ def parse_args(args):
       required=True,
       help="""User's script to install custom packages.""")
   required_args.add_argument(
-      "--daisy-path", type=str, required=True, help="""Path to daisy binary.""")
+      "--daisy-path", type=str, required=False, help="""Path to daisy binary.""")
   required_args.add_argument(
       "--zone",
       type=str,
@@ -132,6 +132,14 @@ def parse_args(args):
       that builds the custom image. A full subnetwork URL is required.
       Default subnetwork is None. For shared VPC only provide this parameter and
       do not use the --network argument.""")
+  parser.add_argument(
+      "--no-external-ip",
+      action="store_true",
+      help="""(Optional) Disables external IP for the image build VM. The VM
+      will not be able to access the internet, but if Private Google
+      Access is enabled for the subnetwork, it can still access Google services
+      (e.g., GCS) through internal IP of the VPC. This flag is ignored when
+      --daisy-path is specified.""")
   parser.add_argument(
       "--service-account",
       type=str,

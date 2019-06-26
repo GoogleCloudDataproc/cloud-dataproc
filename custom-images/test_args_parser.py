@@ -1,3 +1,16 @@
+# Copyright 2019 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the 'License');
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#            http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an 'AS IS' BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import unittest
 import args_parser
 
@@ -37,6 +50,7 @@ class TestArgsParser(unittest.TestCase):
         image_name="'{}'".format(image_name),
         machine_type="'n1-standard-1'",
         network="'{}'".format(''),
+        no_external_ip="False",
         no_smoke_test="False",
         oauth="None",
         project_id="None",
@@ -62,6 +76,7 @@ class TestArgsParser(unittest.TestCase):
     disk_size = 40
     network = 'my-network'
     subnetwork = 'my-subnetwork'
+    no_external_ip = True
     no_smoke_test = True
     dry_run = True
     service_account = "my-service-account"
@@ -78,6 +93,7 @@ class TestArgsParser(unittest.TestCase):
         '--image-name', image_name,
         '--machine-type', machine_type,
         '--network', network,
+        '--no-external-ip',
         '--no-smoke-test',
         '--oauth', oauth,
         '--project-id', project_id,
@@ -100,6 +116,7 @@ class TestArgsParser(unittest.TestCase):
         image_name="'{}'".format(image_name),
         machine_type="'{}'".format(machine_type),
         network="'{}'".format(network),
+        no_external_ip="{}".format(no_external_ip),
         no_smoke_test="{}".format(no_smoke_test),
         oauth="'{}'".format(oauth),
         project_id="'{}'".format(project_id),
@@ -124,6 +141,7 @@ class TestArgsParser(unittest.TestCase):
       image_name,
       machine_type,
       network,
+      no_external_ip,
       no_smoke_test,
       oauth,
       project_id,
@@ -145,6 +163,7 @@ class TestArgsParser(unittest.TestCase):
         "image_name={}, "
         "machine_type={}, "
         "network={}, "
+        "no_external_ip={}, "
         "no_smoke_test={}, "
         "oauth={}, "
         "project_id={}, "
@@ -165,6 +184,7 @@ class TestArgsParser(unittest.TestCase):
         image_name,
         machine_type,
         network,
+        no_external_ip,
         no_smoke_test,
         oauth,
         project_id,
@@ -172,7 +192,7 @@ class TestArgsParser(unittest.TestCase):
         shutdown_instance_timer_sec,
         subnetwork,
         zone)
-  
-  
+
+
   if __name__ == '__main__':
     unittest.main()
