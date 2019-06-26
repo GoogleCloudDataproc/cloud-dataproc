@@ -24,7 +24,7 @@ from pyspark.sql import SparkSession
 # This will help catch some PySpark errors
 from py4j.protocol import Py4JJavaError
 
-# Create a SparkSession uder the name "reddit". Viewable via the Spark UI
+# Create a SparkSession under the name "reddit". Viewable via the Spark UI
 spark = SparkSession.builder.appName("reddit").getOrCreate()
 
 # Create a two column schema consisting of a string and a long integer

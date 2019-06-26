@@ -15,7 +15,7 @@
 
 # This code accompanies the codelab <NAME>. It contains a script for backfilling a set of data 
 
-# Python Imports
+# Python imports
 import re
 import time
 import sys
@@ -38,12 +38,12 @@ spark = SparkSession.builder.appName("reddit").getOrCreate()
 # Establish a set of years and months to iterate over
 year = sys.argv[1]
 month = sys.argv[2]
+bucket_name = sys.argv[3]
           
 # Establish a subreddit to process
 subreddit = 'food'
 
 # Set Google Cloud Storage temp location          
-bucket_name = "bm_reddit"
 path = "tmp" + str(time.time())
 
 # Keep track of all tables accessed via the job
@@ -62,7 +62,8 @@ except Py4JJavaError:
 
 print(f"Processing {table}.")
 
-# Select the "title", "selftext" and "created_utc" columns of the designated subreddit
+# Select the "title", "selftext" and "created_utc" columns of the designated subreddit and
+# replace newline characters with a single space
 subreddit_timestamps = (
     df
     .select(
@@ -75,7 +76,7 @@ subreddit_timestamps = (
         
 tmp_output_path = "gs://" + bucket_name + "/" + path + "/" + year + "/" + month
 # Write output to our temp GCS bucket. Spark jobs can be written out to multiple files 
-# partitions.By using coalesce, we ensure the output is consolidated to a single file.
+# and partitions. By using coalesce, we ensure the output is consolidated to a single file.
 # We then use .options to tell Spark to write out in a gzip format, and .csv to do the write.
 (
     subreddit_timestamps

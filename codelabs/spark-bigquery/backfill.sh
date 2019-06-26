@@ -26,6 +26,10 @@ tables=$(bq ls fh-bigquery:reddit_posts)
 
 year=${base_year}
 warm_up=true 
+
+# Set the name of the output bucket
+bucket=${1}
+
 # Iterate for every year / month pair starting from January 2016 up through the current year.
 while [[ ${year} -le $(date +%Y) ]]
 do
@@ -44,7 +48,7 @@ do
         --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \
         --driver-log-levels root=FATAL \
         backfill.py \
-        -- ${year} ${month} &
+        -- ${year} ${month} ${bucket} &
       sleep 5
 
       if ${warm_up}; then 
