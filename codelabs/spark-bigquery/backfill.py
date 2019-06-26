@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# This code accompanies the codelab <NAME>. It contains a script for backfilling a set of data 
+# This code accompanies this codelab: https://codelabs.developers.google.com/codelabs/pyspark-bigquery/. 
+# This is a script for backfilling a set of data from Reddit into Google Cloud Storage
 
 # Python imports
 import re

@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is associated with the codelab found at <url>. This kicks off a 
-# series of Cloud Dataproc PySpark Jobs.
+# This script is associated with the codelab found at https://codelabs.developers.google.com/codelabs/pyspark-bigquery/. 
+# This script kicks off a series of Cloud Dataproc PySpark Jobs.
+# This script must be provided with a Cloud Dataproc Cluster name and Bucket name in positions arguments 1 and 2 respectively.
 
 # Starting year and all months
 base_year=2016

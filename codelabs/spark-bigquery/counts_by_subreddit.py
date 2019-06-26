@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script for viewing counts of all subreddits for a given set of years and month
-# This all come from the BigQuery via the dataset "fh-bigquery.reddit_comments"
+# This script accompanies this codelab: https://codelabs.developers.google.com/codelabs/pyspark-bigquery/.
+# This is a script for viewing counts of all subreddits for a given set of years and month
+# This data comes from BigQuery via the dataset "fh-bigquery.reddit_comments"
 
 # These allow us to create a schema for our data
 from pyspark.sql.types import StructField, StructType, StringType, LongType

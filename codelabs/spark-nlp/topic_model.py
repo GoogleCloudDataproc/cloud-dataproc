@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# This code accompanies the codelab <NAME>.
+# This code accompanies this codelab: https://codelabs.developers.google.com/codelabs/spark-nlp.
 # In this example, we will build a topic model using spark-nlp and Spark ML.
 # In order for this code to work properly, a bucket name must be provided.
 
