@@ -28,7 +28,8 @@ year=${base_year}
 warm_up=true 
 
 # Set the name of the output bucket
-bucket=${1}
+CLUSTER_NAME=${1}
+BUCKET_NAME=${2}
 
 # Iterate for every year / month pair starting from January 2016 up through the current year.
 while [[ ${year} -le $(date +%Y) ]]
@@ -44,11 +45,11 @@ do
 
       # Submit a PySpark job via the Cloud Dataproc Jobs API
       gcloud dataproc jobs submit pyspark \
-        --cluster ws-spark-15 \
+        --cluster ${CLUSTER_NAME} \
         --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \
         --driver-log-levels root=FATAL \
         backfill.py \
-        -- ${year} ${month} ${bucket} &
+        -- ${year} ${month} ${BUCKET_NAME} &
       sleep 5
 
       if ${warm_up}; then 
