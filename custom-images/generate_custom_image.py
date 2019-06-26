@@ -19,7 +19,7 @@ With the required arguments such as custom install packages script and
 Dataproc version, this script will run the following steps in order:
   1. Get user's gcloud project ID.
   2. Get Dataproc's base image name with Dataproc version.
-  3. Run Daisy workflow (on GCE) to create a custom Dataproc image.
+  3. Run Shell script or Daisy workflow to create a custom Dataproc image.
     1. Create a disk with Dataproc's base image.
     2. Create an GCE instance with the disk.
     3. Run custom install packages script to install custom packages.
@@ -44,6 +44,7 @@ import uuid
 import args_parser
 import constants
 import daisy_image_creator
+import shell_image_creator
 
 
 _IMAGE_URI = "projects/{}/global/images/{}"
@@ -131,31 +132,6 @@ def get_dataproc_base_image(version):
 
   raise RuntimeError("Cannot find dataproc base image with "
                      "dataproc-version=%s.", version)
-
-
-def run_daisy(daisy_path, workflow):
-  """Run Daisy workflow."""
-  if not os.path.isfile(daisy_path):
-    raise RuntimeError("Invalid path to Daisy binary: '%s' is not a file.",
-                       daisy_path)
-
-  # write workflow to file
-  temp_file = tempfile.NamedTemporaryFile(delete=False)
-  try:
-    temp_file.write(workflow.encode("utf-8"))
-    temp_file.flush()
-    temp_file.close()  # close this file but do not delete
-
-    # run daisy workflow, which reads the temp file
-    pipe = subprocess.Popen([daisy_path, temp_file.name])
-    pipe.wait()  # wait for daisy workflow to complete
-    if pipe.returncode != 0:
-      raise RuntimeError("Error building custom image.")
-  finally:
-    try:
-      os.remove(temp_file.name)  # delete temp file
-    except OSError:
-      pass
 
 
 def set_custom_image_label(image_name, version, project_id, parsed=False):
@@ -331,15 +307,16 @@ def infer_args(args):
     args.oauth = ""
 
   # Daisy sources
-  run_script_path = os.path.join(
-      os.path.dirname(os.path.realpath(__file__)), "run.sh")
-  daisy_sources = {
-    "run.sh": run_script_path,
-    "init_actions.sh": os.path.abspath(args.customization_script)
-  }
-  daisy_sources.update(args.extra_sources)
-  args.sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
-                        for source, path in daisy_sources.items()])
+  if args.daisy_path:
+    run_script_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "run.sh")
+    daisy_sources = {
+      "run.sh": run_script_path,
+      "init_actions.sh": os.path.abspath(args.customization_script)
+    }
+    daisy_sources.update(args.extra_sources)
+    args.sources = ",\n".join(["\"{}\": \"{}\"".format(source, path)
+                          for source, path in daisy_sources.items()])
 
   # When the user wants to create a VM in a shared VPC,
   # only the subnetwork argument has to be provided whereas
@@ -369,7 +346,7 @@ def perform_sanity_checks(args):
   _LOG.info("Performing sanity checks...")
 
   # Daisy binary
-  if not os.path.isfile(args.daisy_path):
+  if args.daisy_path and not os.path.isfile(args.daisy_path):
     raise Exception("Invalid path to Daisy binary: '{}' is not a file.".format(
         args.daisy_path))
 
@@ -377,6 +354,16 @@ def perform_sanity_checks(args):
   if not os.path.isfile(args.customization_script):
     raise Exception("Invalid path to customization script: '{}' is not a file.".format(
         args.customization_script))
+
+  # Check the image doesn't already exist.
+  command = "gcloud compute images describe {} --project={}".format(
+      args.image_name, args.project_id)
+  with open(os.devnull, 'w') as devnull:
+    pipe = subprocess.Popen(
+        [command], stdout=devnull, stderr=devnull, shell=True)
+    pipe.wait()
+    if pipe.returncode == 0:
+      raise RuntimeError("Image {} already exists.".format(args.image_name))
 
   _LOG.info("Passed sanity checks...")
 
@@ -415,22 +402,24 @@ def notify_expiration(args):
 
   if not args.dry_run:
     _LOG.info("Successfully built Dataproc custom image: %s", args.image_name)
+    creation_date = _parse_date_time(
+        get_custom_image_creation_timestamp(args.image_name, args.project_id))
+    expiration_date = creation_date + datetime.timedelta(days=60)
+    _LOG.info(
+        constants.notify_expiration_text.format(args.image_name,
+                                                str(expiration_date)))
   else:
     _LOG.info("Dry run succeeded.")
-
-  creation_date = _parse_date_time(
-      get_custom_image_creation_timestamp(args.image_name, args.project_id))
-  expiration_date = creation_date + datetime.timedelta(days=60)
-  _LOG.info(
-      constants.notify_expiration_text.format(args.image_name,
-                                              str(expiration_date)))
 
 def run():
   """Generates custom image."""
 
   args = parse_args(sys.argv[1:])
   perform_sanity_checks(args)
-  daisy_image_creator.create(args)
+  if args.daisy_path:
+    daisy_image_creator.create(args)
+  else:
+    shell_image_creator.create(args)
   add_label(args)
   run_smoke_test(args)
   notify_expiration(args)
