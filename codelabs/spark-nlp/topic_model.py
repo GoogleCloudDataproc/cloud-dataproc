@@ -212,4 +212,4 @@ for topic in topic_inds:
 
 # Let's see our topics!
 for i, topic in enumerate(topics, start=1):
-    print(f"topic {i}: {topic}")
+  print(f"topic {i}: {topic}")
