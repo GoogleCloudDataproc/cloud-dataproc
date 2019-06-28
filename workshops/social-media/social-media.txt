@@ -7,3 +7,5 @@ bit.ly/spark-nlp
 Use Google Cloud AutoML and Natural Language APIs to process Social Media data
 bit.ly/social-media-nlp
 
+Video discussing AutoML
+https://www.youtube.com/watch?reload=9&v=XrMtF_inTZ0
