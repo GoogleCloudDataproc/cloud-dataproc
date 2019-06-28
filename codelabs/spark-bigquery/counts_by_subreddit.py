@@ -44,31 +44,31 @@ months = ['01', '02', '03', '04', '05', '06',
 # Keep track of all tables accessed via the job
 tables_read = []
 for year in years:
-    for month in months:
+  for month in months:
+    
+    # In the form of <project-id>.<dataset>.<table>
+    table = f"fh-bigquery.reddit_posts.{year}_{month}"
         
-        # In the form of <project-id>.<dataset>.<table>
-        table = f"fh-bigquery.reddit_posts.{year}_{month}"
+    # If the table doesn't exist we will simply continue and not
+    # log it into our "tables_read" list
+    try:
+      table_df = spark.read.format('bigquery').option('table', table).load()
+      tables_read.append(table)
+    except Py4JJavaError:
+      continue
         
-        # If the table doesn't exist we will simply continue and not
-        # log it into our "tables_read" list
-        try:
-            table_df = spark.read.format('bigquery').option('table', table).load()
-            tables_read.append(table)
-        except Py4JJavaError:
-            continue
-        
-        # We perform a group-by on subreddit, aggregating by the count and then
-        # unioning the output to our base dataframe
-        subreddit_counts = (
-            table_df
-            .groupBy("subreddit")
-            .count()
-            .union(subreddit_counts)
-        )
+    # We perform a group-by on subreddit, aggregating by the count and then
+    # unioning the output to our base dataframe
+    subreddit_counts = (
+        table_df
+        .groupBy("subreddit")
+        .count()
+        .union(subreddit_counts)
+    )
         
 print("The following list of tables will be accounted for in our analysis:")
 for table in tables_read:
-    print(table)
+  print(table)
 
 # From our base table, we perform a group-by, summing over the counts.
 # We then rename the column and sort in descending order both for readability.
