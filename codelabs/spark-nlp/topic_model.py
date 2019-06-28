@@ -46,10 +46,10 @@ from pyspark.sql.utils import AnalysisException
 
 # Assign bucket where the data lives
 try:
-    bucket = sys.argv[1]
+  bucket = sys.argv[1]
 except IndexError:
-    print("Please provide a bucket name")
-    sys.exit(1)
+  print("Please provide a bucket name")
+  sys.exit(1)
 
 # Create a SparkSession under the name "reddit". Viewable via the Spark UI
 spark = SparkSession.builder.appName("reddit topic model").getOrCreate()
@@ -75,29 +75,29 @@ reddit_data = spark.createDataFrame([], schema)
 files_read = []
 
 for year in years:
-    for month in months:
+  for month in months:
         
-        # In the form of <project-id>.<dataset>.<table>
-        gs_uri = f"gs://{bucket}/reddit_posts/{year}/{month}/{subreddit}.csv.gz"
+    # In the form of <project-id>.<dataset>.<table>
+    gs_uri = f"gs://{bucket}/reddit_posts/{year}/{month}/{subreddit}.csv.gz"
         
-        # If the table doesn't exist we will simply continue and not
-        # log it into our "tables_read" list
-        try:
-            reddit_data = (
-                spark.read.format('csv')
-                .options(codec="org.apache.hadoop.io.compress.GzipCodec")
-                .load(gs_uri, schema=schema)
-                .union(reddit_data)
-            )
+    # If the table doesn't exist we will simply continue and not
+    # log it into our "tables_read" list
+    try:
+      reddit_data = (
+        spark.read.format('csv')
+        .options(codec="org.apache.hadoop.io.compress.GzipCodec")
+        .load(gs_uri, schema=schema)
+        .union(reddit_data)
+      )
             
-            files_read.append(gs_uri)
+      files_read.append(gs_uri)
 
-        except AnalysisException:
-            continue
+    except AnalysisException:
+      continue
         
 if len(files_read) == 0:
-    print('No files read')
-    sys.exit(1)
+  print('No files read')
+  sys.exit(1)
 
 # Replacing null values with their respective typed-equivalent is usually 
 # easier to work with. In this case, we'll replace nulls with empty strings.
@@ -109,7 +109,7 @@ df_train = (
     # Replace null values with an empty string
     .fillna("") 
     .select(
-         # Combine columns
+        # Combine columns
         concat(
             # First column to concatenate. col() is used to specify that we're referencing a column
             col("title"), 
@@ -205,10 +205,10 @@ topic_inds = [ind.termIndices for ind in raw_topics]
 # Using the below code, we can generate the mappings from our topic indicies to our vocabulary.
 topics = []
 for topic in topic_inds:
-    _topic = []
-    for ind in topic:
-        _topic.append(vocab[ind])
-    topics.append(_topic)
+  _topic = []
+  for ind in topic:
+    _topic.append(vocab[ind])
+  topics.append(_topic)
 
 # Let's see our topics!
 for i, topic in enumerate(topics, start=1):
