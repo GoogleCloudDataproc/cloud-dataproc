@@ -103,16 +103,6 @@ source_bucket = storage_client.get_bucket(bucket_name)
 # directory, so we'll make sure to find our single csv file.
 buckets = list(source_bucket.list_blobs(prefix=path))
 for bucket in buckets:
-<<<<<<< HEAD
-    name = bucket.name
-            
-    # Locate the file that represents our partition. Copy to new location and 
-    # delete temp directory.
-    if re.search(regex, name):
-       blob = source_bucket.blob(name)
-       source_bucket.copy_blob(blob, source_bucket, new_path)
-       blob.delete()
-=======
   name = bucket.name
             
   # Locate the file that represents our partition. Copy to new location and 
@@ -121,4 +111,3 @@ for bucket in buckets:
     blob = source_bucket.blob(name)
     source_bucket.copy_blob(blob, source_bucket, new_path)
     blob.delete()
->>>>>>> upstream/master
