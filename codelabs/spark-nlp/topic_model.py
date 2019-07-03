@@ -46,10 +46,17 @@ from pyspark.sql.utils import AnalysisException
 
 # Assign bucket where the data lives
 try:
+<<<<<<< HEAD
     bucket = sys.argv[1]
 except IndexError:
     print("Please provide a bucket name")
     sys.exit(1)
+=======
+  bucket = sys.argv[1]
+except IndexError:
+  print("Please provide a bucket name")
+  sys.exit(1)
+>>>>>>> upstream/master
 
 # Create a SparkSession under the name "reddit". Viewable via the Spark UI
 spark = SparkSession.builder.appName("reddit topic model").getOrCreate()
@@ -75,6 +82,7 @@ reddit_data = spark.createDataFrame([], schema)
 files_read = []
 
 for year in years:
+<<<<<<< HEAD
     for month in months:
         
         # In the form of <project-id>.<dataset>.<table>
@@ -98,6 +106,31 @@ for year in years:
 if len(files_read) == 0:
     print('No files read')
     sys.exit(1)
+=======
+  for month in months:
+        
+    # In the form of <project-id>.<dataset>.<table>
+    gs_uri = f"gs://{bucket}/reddit_posts/{year}/{month}/{subreddit}.csv.gz"
+        
+    # If the table doesn't exist we will simply continue and not
+    # log it into our "tables_read" list
+    try:
+      reddit_data = (
+        spark.read.format('csv')
+        .options(codec="org.apache.hadoop.io.compress.GzipCodec")
+        .load(gs_uri, schema=schema)
+        .union(reddit_data)
+      )
+            
+      files_read.append(gs_uri)
+
+    except AnalysisException:
+      continue
+        
+if len(files_read) == 0:
+  print('No files read')
+  sys.exit(1)
+>>>>>>> upstream/master
 
 # Replacing null values with their respective typed-equivalent is usually 
 # easier to work with. In this case, we'll replace nulls with empty strings.
@@ -109,7 +142,11 @@ df_train = (
     # Replace null values with an empty string
     .fillna("") 
     .select(
+<<<<<<< HEAD
          # Combine columns
+=======
+        # Combine columns
+>>>>>>> upstream/master
         concat(
             # First column to concatenate. col() is used to specify that we're referencing a column
             col("title"), 
@@ -205,6 +242,7 @@ topic_inds = [ind.termIndices for ind in raw_topics]
 # Using the below code, we can generate the mappings from our topic indicies to our vocabulary.
 topics = []
 for topic in topic_inds:
+<<<<<<< HEAD
     _topic = []
     for ind in topic:
         _topic.append(vocab[ind])
@@ -213,3 +251,13 @@ for topic in topic_inds:
 # Let's see our topics!
 for i, topic in enumerate(topics, start=1):
     print(f"topic {i}: {topic}")
+=======
+  _topic = []
+  for ind in topic:
+    _topic.append(vocab[ind])
+  topics.append(_topic)
+
+# Let's see our topics!
+for i, topic in enumerate(topics, start=1):
+  print(f"topic {i}: {topic}")
+>>>>>>> upstream/master
