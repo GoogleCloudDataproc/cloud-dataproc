@@ -70,7 +70,6 @@ print("The following list of tables will be accounted for in our analysis:")
 for table in tables_read:
   print(table)
 
-
 # From our base table, we perform a group-by, summing over the counts.
 # We then rename the column and sort in descending order both for readability.
 # show() will collect the table into memory output the table to std out.

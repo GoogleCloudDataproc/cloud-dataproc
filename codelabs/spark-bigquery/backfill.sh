@@ -37,7 +37,6 @@ while [[ ${year} -le $(date +%Y) ]]
 do
   for month in "${months[@]}"
   do
-<<<<<<< HEAD
       # If the YYYY_MM table doesn't exist, we skip over it.
       exists="$(echo "${tables}" | grep " ${year}_${month} ")"
       if [ -z "${exists}" ]; then
@@ -47,7 +46,7 @@ do
 
       # Submit a PySpark job via the Cloud Dataproc Jobs API
       gcloud dataproc jobs submit pyspark \
-=======
+
     # If the YYYY_MM table doesn't exist, we skip over it.
     exists="$(echo "${tables}" | grep " ${year}_${month} ")"
     if [ -z "${exists}" ]; then
@@ -57,23 +56,11 @@ do
 
     # Submit a PySpark job via the Cloud Dataproc Jobs API
     gcloud dataproc jobs submit pyspark \
->>>>>>> upstream/master
         --cluster ${CLUSTER_NAME} \
         --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \
         --driver-log-levels root=FATAL \
         backfill.py \
         -- ${year} ${month} ${BUCKET_NAME} &
-<<<<<<< HEAD
-      sleep 5
-
-      if ${warm_up}; then 
-          sleep 10
-          warm_up=false 
-      fi
-  done
-  ((year ++))
-done
-=======
     sleep 5
 
     if ${warm_up}; then 
@@ -83,4 +70,3 @@ done
   done
   ((year ++))
 done
->>>>>>> upstream/master
