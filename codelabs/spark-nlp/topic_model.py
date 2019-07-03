@@ -170,6 +170,7 @@ idf = IDF(inputCol="raw_features", outputCol="features")
 
 # LDA creates a statistical representation of how frequently words appear 
 # together in order to create "topics" or groups of commonly appearing words.
+# In this case, we'll create 5 topics.
 lda = LDA(k=5)
 
 # We add all of the transformers into a Pipeline object. Each transformer
