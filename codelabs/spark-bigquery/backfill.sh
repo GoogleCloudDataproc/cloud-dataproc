@@ -37,16 +37,6 @@ while [[ ${year} -le $(date +%Y) ]]
 do
   for month in "${months[@]}"
   do
-      # If the YYYY_MM table doesn't exist, we skip over it.
-      exists="$(echo "${tables}" | grep " ${year}_${month} ")"
-      if [ -z "${exists}" ]; then
-        continue
-      fi
-      echo "${year}_${month}"
-
-      # Submit a PySpark job via the Cloud Dataproc Jobs API
-      gcloud dataproc jobs submit pyspark \
-
     # If the YYYY_MM table doesn't exist, we skip over it.
     exists="$(echo "${tables}" | grep " ${year}_${month} ")"
     if [ -z "${exists}" ]; then

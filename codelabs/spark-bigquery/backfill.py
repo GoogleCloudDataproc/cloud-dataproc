@@ -101,13 +101,13 @@ source_bucket = storage_client.get_bucket(bucket_name)
         
 # Grab all files in the source bucket. Typically there is also a _SUCCESS file, inside of the
 # directory, so we'll make sure to find our single csv file.
-buckets = list(source_bucket.list_blobs(prefix=path))
-for bucket in buckets:
-  name = bucket.name
-            
-  # Locate the file that represents our partition. Copy to new location and 
-  # delete temp directory.
-  if re.search(regex, name):
-    blob = source_bucket.blob(name)
+blobs = list(source_bucket.list_blobs(prefix=path))
+
+# Locate the file that represents our partition. Copy to new location.
+for blob in blobs:
+  if re.search(regex, blob.name):
     source_bucket.copy_blob(blob, source_bucket, new_path)
+
+# Lastly, delete the temp directory. 
+for blob in blobs:
     blob.delete()
