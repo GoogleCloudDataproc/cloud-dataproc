@@ -100,7 +100,7 @@ storage_client = storage.Client()
 source_bucket = storage_client.get_bucket(bucket_name)
         
 # Grab all files in the source bucket. Typically there is also a _SUCCESS file, inside of the
-# directory, so we'll make sure to find our single csv file.
+# directory, so we'll make sure to find just our single csv file.
 blobs = list(source_bucket.list_blobs(prefix=path))
 
 # Locate the file that represents our partition. Copy to new location.
