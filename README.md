@@ -37,7 +37,7 @@ You can find more Dataproc resources in these github repositories:
 ### Examples
 * [Dataproc Python
   examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
-* [Dataproc Pubsub Spark Streaming example]https://github.com/GoogleCloudPlatform/dataproc-pubsub-spark-streaming)
+* [Dataproc Pubsub Spark Streaming example](https://github.com/GoogleCloudPlatform/dataproc-pubsub-spark-streaming)
 * [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/java/dataproc-wordcount)
 * [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/scala)
 
