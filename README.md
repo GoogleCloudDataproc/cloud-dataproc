@@ -16,16 +16,28 @@ See each directories README for more information.
 
 You can find more Dataproc resources in these github repositories:
 
+### Dataproc projects
 * [Dataproc initialization
   actions](https://github.com/GoogleCloudPlatform/dataproc-initialization-actions)
+* [GCP Token Broker](https://github.com/GoogleCloudPlatform/gcp-token-broker)
+* [Dataproc Custom Images](https://github.com/GoogleCloudPlatform/dataproc-custom-images)
+* [Dataproc Spawner](https://github.com/GoogleCloudPlatform/dataprocspawner)
+
+### Connectors
 * [Hadoop/Spark GCS Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/gcs)
 * [Spark BigQuery Connector](https://github.com/GoogleCloudPlatform/spark-bigquery-connector)
 * [Hadoop BigQuery Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/bigquery)
 * [Spark Pubsub Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/pubsub)
 * [Spark Spanner Connector](https://github.com/GoogleCloudPlatform/cloud-spanner-spark-connector)
-* [GCP Token Broker](https://github.com/GoogleCloudPlatform/gcp-token-broker)
+
+### Kubernetes Operators
+* [Spark kubernetes operator](https://github.com/GoogleCloudPlatform/spark-on-k8s-operator)
+* [Flink kubernetes operator](https://github.com/GoogleCloudPlatform/flink-on-k8s-operator)
+
+### Examples
 * [Dataproc Python
   examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
+* [Dataproc Pubsub Spark Streaming example])https://github.com/GoogleCloudPlatform/dataproc-pubsub-spark-streaming)
 * [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/java/dataproc-wordcount)
 * [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/scala)
 
