@@ -29,6 +29,7 @@ You can find more Dataproc resources in these github repositories:
 * [Hadoop BigQuery Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/bigquery)
 * [Spark Pubsub Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/pubsub)
 * [Spark Spanner Connector](https://github.com/GoogleCloudPlatform/cloud-spanner-spark-connector)
+* [Hive Bigquery Storage Handler](https://github.com/GoogleCloudPlatform/hive-bigquery-storage-handler)
 
 ### Kubernetes Operators
 * [Spark kubernetes operator](https://github.com/GoogleCloudPlatform/spark-on-k8s-operator)
