@@ -47,7 +47,7 @@ for year in years:
   for month in months:
     
     # In the form of <project-id>.<dataset>.<table>
-    table = "fh-bigquery.reddit_posts.{year}_{month}"
+    table = f"fh-bigquery.reddit_posts.{year}_{month}"
         
     # If the table doesn't exist we will simply continue and not
     # log it into our "tables_read" list
