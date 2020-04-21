@@ -19,7 +19,7 @@
 # This script must be provided with a Cloud Dataproc Cluster name and Bucket name in positions arguments 1 and 2 respectively.
 
 # Starting year and all months
-base_year=2016
+base_year=2017
 months=(01 02 03 04 05 06 07 08 09 10 11 12)
 
 # Grab list of existing BigQuery tables
@@ -47,7 +47,7 @@ do
     # Submit a PySpark job via the Cloud Dataproc Jobs API
     gcloud dataproc jobs submit pyspark \
         --cluster ${CLUSTER_NAME} \
-        --jars gs://spark-lib/bigquery/spark-bigquery-latest.jar \
+        --jars gs://spark-lib/bigquery/spark-bigquery-latest_2.12.jar \
         --driver-log-levels root=FATAL \
         backfill.py \
         -- ${year} ${month} ${BUCKET_NAME} &
