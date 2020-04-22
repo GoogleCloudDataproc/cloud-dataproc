@@ -60,3 +60,5 @@ do
   done
   ((year ++))
 done
+
+wait
