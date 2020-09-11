@@ -57,8 +57,11 @@ for year in years:
             table_df = (spark.read.format('bigquery').option('table', table)
                         .load())
             tables_read.append(table)
-        except Py4JJavaError:
-            continue
+        except Py4JJavaError as e:
+            if f"Table {table} not found" in str(e):
+                continue
+            else:
+                raise
 
         # We perform a group-by on subreddit, aggregating by the count and then
         # unioning the output to our base dataframe
