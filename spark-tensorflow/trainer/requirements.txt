@@ -7,7 +7,7 @@ numpy==1.13.0
 pbr==3.0.1
 protobuf==3.3.0
 six==1.10.0
-tensorflow==1.15.2
+tensorflow==1.15.4
 Werkzeug==0.15.3
 google-cloud-core==0.27.1
 google-cloud-storage==1.4.0
