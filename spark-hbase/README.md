@@ -27,12 +27,12 @@ CLUSTER=dataproc-hbase-cluster
 
 ```
 gcloud dataproc clusters create ${CLUSTER} \
---project=${PROJECT} \
---image-version=${IMAGE_VERSION} \
---region=${REGION} \
---num-workers=${WORKERS}
---optional-components=ZOOKEEPER,HBASE \
---enable-component-gateway
+  --project=${PROJECT} \
+  --image-version=${IMAGE_VERSION} \
+  --region=${REGION} \
+  --num-workers=${WORKERS} \
+  --optional-components=ZOOKEEPER,HBASE \
+  --enable-component-gateway
 ```
 
 ## Create HBase table via HBase Shell
@@ -67,7 +67,12 @@ mvn clean package
 To submit the Java Spark job, using the command below:
 
 ```
-gcloud dataproc jobs submit spark --class=hbase.SparkHBaseMain --jars=spark-hbase-1.0-SNAPSHOT.jar --project=${PROJECT} --region=${REGION} --cluster=${CLUSTER} --properties='spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*'
+gcloud dataproc jobs submit spark --class=hbase.SparkHBaseMain \
+  --jars=spark-hbase-1.0-SNAPSHOT.jar \
+  --project=${PROJECT} \
+  --region=${REGION} \
+  --cluster=${CLUSTER} \
+  --properties='spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*'
 ```
 
 ### Submit the PySpark job
@@ -75,7 +80,11 @@ gcloud dataproc jobs submit spark --class=hbase.SparkHBaseMain --jars=spark-hbas
 To submit the PySpark job, using the command below:
 
 ```
-gcloud dataproc jobs submit pyspark --project=${PROJECT} --region=${REGION} --cluster=${CLUSTER} --properties='spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*' pyspark-hbase.py
+gcloud dataproc jobs submit pyspark --project=${PROJECT} \
+  --region=${REGION} \
+  --cluster=${CLUSTER} \
+  --properties='spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*' \
+  pyspark-hbase.py
 ```
 
 > You need to pass the Spark properties “spark.driver.extraClassPath” and “spark.executor.extraClassPath” to add HBase configuration and HBase library to classpath. Otherwise, the job will fail with exceptions.
@@ -84,13 +93,13 @@ Alternatively, you can add above properties when creating the Dataproc cluster s
 
 ```
 gcloud dataproc clusters create ${CLUSTER} \
---project=${PROJECT} \
---image-version=${IMAGE_VERSION} \
---region=${REGION} \
---num-workers=${WORKERS} \
---optional-components=ZOOKEEPER,HBASE \
---enable-component-gateway
---properties='spark:spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark:spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*’
+  --project=${PROJECT} \
+  --image-version=${IMAGE_VERSION} \
+  --region=${REGION} \
+  --num-workers=${WORKERS} \
+  --optional-components=ZOOKEEPER,HBASE \
+  --enable-component-gateway
+  --properties='spark:spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark:spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*’
 ```
 
 ## Verify the data in HBase shell
@@ -102,8 +111,8 @@ After the Spark job is successfully, you can follow these steps to verify the da
 ```
 hbase shell
 ```
-3. Create HBase table with a column family:
-4. 
+3. Scan the table to view the data using command:
+
 ```
 scan 'my_table'
 ```
