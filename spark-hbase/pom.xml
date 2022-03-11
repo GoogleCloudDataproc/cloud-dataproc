@@ -14,7 +14,7 @@
         <scala.version>2.12.14</scala.version>
         <scala.main.version>2.12</scala.main.version>
         <spark.version>3.1.2</spark.version>
-        <hbase.client.version>2.2.6</hbase.client.version>
+        <hbase.client.version>2.2.7</hbase.client.version>
         <hbase-spark.version>1.0.0</hbase-spark.version>
     </properties>
 
