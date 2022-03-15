@@ -98,7 +98,7 @@ gcloud dataproc clusters create ${CLUSTER} \
   --region=${REGION} \
   --num-workers=${WORKERS} \
   --optional-components=ZOOKEEPER,HBASE \
-  --enable-component-gateway
+  --enable-component-gateway \
   --properties='spark:spark.driver.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*,spark:spark.executor.extraClassPath=/etc/hbase/conf:/usr/lib/hbase/*’
 ```
 
