@@ -1,0 +1,19 @@
+jobs:
+- spark_job:
+    args:
+    - --inputPath=gs://your_bucket/your_input_data_path/
+    - --outputTable=your_table
+    - --writeMode=false
+    - --temporaryGcsBucketPath=your_temp_bq_bucket
+    main_jar_file_uri: gs://your_bucket/your_spark_app.jar
+  step_id: batch-gcs-bq-workflow
+placement:
+  managed_cluster:
+    cluster_name: your-managed-cluster-name
+    config:
+      gce_cluster_config:
+        zone_uri: your_zone
+      master_config:
+        num_instances: 1
+      worker_config:
+        num_instances: 3
