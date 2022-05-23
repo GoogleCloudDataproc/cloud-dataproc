@@ -18,8 +18,6 @@ package com.google.cloud.write
 import org.apache.spark.sql
 import org.apache.spark.sql.streaming.Trigger
 
-// https://medium.com/swlh/unit-testing-apache-spark-structured-streaming-using-memorystream-8e77e97c5f5d
-
 class WriteStorage {
 
   def write(df: sql.DataFrame, outputPath: String, checkpointPath: String, triggerTime: String) : Unit = {
