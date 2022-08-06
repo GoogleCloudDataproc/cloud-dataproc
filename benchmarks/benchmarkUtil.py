@@ -77,9 +77,8 @@ class Benchmark:
         return scenarios
 
     def read_template_yaml(self):
-        stream = open(self.cluster_template_path, 'r')
-        template = yaml.safe_load(stream)
-        stream.close()
+        with open(self.cluster_template_path, 'r') as stream:
+            template = yaml.safe_load(stream)
         return template
 
     def write_scenarios_yaml(self, data, scenario, scenario_file):
