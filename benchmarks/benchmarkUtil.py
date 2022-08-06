@@ -82,9 +82,8 @@ class Benchmark:
         return template
 
     def write_scenarios_yaml(self, data, scenario, scenario_file):
-        stream = open(scenario_file, 'w')
-        yaml.dump(data, stream, default_flow_style=False)
-        stream.close()
+        with open(scenario_file, 'w') as stream:
+            yaml.dump(data, stream, default_flow_style=False)
 
     def merge_dicts(self, original, override):
         """
