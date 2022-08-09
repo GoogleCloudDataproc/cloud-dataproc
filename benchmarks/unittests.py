@@ -24,10 +24,8 @@ class VerifyBenchmarking(unittest.TestCase):
 
     def read_yaml(self, yaml_name):
         """Safely open, read and close any yaml file."""
-        stream = open(yaml_name, 'r')
-        yaml_file = yaml.safe_load(stream)
-        stream.close()
-        return yaml_file
+        with open(yaml_name, 'r') as stream:
+            return yaml.safe_load(stream)
 
     def test_job_is_merged_with_good_arguments(self):
         """Testing passing PySpark job and its args."""

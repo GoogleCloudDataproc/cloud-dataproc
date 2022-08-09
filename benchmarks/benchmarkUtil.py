@@ -72,21 +72,16 @@ class Benchmark:
         self.scenario_file_name = scenarios
 
     def read_scenarios_yaml(self):
-        stream = open(self.scenario_file_name, 'r')
-        scenarios = yaml.safe_load(stream)
-        stream.close()
-        return scenarios
+        with open(self.scenario_file_name, 'r') as stream:
+            return yaml.safe_load(stream)
 
     def read_template_yaml(self):
-        stream = open(self.cluster_template_path, 'r')
-        template = yaml.safe_load(stream)
-        stream.close()
-        return template
+        with open(self.cluster_template_path, 'r') as stream:
+            return yaml.safe_load(stream)
 
     def write_scenarios_yaml(self, data, scenario, scenario_file):
-        stream = open(scenario_file, 'w')
-        yaml.dump(data, stream, default_flow_style=False)
-        stream.close()
+        with open(scenario_file, 'w') as stream:
+            yaml.dump(data, stream, default_flow_style=False)
 
     def merge_dicts(self, original, override):
         """
