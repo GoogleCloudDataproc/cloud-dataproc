@@ -73,13 +73,11 @@ class Benchmark:
 
     def read_scenarios_yaml(self):
         with open(self.scenario_file_name, 'r') as stream:
-            scenarios = yaml.safe_load(stream)
-            return scenarios
+            return yaml.safe_load(stream)
 
     def read_template_yaml(self):
         with open(self.cluster_template_path, 'r') as stream:
-            template = yaml.safe_load(stream)
-            return template
+            return yaml.safe_load(stream)
 
     def write_scenarios_yaml(self, data, scenario, scenario_file):
         with open(scenario_file, 'w') as stream:
