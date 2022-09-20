@@ -23,4 +23,9 @@ Follow the links below for instructions on how to create a Dataproc Cluster with
 * 2.1. Google Cloud Storage (CSV) & Spark DataFrames
 * 3.1. Spark DataFrames & Pandas Plotting
 
+### Neo4j examples (Python and PySpark)
+
+* / neo4j / 1.1. Similarity Example, Graph Data Science Client - Python
+* / neo4j / 1.2. Similarity Example, Python Client
+* / neo4j / 1.3. Similarity Example, BigQuery Storage & Spark Connector & GDS Client - Python
 

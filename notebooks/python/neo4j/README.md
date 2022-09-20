@@ -1,22 +1,8 @@
-# Neo4j: The Sparks are Flying!
-
-[Anthony Krinsky](mailto:anthony.krinsky@neo4j.com)<br>
-Senior Presales Engineer, Neo4j
+# Neo4j Python Examples
 
 ![Neo4j + Google Data Proc](images/neo4j_dataproc_mkture.png)
 
-Increasing demands on data scientists require higher productivity tools.  Most data scientists are still rolling their own algorithms or using “[free code](https://wiki.python.org/moin/PythonGraphLibraries)” for the job.  Others have already discovered that adding Neo4j to their python data science tool-belt offers these benefits:
-
-<li>Persisting data across runs</li>
-<li>Easy querying of graph structures using Cypher query language</li>
-<li>Executing more complex algorithms faster thanks to constant-time O(1) query behavior</li>
-<li>Participating in a community of over 200,000 graph experts</li>
-<li>Sharing graph datasets between processes and team members</li>
-<li>Running more than 60+ graph data science algorithms and ML  in memory</li>
-<li>Exporting graph embeddings to AI/ML systems</li>
-<li>Starting right (and even for free) with the #1 graph database</li>
-
-In this post we attempt to de-risk your next graph data science project by showing how to load data from text and relational sources, run graph data science algorithms on in-memory projections, write enriched features back to the database and then export them to relational stores, for example BigQuery.
+In these examples we show how to load data from text and relational sources, run graph data science algorithms on in-memory projections, write enriched features back to the database and then export them to BigQuery.
 
 As with most data science journeys, this scenario is iterative and interactive.  We normalize the data with log functions, calculate similarity using K-Nearest neighbors and Euclidean distance, derive Louvain communities, and explore the data both in Neo4j Bloom and in our notebooks using Seaborn.
 
@@ -25,7 +11,7 @@ However, many exploratory scenarios prove so useful that they are operationalize
 The python-based examples in this repository exercise the Neo4j python client, Graph Data Science (GDS) client and Spark Connector and are free for your download and adaptation.
 
 ## Analytic Flow
-Rather than starting from scratch, this article boot-straps from a project developed by Nathan Smith in 2021 called [Create a similarity graph from node properties with Neo4j](https://medium.com/towards-data-science/create-a-similarity-graph-from-node-properties-with-neo4j-2d26bb9d829e).
+Rather than starting from scratch, these examples boot-strap a project developed by Nathan Smith in 2021 called [Create a similarity graph from node properties with Neo4j](https://medium.com/towards-data-science/create-a-similarity-graph-from-node-properties-with-neo4j-2d26bb9d829e).
 
 Nathan’s article on similarity tackles the following problem.  In advertising and other fields, it is common to think of geographies as “[metropolitan statistical areas](https://en.wikipedia.org/wiki/Metropolitan_statistical_area)” (MSAs) known by close economic ties throughout the area.  A dataset of MSAs will contain rollups of socio, economic, or other characteristics that characterize the area.  Nathan tries to answer the question which MSAs are similar and to extract most similar clusters from this dataset using Neo4j.   Similar questions could be asked of asset funds, medical treatments, molecules, voters… most anything.
 
@@ -38,15 +24,13 @@ The purpose of this article is not to retell Nathan’s blog but to make it easi
 ## Python Notebooks
 Neo4j makes it easier for data scientists to work with graphs through a variety of [client APIs](https://neo4j.com/developer/language-guides) which wrap the binary bolt protocol.  In these examples, we utilize the Neo4j Python API, Graph Data Science (GDS) api, and the Neo4j Spark Connector which offers higher-level constructs for reading and writing Spark data.
 
-This article emphasizes graph data science transformations which are iterative and don’t lend themselves to straight data pipelines.  For this reason it does not consider the forthcoming Apache Beam/DataFlow FlexTemplate or the Neo4j Data Warehouse (DWH) Connector, a metadata driven end-to-end pipeline that supports Google BigQuery as well as other databases.
+These examples emphasize graph data science transformations which are iterative and don’t lend themselves to straight data pipelines.  For this reason it does not consider the forthcoming Apache Beam/DataFlow FlexTemplate or the Neo4j Data Warehouse (DWH) Connector, a metadata driven end-to-end pipeline that supports Google BigQuery as well as other databases.
 
 Each notebook in this collection has been tested on Spark 2.12 in Google DataProc.  Updating library versions will allow these examples to run in other environments.  Other notebooks including [Collab](https://research.google.com/colaboratory/) (a free, exploratory oriented tool) and [Vertex AI Workbench](https://cloud.google.com/vertex-ai-workbench) will work as well.
 
 ![Data science stack](images/neo4j_dataproc_stack.png)
 
-A <a href="1.1. msa_similarity_gds_python3.ipynb">notebook</a> following the original article’s methodology reads data from Google Cloud Storage using cypher ``LOAD_CSV`` and executes the entire flow using the elegant Graph Data Sciences (GDS) python client.  This implementation needs only Python3 (local is fine) and runs in a single thread.  An alternative implementation uses the classic <a href="1.2. msa_similarity_python_python3.ipynb">Neo4j python client</a> for Neo4j.
-
-The <a href="1.3. msa_similarity_spark_connector_gds_bigquery_python3.ipynb">next implementation</a> requires Spark and use Spark Connector libraries for Neo4j and BigQuery.  This notebook modifies the standard flow by reading source data from BigQuery where it also writes back graph features. 
+The first <a href="1.1. Similarity Example, Graph Data Science Client - Python.ipynb">notebook</a> follows the original article’s methodology to read data from Google Cloud Storage using cypher ``LOAD_CSV`` and execute the entire flow using the elegant Graph Data Sciences (GDS) python client.  This implementation needs only Python3 (local is fine) and runs in a single thread.  An alternative implementation uses the classic <a href="1.2. Similarity Example, Python Client - Python.ipynb">Neo4j python client</a> for Neo4j.   The third and final <a href="1.3. Similarity Example, BigQuery Storage & Spark Connector & GDS Client - Python.ipynb">implementation</a> requires Spark and use Spark Connector libraries for Neo4j and BigQuery.  This notebook modifies the standard flow by reading source data from BigQuery where it also writes back graph features. 
 
 ## Pandas and DataFrames
 At the outset, let’s provide some orientation about tabular data structures in the modern data science stack.  Traditional python programs execute on a single machine and all result-sets must fit in memory unless they are streamed to a collection of files, message broker, database, or other store.  The standard way to pass rowsets from one module to another is via an in-memory table called a Panda, or confusingly, Pandas DataFrame.  Common visualization libraries such as Seaborn, consume pandas and the Neo4j GDS and Python (with coercion) client libraries, return them.
@@ -239,15 +223,31 @@ With BigQuery, a temporary Google Cloud Storage (GCS) bucket is required.  Other
     .save())
 
 ## Why it matters
-In this article we call out a handful of patterns found in three Python notebooks which implement the analytic workflow described in Nathan Smith’s wonderful article Create a similarity graph from node properties with Neo4j.
-
 Nathan says that he became a graph evangelist when he realized how much code could be avoided by persisting and querying data in Neo4j rather than re-hydrating intermediate results over and over again and using custom algorithms to analyze it.  Once the data is in Neo4j, it is also possible to leverage over 60 graph algorithms simply and declaratively.  Collaborating on a shared database is valuable.  Deleting in-memory projections is as easy as creating them.  It is easy to source data from files or relational databases, and to write back enriched features to original sources or to other targets.  Exporting graph embeddings to AI/ML systems is just another graph data science function (not shown here).
+
+Increasing demands on data scientists require higher productivity tools.  Most data scientists are still rolling their own algorithms or using “[free code](https://wiki.python.org/moin/PythonGraphLibraries)” for the job.  Others have already discovered that adding Neo4j to their python data science tool-belt offers these benefits:
+
+<li>Persisting data across runs</li>
+<li>Easy querying of graph structures using Cypher query language</li>
+<li>Executing more complex algorithms faster thanks to constant-time O(1) query behavior</li>
+<li>Participating in a community of over 200,000 graph experts</li>
+<li>Sharing graph datasets between processes and team members</li>
+<li>Running more than 60+ graph data science algorithms and ML  in memory</li>
+<li>Exporting graph embeddings to AI/ML systems</li>
+<li>Starting right (and even for free) with the #1 graph database</li>
+
+In these three notebook examples we implement the analytic workflow described in Nathan Smith’s wonderful article Create a similarity graph from node properties with Neo4j.
 
 Please leverage the examples here to get more done faster using Neo4j and a variety of pythonic APIs, with or without Spark.  The approaches described here work with most modern versions of Apache Spark >= 2.4.5, and also work with Spark 3. We suggest you try Google Dataproc.
 
-## For More Information
-For application development, if you aren’t already an Aura user, you can [sign up for AuraDB](https://neo4j.com/cloud/platform/aura-graph-database) to get started right away.  In a Spark environment, you can reference maven libraries as shown in the <a href="1.3. msa_similarity_spark_connector_gds_bigquery_python3.ipynb">example</a>, or [download Spark connector](https://neo4j.com/docs/spark/current/).  For data science, sign up for [AuraDS](https://neo4j.com/cloud/platform/aura-graph-data-science) hosted on the Google Cloud. To roll your own Neo4j cluster on the Google Cloud, check out the incrementally billed [marketplace listing](https://neo4j.com/cloud/aura-google-cloud/).
-
 We’ve already seen customers build machine learning pipelines, data science workflows, and applications using Neo4j Aura and Apache Spark, and we can’t wait to see what you will build next!
 
+## Getting Started
 The best place to find out more about this release is via the official documentation.  You can also drop by the Neo4j Community site to ask questions, or get in touch directly with your Neo4j representative.
+For application development, if you aren’t already an Aura user, you can [sign up for AuraDB](https://neo4j.com/cloud/platform/aura-graph-database) to get started right away.  For data science, sign up for [AuraDS](https://neo4j.com/cloud/platform/aura-graph-data-science) hosted on the Google Cloud. To roll your own Neo4j cluster on the Google Cloud, check out the incrementally billed [marketplace listing](https://neo4j.com/cloud/aura-google-cloud/).
+
+## Maintainer
+
+    Anthony Krinsky 
+    Sr. Sales Engineer
+    anthony.krinsky@neo4j.com
