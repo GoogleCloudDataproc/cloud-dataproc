@@ -49,6 +49,7 @@ When working distributed data on Spark cluster, the Neo4j Spark Connector provid
 ## Using the GDS client
 The GDS api is Neo4j's newest, most elegant and compact python API.  Usage requires importing a single library and instantiating an object on one line.
 
+```
     from graphdatascience import GraphDataScience
 
     neo4j_url = "bolt://<server>:7687"
@@ -56,13 +57,17 @@ The GDS api is Neo4j's newest, most elegant and compact python API.  Usage requi
     neo4j_password = "<password>"
 
     gds = GraphDataScience(neo4j_url, auth=(neo4j_user, neo4j_password))
+```
 
 Thereafter, executing Cypher statements of any kind simply requires calling:
 
+```
     gds.run_cypher('<Cypher statement>')
+```
 
 For GDS functions, invocation is fluent such as:
 
+```
     g_msa, result = gds.graph.project(
         'msa-graph',
         'MSA',
@@ -72,16 +77,19 @@ For GDS functions, invocation is fluent such as:
             "logMedianHouseholdIncome",
             "logMedianHomePrice",
             "logPercentOver25WithBachelors"])
+```
 
 In this case, `g_msa` is a handle to the in-memory projection.
 
 Writing data back from the in-memory graph is simple:
 
+```
     gds.graph.writeRelationship(
         g_msa,
         "IS_SIMILAR",
         relationship_property="similarity"
     )
+```
 
 Return data structures from the GDS client are well documented.
 
@@ -90,6 +98,7 @@ On DataProc in the current release, global variables applied in `SparkSession.bu
 
 To read records (in parallel) from Neo4j into a Spark DataFrame, execute a command like this:
 
+```
     (neo4jDf=spark.read.format("org.neo4j.spark.DataSource")
         .option("labels", "MSA")
         .option("url", neo4j_url)  
@@ -97,9 +106,11 @@ To read records (in parallel) from Neo4j into a Spark DataFrame, execute a comma
         .option("authentication.basic.username", neo4j_user)
         .option("authentication.basic.password", neo4j_password)
         .load())
+```
 
 Writing records (single threaded) to Neo4j from a Spark DataFrame can be executed like this:
 
+```
     (castBigqueryDf.write
         .format("org.neo4j.spark.DataSource")
         .mode("Overwrite")
@@ -111,6 +122,7 @@ Writing records (single threaded) to Neo4j from a Spark DataFrame can be execute
         .option("authentication.basic.password", neo4j_password)
         .option("partitions", "1")
         .save())
+```
 
 To avoid duplicating records, specify a key field in `node.keys`.  Although the Spark connector will run raw Cypher using the `query` option, it is itself a Cypher generator with a rich set of read and write option arguments that can generate Cypher for you.
 
@@ -121,15 +133,19 @@ In the helper class we can manually set parallelism using the `partitions` optio
 
 We know that Spark can collect results executed on many processes in parallel.  So how does Spark parallelize this query:
 
+```
     MATCH (p:Person) RETURN p
+```
 
 In fact, the Spark Connector parses and rewrites the query.  It first figures out how many rows your query will return (let’s say 100) and then rewrites the query so it can be sharded, this way:
 
+```
     MATCH (p:Person) RETURN p SKIP 0 LIMIT 20
     MATCH (p:Person) RETURN p SKIP 20 LIMIT 20
     MATCH (p:Person) RETURN p SKIP 40 LIMIT 20
     MATCH (p:Person) RETURN p SKIP 60 LIMIT 20
     MATCH (p:Person) RETURN p SKIP 80 LIMIT 20
+```
 
 And this is why you’ll have a hard time using SKIP and LIMIT in your Cypher queries, when running under the Spark Connector!
 
@@ -140,9 +156,11 @@ In many cases, the system of record will be an RDBMS like BigQuery.  When using 
 
 At the time of writing, DataProc supported Spark 2.4 and the following packages are required for BigQuery.
 
+```
     .config('spark.jars.packages',
     "org.neo4j:neo4j-connector-apache-spark_2.12:4.1.3_for_spark_2.4,
     com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.26.0")
+```
 
 Now that the Spark session is initialized with the right libraries (the full initializer is in the code), we can read and write to our databases.
 
@@ -155,15 +173,18 @@ You can inspect data types with the `df.printSchema()` method.
 
 There are many possible ways to recast columns in a DataFrame; here `selectExpr` is shown:
 
+```
     floatCastSelectExpr=["NAME as name","cast(POPULATION as long) population",\
     "cast(PERCENTOVER25WITHBACHELORS as float) percentOver25WithBachelors",\
     "cast(MEDIANHOMEPRICE as int) medianHomePrice",\
     "cast(MEDIANHOUSEHOLDINCOME as int) medianHouseholdIncome"]
 
     castedDf = rawDf.selectExpr(floatCastSelectExpr)
+```
 
 After down-casting doubles and decimals which Neo4j does not support, to floats or integers which it does, populating Neo4j nodes from a Spark DataFrame is trivial, and identical regardless of source.
 
+```
     (castedDf.write
     .format("org.neo4j.spark.DataSource")
     .mode("ErrorIfExists")
@@ -174,6 +195,7 @@ After down-casting doubles and decimals which Neo4j does not support, to floats 
     .option("authentication.basic.password", neo4j_password)
     .option("partitions", "1")
     .save())
+```
 
 BigQuery fully supports Neo4j datatypes but casting may be necessary if the native types are mismatched.  
 
@@ -184,6 +206,7 @@ Every time a query is executed, intermediary results will be cached in a tempora
 
 That table will be reaped after 1 day by default, more frequently if overridden.
 
+```
     spark.conf.set("viewsEnabled","true")
     spark.conf.set("materializationDataset","census")
     # if this value is too low, big query will expect that it exists in cache.  Default is 1440.
@@ -198,32 +221,40 @@ That table will be reaped after 1 day by default, more frequently if overridden.
         FROM `neo4jbusinessdev.census.msa_demos`
     """
     bigqueryDf = spark.read.format("bigquery").option("query",msa_query).load()
+```
 
 However, materialization is not necessary when using the table (vs query) option because a BigQuery likes to keep around result caches but a table (SELECT * FROM <table>) doesn’t need a copy of itself!  For example:
 
+```
     msa_table="""
         neo4jbusinessdev.census.msa_demos
     """
     tableBqDf = spark.read.format("bigquery").option("table",msa_table).load()
+```
 
 Should derivative DataFrames then be required, secondary filtering can be done using Spark SQL as shown:
 
+```
     tableBqDf.createOrReplaceTempView("msa_df")
     bigqueryPostQueryDf = spark.sql("SELECT * FROM msa_df WHERE population > 1000")
+```
 
 After enriching features in a graph, it may be desirable to write them back to a relational source for use downstream in an AI/ML pipeline, or with business intelligence clients like Tableau, Looker, or PowerBI.
 
 With BigQuery, a temporary Google Cloud Storage (GCS) bucket is required.  Otherwise, everything is straight-forward in the Spark DataFrame way.
 
-    # tmp_working_bucket
-    spark.conf.set("temporaryGcsBucket", "neo4j_sandbox")
-    (relsDf.write.format("bigquery")
-    .mode("overwrite")
-    .option("table","neo4jbusinessdev.census.msa_demo_similarity")
-    .save())
+```
+# tmp_working_bucket
+spark.conf.set("temporaryGcsBucket", "neo4j_sandbox")
+
+(relsDf.write.format("bigquery")
+  .mode("overwrite") 
+  .option("table","neo4jbusinessdev.census.msa_demo_similarity")
+  .save())
+```
 
 ## Why it matters
-Nathan says that he became a graph evangelist when he realized how much code could be avoided by persisting and querying data in Neo4j rather than re-hydrating intermediate results over and over again and using custom algorithms to analyze it.  Once the data is in Neo4j, it is also possible to leverage over 60 graph algorithms simply and declaratively.  Collaborating on a shared database is valuable.  Deleting in-memory projections is as easy as creating them.  It is easy to source data from files or relational databases, and to write back enriched features to original sources or to other targets.  Exporting graph embeddings to AI/ML systems is just another graph data science function (not shown here).
+Nathan says that he became a graph evangelist when he realized how much code could be avoided by persisting and querying data in Neo4j rather than re-hydrating intermediate results over and over again and using custom algorithms to analyze it.  Collaborating on a shared database is valuable.  Deleting in-memory projections is as easy as creating them.  It is easy to source data from files or relational databases, and to write back enriched features to original sources or to other targets.  Exporting graph embeddings to AI/ML systems is just another graph data science function (not shown here).
 
 Increasing demands on data scientists require higher productivity tools.  Most data scientists are still rolling their own algorithms or using “[free code](https://wiki.python.org/moin/PythonGraphLibraries)” for the job.  Others have already discovered that adding Neo4j to their python data science tool-belt offers these benefits:
 
@@ -234,7 +265,6 @@ Increasing demands on data scientists require higher productivity tools.  Most d
 <li>Sharing graph datasets between processes and team members</li>
 <li>Running more than 60+ graph data science algorithms and ML  in memory</li>
 <li>Exporting graph embeddings to AI/ML systems</li>
-<li>Starting right (and even for free) with the #1 graph database</li>
 
 In these three notebook examples we implement the analytic workflow described in Nathan Smith’s wonderful article Create a similarity graph from node properties with Neo4j.
 
@@ -246,6 +276,12 @@ We’ve already seen customers build machine learning pipelines, data science wo
 The best place to find out more about this release is via the official documentation.  You can also drop by the Neo4j Community site to ask questions, or get in touch directly with your Neo4j representative.
 For application development, if you aren’t already an Aura user, you can [sign up for AuraDB](https://neo4j.com/cloud/platform/aura-graph-database) to get started right away.  For data science, sign up for [AuraDS](https://neo4j.com/cloud/platform/aura-graph-data-science) hosted on the Google Cloud. To roll your own Neo4j cluster on the Google Cloud, check out the incrementally billed [marketplace listing](https://neo4j.com/cloud/aura-google-cloud/).
 
+## Github merge notes
+```
+git remote add upstream https://github.com/GoogleCloudDataproc/cloud-dataproc
+git fetch upstream master
+git rebase upstream/master
+```
 ## Maintainer
 
     Anthony Krinsky 
