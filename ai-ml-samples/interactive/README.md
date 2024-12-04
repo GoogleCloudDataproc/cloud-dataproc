@@ -4,4 +4,4 @@ There are three ways to run notebooks inside Dataproc:
 3. [Jupyter optional component](https://cloud.google.com/dataproc/docs/concepts/components/jupyter)
 
 ## Contributing
-Please follow this template (https://github.com/GoogleCloudPlatform/generative-ai/blob/main/notebook_template.ipynb) to contribute more scenarios
+Please follow this [template](https://github.com/GoogleCloudPlatform/generative-ai/blob/main/notebook_template.ipynb) to contribute more scenarios
