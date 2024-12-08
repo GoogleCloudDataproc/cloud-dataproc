@@ -4,7 +4,7 @@ This repository contains code and documentation for use with
 [Google Cloud Dataproc](https://cloud.google.com/dataproc/).
 
 ## Samples in this Repository
- * `codelabs/opencv-haarcascade` provides the source code for the [OpenCV Dataproc Codelab](https://codelabs.developers.google.com/codelabs/cloud-dataproc-opencv/index.html), which demonstrates a Spark job that adds facial detection to a set of images. 
+ * `codelabs/opencv-haarcascade` provides the source code for the [OpenCV Dataproc Codelab](https://kiosk-dot-codelabs-site.appspot.com/codelabs/cloud-dataproc-opencv/index.html?index=..%2F..hpc#0), which demonstrates a Spark job that adds facial detection to a set of images. 
 * `codelabs/spark-bigquery` provides the source code for the [PySpark for Preprocessing BigQuery Data  Codelab](https://codelabs.developers.google.com/codelabs/pyspark-bigquery/index.html), which demonstrates using PySpark on Cloud Dataproc to process data from BigQuery.
 * `codelabs/spark-nlp` provides the source code for the [PySpark for Natural Language Processing Codelab](https://codelabs.developers.google.com/codelabs/spark-nlp/index.html), which demonstrates using [spark-nlp](https://github.com/JohnSnowLabs/spark-nlp) library for Natural Language Processing.
 * `notebooks/python` provides example Jupyter notebooks to demonstrate using PySpark with the [BigQuery Storage Connector](https://github.com/GoogleCloudPlatform/spark-bigquery-connector) and the [Spark GCS Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/gcs)
@@ -40,10 +40,10 @@ You can find more Dataproc resources in these github repositories:
 
 ### Examples
 * [Dataproc Python
-  examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
+  examples](https://github.com/googleapis/python-dataproc/tree/main/samples)
 * [Dataproc Pubsub Spark Streaming example](https://github.com/GoogleCloudPlatform/dataproc-pubsub-spark-streaming)
 * [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/java/dataproc-wordcount)
-* [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/scala)
+* [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/main/bigtable/spark)
 
 ## For more information
 For more information, review the [Dataproc
