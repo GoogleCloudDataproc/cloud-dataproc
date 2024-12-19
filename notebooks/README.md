@@ -28,4 +28,3 @@ Follow the links below for instructions on how to create a Dataproc Cluster with
 * / neo4j / 1.1. Similarity Example, Graph Data Science Client - Python
 * / neo4j / 1.2. Similarity Example, Python Client
 * / neo4j / 1.3. Similarity Example, BigQuery Storage & Spark Connector & GDS Client - Python
-
