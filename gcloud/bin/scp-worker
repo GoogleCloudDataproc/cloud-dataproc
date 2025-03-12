@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS-IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+source lib/env.sh
+
+set -x
+
+if [[ -z "$1" ]]; then
+  echo "$0 [worker number] <files to copy to worker:/tmp>"
+  exit 1
+fi
+
+# If the first argument is a number, assume it indicates which worker to send file to
+WORKER_HOSTNAME="${CLUSTER_NAME}-w"
+if [[ $(perl -e "print 1 if q{$1} =~ /^\d+$/") == "1" ]]; then
+  worker_num="$1"
+  echo "worker_num: $worker_num"
+  WORKER_HOSTNAME="${WORKER_HOSTNAME}-${worker_num}"
+  shift 1
+else
+  WORKER_HOSTNAME="${WORKER_HOSTNAME}-0"  
+fi
+
+gcloud compute scp --recurse "$*" \
+  --zone ${ZONE} \
+  ${WORKER_HOSTNAME}:/tmp  \
+  --tunnel-through-iap \
+  --project ${PROJECT_ID}
+
+set +x
