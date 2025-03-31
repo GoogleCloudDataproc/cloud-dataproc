@@ -12,6 +12,7 @@ This repository contains code and documentation for use with
  * `spark-tensorflow` provides an example of using Spark as a preprocessing toolchain for Tensorflow jobs. Optionally,
  it demonstrates the [spark-tensorflow-connector](https://github.com/tensorflow/ecosystem/tree/master/spark/spark-tensorflow-connector) to convert CSV files to TFRecords.
  * `spark-translate` provides a simple demo Spark application that translates words using Google's Translation API and running on Cloud Dataproc.
+ * `gcloud` provides a set of scripts to provision dataproc clusters for use in exercising arbitrary initialization-actions.
 
 See each directories README for more information.
 
