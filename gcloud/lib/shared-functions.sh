@@ -60,7 +60,6 @@ function create_dpgce_cluster() {
     --metadata rapids-runtime="SPARK" \
     --metadata bigtable-instance=${BIGTABLE_INSTANCE} \
     --metadata include-gpus=1 \
-    --initialization-actions "${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh" \
     --image-version "${IMAGE_VERSION}" \
     --no-shielded-secure-boot \
     --initialization-action-timeout=90m \
@@ -524,10 +523,10 @@ function set_cluster_name() {
     echo "CLUSTER_NAME already set to [${cluster_name}]"
   fi
 
-  # ../env.json is the source of truth.  modify and reload env.sh
-  cp ../env.json ../env.json.tmp
-  cat ../env.json.tmp | jq ".CLUSTER_NAME |= \"${CLUSTER_NAME}\"" > ../env.json
-  rm ../env.json.tmp
+  # env.json is the source of truth.  modify and reload env.sh
+  cp env.json env.json.tmp
+  cat env.json.tmp | jq ".CLUSTER_NAME |= \"${CLUSTER_NAME}\"" > env.json
+  rm env.json.tmp
   source lib/env.sh
 }
 

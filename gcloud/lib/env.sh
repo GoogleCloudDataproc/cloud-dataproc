@@ -15,23 +15,23 @@
 # limitations under the License.
 #
 export PATH_SEPARATOR=";"
-export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER ../env.json)"
-export DOMAIN="$(jq -r .DOMAIN ../env.json)"
-export USER="$(jq -r .USER ../env.json)"
-export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN ../env.json)"
-export PRIV_USER="$(jq -r .PRIV_USER ../env.json)"
-export PROJECT_ID="$(jq -r .PROJECT_ID ../env.json)"
+export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER env.json)"
+export DOMAIN="$(jq -r .DOMAIN env.json)"
+export USER="$(jq -r .USER env.json)"
+export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN env.json)"
+export PRIV_USER="$(jq -r .PRIV_USER env.json)"
+export PROJECT_ID="$(jq -r .PROJECT_ID env.json)"
 if [[ "${PROJECT_ID}" == "ldap-example-yyyy-nn" ]]; then
   export PROJECT_ID="${USER}-example-$(date +%Y-%U)"
 fi
-export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT ../env.json)"
-export CLUSTER_NAME="$(jq -r .CLUSTER_NAME ../env.json)"
-export BUCKET="$(jq -r .BUCKET ../env.json)"
-export RANGE="$(jq -r .RANGE ../env.json)"
-export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT ../env.json)"
-export ASN_NUMBER="$(jq -r .ASN_NUMBER ../env.json)"
-export IMAGE_VERSION="$(jq -r .IMAGE_VERSION ../env.json)"
-export REGION="$(jq -r .REGION ../env.json)"
+export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT env.json)"
+export CLUSTER_NAME="$(jq -r .CLUSTER_NAME env.json)"
+export BUCKET="$(jq -r .BUCKET env.json)"
+export RANGE="$(jq -r .RANGE env.json)"
+export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT env.json)"
+export ASN_NUMBER="$(jq -r .ASN_NUMBER env.json)"
+export IMAGE_VERSION="$(jq -r .IMAGE_VERSION env.json)"
+export REGION="$(jq -r .REGION env.json)"
 
 export ZONE="${REGION}-b"
 #export ZONE="${REGION}-b"
@@ -83,15 +83,15 @@ export PRINCIPAL="${USER}@${DOMAIN}"
 export ARTIFACT_REPOSITORY="${PROJECT_ID}-dataproc-repro"
 
 # BigTable
-export BIGTABLE_INSTANCE="$(jq -r .BIGTABLE_INSTANCE ../env.json)"
+export BIGTABLE_INSTANCE="$(jq -r .BIGTABLE_INSTANCE env.json)"
 if [[ "${BIGTABLE_INSTANCE}" == "null" ]]; then
   BIGTABLE_INSTANCE="${USER}-bigtable0"
 fi
-export BIGTABLE_DISPLAY_NAME="$(jq -r .BIGTABLE_DISPLAY_NAME ../env.json)"
+export BIGTABLE_DISPLAY_NAME="$(jq -r .BIGTABLE_DISPLAY_NAME env.json)"
 if [[ "${BIGTABLE_DISPLAY_NAME}" == "null" ]]; then
   BIGTABLE_DISPLAY_NAME="bigtable-${CLUSTER_NAME}"
 fi
-export BIGTABLE_CLUSTER_CONFIG="$(jq -r .BIGTABLE_CLUSTER_CONFIG ../env.json)"
+export BIGTABLE_CLUSTER_CONFIG="$(jq -r .BIGTABLE_CLUSTER_CONFIG env.json)"
 if [[ "${BIGTABLE_CLUSTER_CONFIG}" == "null" ]]; then
   BIGTABLE_CLUSTER_CONFIG="id=${BIGTABLE_DISPLAY_NAME},zone=${ZONE},nodes=3"
 fi
