@@ -22,30 +22,26 @@ See each directories README for more information.
 You can find more Dataproc resources in these github repositories:
 
 ### Dataproc projects
-* [Dataproc initialization
-  actions](https://github.com/GoogleCloudPlatform/dataproc-initialization-actions)
+* [Dataproc initialization actions](https://github.com/GoogleCloudDataproc/initialization-actions)
 * [GCP Token Broker](https://github.com/GoogleCloudPlatform/gcp-token-broker)
-* [Dataproc Custom Images](https://github.com/GoogleCloudPlatform/dataproc-custom-images)
-* [Dataproc Spawner](https://github.com/GoogleCloudPlatform/dataprocspawner)
+* [Dataproc Custom Images](https://github.com/GoogleCloudDataproc/custom-images)
+* [JupyterHub Dataproc Spawner](https://github.com/GoogleCloudDataproc/jupyterhub-dataprocspawner)
 
 ### Connectors
-* [Hadoop/Spark GCS Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/gcs)
-* [Spark BigQuery Connector](https://github.com/GoogleCloudPlatform/spark-bigquery-connector)
-* [Hadoop BigQuery Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/bigquery)
-* [Spark Pubsub Connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/pubsub)
-* [Spark Spanner Connector](https://github.com/GoogleCloudPlatform/cloud-spanner-spark-connector)
-* [Hive Bigquery Storage Handler](https://github.com/GoogleCloudPlatform/hive-bigquery-storage-handler)
-
-### Kubernetes Operators
-* [Spark kubernetes operator](https://github.com/GoogleCloudPlatform/spark-on-k8s-operator)
-* [Flink kubernetes operator](https://github.com/GoogleCloudPlatform/flink-on-k8s-operator)
+* [Hadoop/Spark GCS Connector](https://github.com/GoogleCloudDataproc/hadoop-connectors/tree/master/gcs)
+* [Spark BigTable Connector](https://github.com/GoogleCloudDataproc/spark-bigtable-connector)
+* [Spark BigQuery Connector](https://github.com/GoogleCloudDataproc/spark-bigquery-connector)
+* [Flink BigQuery Connector](https://github.com/GoogleCloudDataproc/flink-bigquery-connector)
+* [Spark Spanner Connector](https://github.com/GoogleCloudDataproc/spark-spanner-connector)
+* [Hive BigQuery Connector](https://github.com/GoogleCloudDataproc/hive-bigquery-connector)
+* [Hive Bigquery Storage Handler](https://github.com/GoogleCloudDataproc/hive-bigquery-storage-handler) [No Longer Maintained]
+* [Dataproc JDBC Connector](https://github.com/GoogleCloudDataproc/dataproc-jdbc-connector)
 
 ### Examples
-* [Dataproc Python
-  examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/dataproc)
+* [Dataproc Python examples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/main/dataproc/snippets)
 * [Dataproc Pubsub Spark Streaming example](https://github.com/GoogleCloudPlatform/dataproc-pubsub-spark-streaming)
-* [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/java/dataproc-wordcount)
-* [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/master/scala)
+* [Dataproc Java Bigtable sample](https://github.com/GoogleCloudPlatform/cloud-bigtable-examples/tree/main/java/dataproc-wordcount)
+* [Dataproc Spark-Bigtable samples](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/main/bigtable/spark)
 
 ## For more information
 For more information, review the [Dataproc
