@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Verifies and enforces a pristine state in the project for CUJ testing.
-# This script is designed to be run from a CI/CD pipeline.
+# Verifies and enforces a pristine state in the project for CUJ testing
+# by finding and deleting all resources tagged with the CUJ_TAG.
 #
-# It finds all resources associated with the CUJ test network and deletes them.
+# This script is designed to be run from a CI/CD pipeline at the beginning
+# (in cleanup mode) and at the end (in strict mode) of a test run.
 #
 # Usage:
 #   ./pristine_check.sh           # Cleanup mode: Aggressively deletes resources.
@@ -19,69 +20,74 @@ if [[ "$1" == "--strict" ]]; then
   STRICT_MODE=true
 fi
 
-# Use a temporary file to track leftover resources for the final report.
+# Store leftover resources to report at the end
 LEFTOVERS_FILE=$(mktemp)
 trap 'rm -f -- "${LEFTOVERS_FILE}"' EXIT
 
+# --- Helper Functions ---
+
+# Generic function to find, report, and optionally delete tagged resources.
+# Arguments:
+#   $1: The type of resource (for logging purposes, e.g., "Dataproc Clusters")
+#   $2: The gcloud command to list resources (e.g., "gcloud dataproc clusters list ...")
+#   $3: The gcloud command to delete resources (e.g., "gcloud dataproc clusters delete ...")
+function process_resources() {
+  local resource_type="$1"
+  local list_command="$2"
+  local delete_command="$3"
+
+  # The "tr" command handles cases where no resources are found (to avoid errors)
+  # and where multiple resources are found (one per line).
+  local resources
+  resources=$(eval "${list_command}" | tr '\n' ' ' | sed 's/ *$//')
+
+  if [[ -n "${resources}" ]]; then
+    echo "Found leftover ${resource_type}: ${resources}" | tee -a "${LEFTOVERS_FILE}"
+    if [[ "$STRICT_MODE" == false ]]; then
+      echo "Cleaning up ${resource_type}..."
+      # Some delete commands need resource name(s) first, others last. We assume last.
+      eval "${delete_command} ${resources}" &
+    fi
+  fi
+}
+
+# --- Main Execution ---
+
 header "Pristine Check running in $([[ "$STRICT_MODE" == true ]] && echo 'STRICT' || echo 'CLEANUP') mode"
 
-# --- Resource Discovery and Cleanup ---
+# Define commands for each resource type. All are filtered by the CUJ_TAG where possible.
+LIST_CLUSTERS_CMD="gcloud dataproc clusters list --region='${CONFIG[REGION]}' --filter='config.gceClusterConfig.tags.items=${CONFIG[CUJ_TAG]}' --format='value(clusterName)' 2>/dev/null"
+DELETE_CLUSTERS_CMD="gcloud dataproc clusters delete --quiet --region='${CONFIG[REGION]}'"
 
-# 1. Dataproc Clusters
-# Find any clusters on the target network.
-CLUSTERS=$(gcloud dataproc clusters list --region="${CONFIG[REGION]}" --filter="config.gceClusterConfig.networkUri.endsWith(\"/${CONFIG[NETWORK]}\")" --format="value(clusterName)" 2>/dev/null)
-if [[ -n "${CLUSTERS}" ]]; then
-  echo "Found leftover Dataproc clusters: ${CLUSTERS}" | tee -a "${LEFTOVERS_FILE}"
-  if [[ "$STRICT_MODE" == false ]]; then
-    echo "Cleaning up..."
-    # Run deletions in the background for speed.
-    for cluster in ${CLUSTERS}; do
-      gcloud dataproc clusters delete --quiet "${cluster}" --region="${CONFIG[REGION]}" &
-    done
-  fi
-fi
+LIST_INSTANCES_CMD="gcloud compute instances list --filter='tags.items=${CONFIG[CUJ_TAG]}' --format='value(name)' 2>/dev/null"
+DELETE_INSTANCES_CMD="gcloud compute instances delete --quiet --zone='${CONFIG[ZONE]}'"
 
-# 2. GCE Instances
-# Find any instances on the target network that are NOT part of a managed instance group (like a KDC).
-INSTANCES=$(gcloud compute instances list --filter="networkInterfaces.network.endsWith(\"/${CONFIG[NETWORK]}\") AND -name~gke-" --format="value(name)" 2>/dev/null)
-if [[ -n "${INSTANCES}" ]]; then
-  echo "Found leftover GCE instances: ${INSTANCES}" | tee -a "${LEFTOVERS_FILE}"
-  if [[ "$STRICT_MODE" == false ]]; then
-    echo "Cleaning up..."
-    gcloud compute instances delete --quiet ${INSTANCES} &
-  fi
-fi
+# Routers and Networks cannot be tagged, so we must rely on a naming convention for them.
+LIST_ROUTERS_CMD="gcloud compute routers list --filter='name~^cuj-' --format='value(name)' 2>/dev/null"
+DELETE_ROUTERS_CMD="gcloud compute routers delete --quiet --region='${CONFIG[REGION]}'"
 
-# 3. Firewall Rules
-# Dataproc auto-creates firewall rules with the network name. We'll find them.
-FIREWALL_RULES=$(gcloud compute firewall-rules list --filter="network.endsWith(\"/${CONFIG[NETWORK]}\")" --format="value(name)" 2>/dev/null)
-if [[ -n "${FIREWALL_RULES}" ]]; then
-  echo "Found leftover Firewall Rules: ${FIREWALL_RULES}" | tee -a "${LEFTOVERS_FILE}"
-  if [[ "$STRICT_MODE" == false ]]; then
-    echo "Cleaning up..."
-    gcloud compute firewall-rules delete --quiet ${FIREWALL_RULES} &
-  fi
-fi
+LIST_FIREWALLS_CMD="gcloud compute firewall-rules list --filter='targetTags.items=${CONFIG[CUJ_TAG]} OR name~^cuj-' --format='value(name)' 2>/dev/null"
+DELETE_FIREWALLS_CMD="gcloud compute firewall-rules delete --quiet"
 
-# Wait for all background cleanup jobs to finish before proceeding to network deletion.
+# Process resources that can be deleted in parallel first.
+process_resources "Dataproc Clusters" "${LIST_CLUSTERS_CMD}" "${DELETE_CLUSTERS_CMD}"
+process_resources "GCE Instances" "${LIST_INSTANCES_CMD}" "${DELETE_INSTANCES_CMD}"
+process_resources "Firewall Rules" "${LIST_FIREWALLS_CMD}" "${DELETE_FIREWALLS_CMD}"
+process_resources "Cloud Routers" "${LIST_ROUTERS_CMD}" "${DELETE_ROUTERS_CMD}"
+
 if [[ "$STRICT_MODE" == false ]]; then
-  echo "Waiting for resource cleanup to complete..."
+  echo "Waiting for initial resource cleanup to complete..."
   wait
-  echo "Cleanup complete."
 fi
 
-# 4. VPC Network
-# This is the last step, as the network cannot be deleted if resources are using it.
-# We will use the function from our library here.
-if gcloud compute networks describe "${CONFIG[NETWORK]}" &>/dev/null; then
-  echo "Found leftover VPC Network: ${CONFIG[NETWORK]}" | tee -a "${LEFTOVERS_FILE}"
-  if [[ "$STRICT_MODE" == false ]]; then
-    echo "Cleaning up..."
-    # The delete_network_and_subnet function is already quiet and handles non-existence.
-    delete_network_and_subnet
-  fi
-fi
+# Process networks last, as they have dependencies.
+LIST_NETWORKS_CMD="gcloud compute networks list --filter='name~^cuj-' --format='value(name)' 2>/dev/null"
+DELETE_NETWORKS_CMD="gcloud compute networks delete --quiet"
+process_resources "VPC Networks" "${LIST_NETWORKS_CMD}" "${DELETE_NETWORKS_CMD}"
 
+if [[ "$STRICT_MODE" == false ]]; then
+  wait
+fi
 
 # --- Final Report ---
 if [[ -s "${LEFTOVERS_FILE}" ]]; then
@@ -93,6 +99,7 @@ if [[ -s "${LEFTOVERS_FILE}" ]]; then
     echo "STRICT mode failed. The project is not pristine." >&2
     exit 1
   fi
+  # In non-strict mode, we report but don't fail, assuming the next run will succeed.
 fi
 
 echo "Pristine check complete."
