@@ -57,7 +57,16 @@ export DATAPROC_IMAGE_VERSION="${IMAGE_VERSION}"
 #export INIT_ACTIONS_ROOT="gs://goog-dataproc-initialization-actions-${REGION}"
 export AUTOSCALING_POLICY_NAME=aspolicy-${CLUSTER_NAME}
 export SA_NAME=sa-${CLUSTER_NAME}
-export GSA=${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com
+
+if [[ "${PROJECT_ID}" == *":"* ]]; then
+  # Domain-scoped project
+  DOMAIN=$(echo "${PROJECT_ID}" | cut -d':' -f1)
+  PROJECT_NAME=$(echo "${PROJECT_ID}" | cut -d':' -f2)
+  export GSA="${SA_NAME}@${PROJECT_NAME}.${DOMAIN}.iam.gserviceaccount.com"
+else
+  # Regular project
+  export GSA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+fi
 
 export INIT_ACTIONS_ROOT="gs://${BUCKET}/dataproc-initialization-actions"
 export YARN_DOCKER_IMAGE="gcr.io/${PROJECT_ID}/${USER}/cudatest-ubuntu18:latest"
