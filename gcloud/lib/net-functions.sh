@@ -55,55 +55,85 @@ function delete_logging_firewall_rules () {
   echo "ingress logging firewall rule deleted"
 }
 
-function create_firewall_rules () {
-# Create egress firewall rules
-
+function create_firewall_rules() {
   set -x
-  gcloud compute firewall-rules describe ${FIREWALL}-out > /dev/null \
-  && echo "firewall rule ${FIREWALL}-out already exists" \
-  || gcloud compute firewall-rules create ${FIREWALL}-out \
-    --direction egress \
-    --network ${NETWORK_URI} \
-    --target-tags=${TAGS} \
-    --action allow \
-    --rules all
 
-  gcloud compute firewall-rules describe ${FIREWALL}-default-allow-internal-out > /dev/null \
-  && echo "firewall rule ${FIREWALL}-default-allow-internal-out already exists" \
-  || gcloud compute firewall-rules create ${FIREWALL}-default-allow-internal-out > /dev/null \
-    --direction egress \
-    --network ${NETWORK_URI} \
-    --source-ranges 10.0.0.0/8 \
-    --rules all \
-    --action allow
+  # Egress rules (assuming these are fine)
+  if ! gcloud compute firewall-rules describe "${FIREWALL}-out" > /dev/null 2>&1; then
+    gcloud compute firewall-rules create "${FIREWALL}-out" \
+      --network="${NETWORK}" \
+      --action=ALLOW \
+      --direction=EGRESS \
+      --destination-ranges=0.0.0.0/0 \
+      --rules=all
+  else
+    echo "firewall rule ${FIREWALL}-out already exists"
+  fi
+  if ! gcloud compute firewall-rules describe "${FIREWALL}-default-allow-internal-out" > /dev/null 2>&1; then
+    gcloud compute firewall-rules create "${FIREWALL}-default-allow-internal-out" \
+      --network="${NETWORK}" \
+      --action=ALLOW \
+      --direction=EGRESS \
+      --destination-ranges="${RANGE}" \
+      --rules=all
+  else
+    echo "firewall rule ${FIREWALL}-default-allow-internal-out already exists"
+  fi
   set +x
-
   echo "============================="
   echo "Egress Firewall rules created"
   echo "============================="
 
-# Create ingress firewall rules
-
+  # Ingress rules
   set -x
-  gcloud compute firewall-rules describe ${FIREWALL}-in > /dev/null \
-  && echo "firewall rule ${FIREWALL}-in already exists" \
-  || gcloud compute firewall-rules create ${FIREWALL}-in \
-    --direction ingress \
-    --network ${NETWORK_URI} \
-    --source-tags=${TAGS} \
-    --action allow \
-    --rules all
+  local iap_range="35.235.240.0/20"
+  local internal_ranges="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-  gcloud compute firewall-rules describe ${FIREWALL}-default-allow-internal-in > /dev/null \
-  && echo "firewall rule ${FIREWALL}-default-allow-internal-in already exists" \
-  || gcloud compute firewall-rules create ${FIREWALL}-default-allow-internal-in \
-    --direction ingress \
-    --network ${NETWORK_URI} \
-    --source-ranges 10.0.0.0/8 \
-    --rules all \
-    --action allow
+  # Rule for SSH, including IAP and internal ranges
+  if ! gcloud compute firewall-rules describe "${FIREWALL}-in-ssh" > /dev/null 2>&1; then
+    gcloud compute firewall-rules create "${FIREWALL}-in-ssh" \
+      --network="${NETWORK}" \
+      --action=ALLOW \
+      --direction=INGRESS \
+      --source-ranges="${iap_range},${internal_ranges}" \
+      --rules=tcp:22 # \
+#      --target-tags="${TAGS}"
+  else
+    echo "firewall rule ${FIREWALL}-in-ssh already exists"
+    # Check if IAP range is missing and add it
+    EXISTING_RANGES=$(gcloud compute firewall-rules describe "${FIREWALL}-in-ssh" --format="value(sourceRanges)")
+    if [[ ! "${EXISTING_RANGES}" == *"${iap_range}"* ]]; then
+      echo "Adding IAP range to existing rule ${FIREWALL}-in-ssh"
+      gcloud compute firewall-rules update "${FIREWALL}-in-ssh" --source-ranges="${EXISTING_RANGES},${iap_range}"
+    fi
+  fi
+
+  # Rule for other internal ingress
+  if ! gcloud compute firewall-rules describe "${FIREWALL}-in-internal" > /dev/null 2>&1; then
+    gcloud compute firewall-rules create "${FIREWALL}-in-internal" \
+      --network="${NETWORK}" \
+      --action=ALLOW \
+      --direction=INGRESS \
+      --source-ranges="${internal_ranges}" \
+      --rules=tcp:443,icmp # \
+#      --target-tags="${TAGS}"
+  else
+    echo "firewall rule ${FIREWALL}-in-internal already exists"
+  fi
+
+  # Rule for subnet range
+  if ! gcloud compute firewall-rules describe "${FIREWALL}-default-allow-internal-in" > /dev/null 2>&1; then
+    gcloud compute firewall-rules create "${FIREWALL}-default-allow-internal-in" \
+      --network="${NETWORK}" \
+      --action=ALLOW \
+      --direction=INGRESS \
+      --source-ranges="${RANGE}" \
+      --rules=all #\
+#      --target-tags="${TAGS}"
+  else
+    echo "firewall rule ${FIREWALL}-default-allow-internal-in already exists"
+  fi
   set +x
-
   echo "=============================="
   echo "Ingress Firewall rules created"
   echo "=============================="
@@ -153,7 +183,7 @@ function add_nat_policy () {
   || gcloud compute routers nats create nat-config \
     --router-region ${REGION} \
     --router ${ROUTER_NAME} \
-    --nat-all-subnet-ip-ranges \
+    --nat-custom-subnet-ip-ranges "${SUBNET}" \
     --auto-allocate-nat-external-ips
   set +x
 
@@ -186,6 +216,41 @@ function delete_router () {
 
   echo "router deleted"
 }
+
+function create_default_route() {
+  local route_name="default-internet-${NETWORK}"
+  set -x
+  if gcloud compute routes describe "${route_name}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
+    echo "Default route ${route_name} already exists for network ${NETWORK}."
+  else
+    echo "Creating default route ${route_name} for network ${NETWORK}..."
+    gcloud compute routes create "${route_name}" \
+      --network="${NETWORK}" \
+      --destination-range=0.0.0.0/0 \
+      --next-hop-gateway=default-internet-gateway \
+      --project="${PROJECT_ID}"
+  fi
+  set +x
+  echo "=========================="
+  echo "Default route configured"
+  echo "=========================="
+}
+
+function delete_default_route() {
+  local route_name="default-internet-${NETWORK}"
+  set -x
+  if gcloud compute routes describe "${route_name}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
+    echo "Deleting default route ${route_name}..."
+    gcloud compute routes delete --quiet "${route_name}" --project="${PROJECT_ID}"
+  else
+    echo "Default route ${route_name} not found."
+  fi
+  set +x
+  echo "=========================="
+  echo "Default route deletion attempt complete"
+  echo "=========================="
+}
+
 
 function create_vpc_peering () {
   set -x

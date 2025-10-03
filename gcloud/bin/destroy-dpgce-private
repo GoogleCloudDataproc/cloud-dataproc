@@ -30,15 +30,27 @@ delete_autoscaling_policy
 #delete_mysql_instance
 #delete_legacy_mssql_instance
 
-delete_default_route
-
 delete_router
 
 delete_firewall_rules
 
+delete_allow_swp_ingress_rule
+
 #delete_logging_firewall_rules
 
 #delete_ip_allocation
+
+delete_swp_gateway
+
+delete_gateway_security_policy
+
+#delete_certificate
+
+delete_managed_certificate
+
+delete_swp_subnet
+
+delete_private_subnet
 
 delete_subnet
 

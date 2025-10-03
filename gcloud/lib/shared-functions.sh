@@ -42,13 +42,13 @@ function create_dpgce_cluster() {
     --service-account="${GSA}" \
     --tags="${TAGS}" \
     --bucket "${BUCKET}" \
+    --temp-bucket "${TEMP_BUCKET}" \
     --enable-component-gateway \
     --metadata "public_secret_name=${public_secret_name}" \
     --metadata "private_secret_name=${private_secret_name}" \
     --metadata "secret_project=${secret_project}" \
     --metadata "secret_version=${secret_version}" \
     --metadata "modulus_md5sum=${modulus_md5sum}" \
-    --metadata cuda-version="${CUDA_VERSION}" \
     --metadata "install-gpu-agent=true" \
     --metadata "gpu-driver-provider=NVIDIA" \
     --metadata "gpu-conda-env=dpgce" \
@@ -56,21 +56,24 @@ function create_dpgce_cluster() {
     --metadata "rapids-mirror-host=${RAPIDS_REGIONAL_MIRROR_ADDR[${REGION}]}"   \
     --metadata "init-actions-repo=${INIT_ACTIONS_ROOT}" \
     --metadata "dask-cloud-logging=true" \
+    --metadata "debug-nm=true" \
     --metadata dask-runtime="standalone" \
     --metadata rapids-runtime="SPARK" \
     --metadata bigtable-instance=${BIGTABLE_INSTANCE} \
     --metadata include-gpus=1 \
+    --initialization-actions ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh \
     --image-version "${IMAGE_VERSION}" \
     --no-shielded-secure-boot \
     --initialization-action-timeout=90m \
     --optional-components DOCKER,JUPYTER \
     --max-idle="${IDLE_TIMEOUT}" \
-    --properties spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog \
+    --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog" \
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   date
   set +x
 }
 
+#    --initialization-actions ${INIT_ACTIONS_ROOT}/spark-rapids/spark-rapids.sh \
 #    --metadata include-pytorch=1 \
 #    --properties "hive:hive.metastore.warehouse.dir=gs://${HIVE_DATA_BUCKET}/hive-warehouse" \
 #    --metadata "hive-metastore-instance=${PROJECT_ID}:${REGION}:${HIVE_INSTANCE_NAME}" \
@@ -467,6 +470,11 @@ function enable_services () {
     dataproc.googleapis.com \
     compute.googleapis.com \
     secretmanager.googleapis.com \
+    certificatemanager.googleapis.com \
+    networksecurity.googleapis.com \
+    networkservices.googleapis.com \
+    networkmanagement.googleapis.com \
+    privateca.googleapis.com \
     --project=${PROJECT_ID}
   set +x
 }
@@ -866,12 +874,19 @@ function create_service_account() {
   # Bind roles to the service account
   ROLES=(
     roles/dataproc.worker
+    roles/dataproc.editor
+    roles/dataproc.admin
     roles/bigquery.dataEditor
+    roles/bigquery.dataViewer
+    roles/bigquery.user
+    roles/storage.admin
     roles/storage.objectCreator
     roles/storage.objectViewer
     roles/secretmanager.secretAccessor
+    roles/compute.admin
     roles/compute.viewer
     roles/compute.instanceAdmin.v1
+    roles/iam.serviceAccountUser
   )
 
   for role in "${ROLES[@]}"; do
@@ -1062,25 +1077,40 @@ function delete_dpgke_cluster() {
 
 source lib/database-functions.sh
 source lib/net-functions.sh
+source lib/swp-functions.sh
 
 function create_bucket () {
-  if gsutil ls -b "gs://${BUCKET}" ; then
-    echo "bucket already exists, skipping creation."
-    return
+  if ! gsutil ls -b "gs://${BUCKET}" &>/dev/null ; then
+    echo "Creating staging bucket: gs://${BUCKET}"
+    gsutil mb -l ${REGION} gs://${BUCKET}
+    echo "======================"
+    echo "Staging bucket created"
+    echo "======================"
+  else
+    echo "Staging bucket gs://${BUCKET} already exists."
   fi
-  set -x
-  gsutil mb -l ${REGION} gs://${BUCKET}
-  set +x
+  # Grant SA permissions on BUCKET
+  echo "Granting Storage Admin to ${GSA} on gs://${BUCKET}"
+  gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${BUCKET}"
 
-  echo "==================="
-  echo "Temp bucket created"
-  echo "==================="
+  if ! gsutil ls -b "gs://${TEMP_BUCKET}" &>/dev/null ; then
+     echo "Creating temp bucket: gs://${TEMP_BUCKET}"
+    gsutil mb -l ${REGION} gs://${TEMP_BUCKET} || echo -n ''
+    echo "==================="
+    echo "Temp bucket created"
+    echo "==================="
+  else
+    echo "Temp bucket gs://${TEMP_BUCKET} already exists."
+  fi
+  # Grant SA permissions on TEMP_BUCKET
+  echo "Granting Storage Admin to ${GSA} on gs://${TEMP_BUCKET}"
+  gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${TEMP_BUCKET}"
 
   # Copy initialization action scripts
-  if [ -d init ]
-  then
+  if [[ -d init ]] ; then
     set -x
-    gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+    gsutil -m cp -r "init/*" "${INIT_ACTIONS_ROOT}/" > /dev/null 2>&1
+#    gcloud storage cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
     set +x
   fi
 
@@ -1092,7 +1122,8 @@ function create_bucket () {
 
 function delete_bucket () {
   set -x
-  gsutil -m rm -r gs://${BUCKET}
+  gsutil -m rm -r "gs://${BUCKET}" || echo -n ""
+#  gsutil -m rm -r "gs://${TEMP_BUCKET}" || echo -n "" # huge cache here, not so great to lose it
   set +x
 
   echo "bucket removed"

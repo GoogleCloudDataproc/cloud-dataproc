@@ -40,17 +40,29 @@ create_vpc_network
 
 # Create a cloud router
 
-create_router
-
-create_default_route
-
-add_nat_policy
-
 # create subnet
 
 create_subnet
 
+create_private_subnet
+
+create_swp_subnet
+
+#create_certificate
+
+create_managed_certificate
+
+create_gateway_security_policy
+
+create_swp_gateway
+
+create_router
+
+add_nat_policy
+
 create_firewall_rules
+
+create_allow_swp_ingress_rule
 
 # Create logging firewall rules
 

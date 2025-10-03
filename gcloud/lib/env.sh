@@ -27,6 +27,7 @@ fi
 export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT env.json)"
 export CLUSTER_NAME="$(jq -r .CLUSTER_NAME env.json)"
 export BUCKET="$(jq -r .BUCKET env.json)"
+export TEMP_BUCKET="$(jq -r .TEMP_BUCKET env.json)"
 export RANGE="$(jq -r .RANGE env.json)"
 export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT env.json)"
 export ASN_NUMBER="$(jq -r .ASN_NUMBER env.json)"
@@ -204,7 +205,7 @@ export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
 #export DRIVER_VERSION="550.135"
 #export CUDA_VERSION="12.6"
 #export CUDA_VERSION="12.6.2"
-export CUDA_VERSION="12.6.3"
+#export CUDA_VERSION="12.6.3"
 #export DRIVER_VERSION="550.142"
 #export DRIVER_VERSION="460.73.01"
 #export DRIVER_VERSION="550.54.14"
@@ -306,7 +307,6 @@ function configure_environment() {
 
   #enable_secret_manager
   #eval $(bash ../custom-images/examples/secure-boot/create-key-pair.sh)
-
 
   # To boot a secure-boot capable cluster from a pre-init image, the
   # reader will have already performed the steps from
