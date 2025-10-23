@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Script to audit resource creation after create-dpgce.sh
+
+source lib/env.sh
+source lib/gcp/misc.sh # Source the file containing configure_gcloud
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
+configure_gcloud # Set gcloud context
+
+if [[ -z "${CLUSTER_NAME}" || "${CLUSTER_NAME}" == "null" ]]; then
+  echo "ERROR: CLUSTER_NAME is not set. Please source lib/env.sh after env.json is configured."
+  exit 1
+fi
+
+LOG_DIR="tmp/create_audit_${CLUSTER_NAME}_$(date +%Y%m%d-%H%M%S)"
+mkdir -p "${LOG_DIR}"
+echo "Detailed logs will be saved in ${LOG_DIR}"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print status updates
+print_status() {
+  local message="$1"
+  local first_word=$(echo "${message}" | awk '{print $1}')
+  local rest_of_message=$(echo "${message}" | cut -d' ' -f2-)
+  echo -en "${YELLOW}${first_word}${NC} ${rest_of_message}"
+}
+
+# Function to print result
+print_result() {
+  local result="$1"
+  if [[ "${result}" == "Pass" ]]; then
+    echo -e " [${GREEN}Pass${NC}]"
+  elif [[ "${result}" == "Exists" ]]; then
+    echo -e " [${GREEN}Exists${NC}]"
+  elif [[ "${result}" == "Fail" ]]; then
+    echo -e " [${RED}Fail${NC}]"
+  else
+    echo -e " [${YELLOW}${result}${NC}]"
+  fi
+}
+
+# Function to check if a resource exists and log details
+function check_exists() {
+  local test_name="$1"
+  local command_to_run="$2"
+  local safe_test_name=$(echo "$test_name" | tr ' /:' '___')
+  local log_file="${LOG_DIR}/${safe_test_name}.log"
+
+  print_status "Checking: ${test_name}... "
+
+  # Run the command, redirect output to log file
+  if eval "${command_to_run}" > "${log_file}" 2>&1; then
+    if [[ $(wc -l < "${log_file}") -eq 0 ]]; then
+      print_result "Fail"
+      echo "  -> ${test_name} NOT FOUND. Check ${log_file}"
+      return 1
+    else
+      print_result "Exists"
+      return 0
+    fi
+  else
+    print_result "Fail"
+    echo "  -> Command failed for ${test_name}. Check ${log_file}"
+    return 1
+  fi
+}
+
+function check_exists_grep() {
+  local test_name="$1"
+  local command_to_run="$2"
+  local grep_pattern="$3"
+  local log_file="${LOG_DIR}/$(echo "$test_name" | tr ' /:' '___').log"
+
+  print_status "Checking: ${test_name}... "
+
+  # Run the command, redirect output to log file
+  eval "${command_to_run}" > "${log_file}" 2>&1
+
+  # Grep the log file quietly
+  if grep -q "${grep_pattern}" "${log_file}"; then
+    print_result "Exists"
+    return 0
+  else
+    print_result "Fail"
+    echo "  -> ${test_name} NOT FOUND or pattern mismatch. Check ${log_file}"
+    return 1
+  fi
+}
+
+# --- Start Audit ---
+echo "Starting resource creation audit for cluster: ${CLUSTER_NAME}"
+
+# 1. VPC Network
+check_exists "VPC Network ${NETWORK}" "gcloud compute networks describe '${NETWORK}' --project='${PROJECT_ID}'"
+
+# 2. Subnet
+check_exists "Main Subnet ${SUBNET}" "gcloud compute networks subnets describe '${SUBNET}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 3. Service Account
+check_exists "Service Account ${GSA}" "gcloud iam service-accounts describe '${GSA}' --project='${PROJECT_ID}'"
+
+# 4. GCS Buckets
+check_exists "GCS Staging Bucket gs://${BUCKET}" "gsutil ls -b 'gs://${BUCKET}'"
+check_exists "GCS Temp Bucket gs://${TEMP_BUCKET}" "gsutil ls -b 'gs://${TEMP_BUCKET}'"
+
+# 5. Cloud Router
+check_exists "Cloud Router ${ROUTER_NAME}" "gcloud compute routers describe '${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 6. NAT Policy
+check_exists "NAT Policy nat-config" "gcloud compute routers nats describe nat-config --router='${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 7. Firewall Rules
+check_exists_grep "Firewall Rule ${FIREWALL}-out" "gcloud compute firewall-rules list --project='${PROJECT_ID}' --filter=\"network ~ ${NETWORK}$ AND name='${FIREWALL}-out'\" --format='value(name)'" "${FIREWALL}-out"
+
+# 8. Autoscaling Policy
+check_exists "Autoscaling Policy ${AUTOSCALING_POLICY_NAME}" "gcloud dataproc autoscaling-policies describe '${AUTOSCALING_POLICY_NAME}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 9. Dataproc Cluster (Optional)
+print_status "Checking: Dataproc Cluster ${CLUSTER_NAME}... "
+cluster_log_file="${LOG_DIR}/Dataproc_Cluster_${CLUSTER_NAME}.log"
+if gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > "${cluster_log_file}" 2>&1; then
+  print_result "Exists"
+else
+  print_result "Not Found"
+fi
+
+echo -e "\nAudit complete."

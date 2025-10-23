@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Script to audit resource creation after create-dpgce-private.sh
+# Expected: All resources should be found.
+
+source lib/env.sh
+source lib/gcp/misc.sh
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
+configure_gcloud # Set gcloud context
+
+parse_args "$@" # Not really used here, but good practice
+
+if [[ -z "${CLUSTER_NAME}" || "${CLUSTER_NAME}" == "null" ]]; then
+  echo "ERROR: CLUSTER_NAME is not set. Please source lib/env.sh after env.json is configured."
+  exit 1
+fi
+
+LOG_DIR="tmp/create_audit_${CLUSTER_NAME}_$(date +%Y%m%d-%H%M%S)"
+mkdir -p "${LOG_DIR}"
+echo "Detailed logs will be saved in ${LOG_DIR}"
+
+# --- Start Audit ---
+echo "Starting resource creation audit for cluster: ${CLUSTER_NAME}"
+
+# 1. VPC Network
+check_exists "VPC Network ${NETWORK}" "gcloud compute networks describe '${NETWORK}' --project='${PROJECT_ID}'"
+
+# 2. Subnets
+check_exists "Main Subnet ${SUBNET}" "gcloud compute networks subnets describe '${SUBNET}' --region='${REGION}' --project='${PROJECT_ID}'"
+check_exists "Private Subnet ${PRIVATE_SUBNET}" "gcloud compute networks subnets describe '${PRIVATE_SUBNET}' --region='${REGION}' --project='${PROJECT_ID}'"
+check_exists "SWP Subnet ${SWP_SUBNET}" "gcloud compute networks subnets describe '${SWP_SUBNET}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 3. Service Account
+check_exists "Service Account ${GSA}" "gcloud iam service-accounts describe '${GSA}' --project='${PROJECT_ID}'"
+
+# 4. GCS Buckets
+check_exists "GCS Staging Bucket gs://${BUCKET}" "gsutil ls -b 'gs://${BUCKET}'"
+check_exists "GCS Temp Bucket gs://${TEMP_BUCKET}" "gsutil ls -b 'gs://${TEMP_BUCKET}'"
+
+# 5. SWP Certificate Components
+SUFFIX=${RESOURCE_SUFFIX}
+CA_POOL_NAME="swp-ca-pool-${CLUSTER_NAME}-${SUFFIX}"
+CIC_NAME="swp-cic-${CLUSTER_NAME}-${SUFFIX}"
+CA_NAME="swp-root-ca-${CLUSTER_NAME}-${SUFFIX}"
+CERT_NAME="swp-cert"
+
+check_exists "CA Pool ${CA_POOL_NAME}" "gcloud privateca pools describe '${CA_POOL_NAME}' --location='${REGION}' --project='${PROJECT_ID}'"
+check_exists "Root CA ${CA_NAME}" "gcloud privateca roots describe '${CA_NAME}' --pool='${CA_POOL_NAME}' --location='${REGION}' --project='${PROJECT_ID}'"
+check_exists "CIC ${CIC_NAME}" "gcloud certificate-manager issuance-configs describe '${CIC_NAME}' --location='${REGION}' --project='${PROJECT_ID}'"
+check_exists "Static Certificate ${CERT_NAME}" "gcloud certificate-manager certificates describe '${CERT_NAME}' --location='${REGION}' --project='${PROJECT_ID}'"
+
+# 6. Gateway Security Policy
+check_exists "Gateway Security Policy ${SWP_POLICY_NAME}" "gcloud network-security gateway-security-policies list --location='${REGION}' --project='${PROJECT_ID}' --filter='name ~ /${SWP_POLICY_NAME}$' --format='value(name)'"
+check_exists "GSP Rule allow-all-rule" "gcloud network-security gateway-security-policies rules list --gateway-security-policy='${SWP_POLICY_NAME}' --location='${REGION}' --project='${PROJECT_ID}' --filter='name ~ /allow-all-rule$' --format='value(name)'"
+
+# 7. SWP Gateway
+check_exists "SWP Gateway ${SWP_INSTANCE_NAME}" "gcloud network-services gateways describe '${SWP_INSTANCE_NAME}' --location='${REGION}' --project='${PROJECT_ID}'"
+
+# 8. Firewall Rules
+check_exists "Firewall Rule allow-swp-ingress-${CLUSTER_NAME}" "gcloud compute firewall-rules describe allow-swp-ingress-${CLUSTER_NAME} --project='${PROJECT_ID}'"
+
+# 9. Autoscaling Policy
+check_exists "Autoscaling Policy ${AUTOSCALING_POLICY_NAME}" "gcloud dataproc autoscaling-policies describe '${AUTOSCALING_POLICY_NAME}' --region='${REGION}' --project='${PROJECT_ID}'"
+
+# 10. Dataproc Cluster (Optional)
+print_status "Checking: Dataproc Cluster ${CLUSTER_NAME}... "
+cluster_log_file="${LOG_DIR}/Dataproc_Cluster_${CLUSTER_NAME}.log"
+if gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > "${cluster_log_file}" 2>&1; then
+  print_result "Exists"
+else
+  print_result "Not Found"
+fi
+
+echo -e "\nAudit complete."

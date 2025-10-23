@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 
-source env.sh
+source lib/env.sh
+source lib/gke.sh # Assuming gke functions are here
 
 # Copy latest initialization action scripts
 gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions

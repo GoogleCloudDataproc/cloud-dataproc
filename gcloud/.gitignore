@@ -1,1 +1,5 @@
 init/*/
+tls/
+#tmp/
+*~
+env.json

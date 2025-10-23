@@ -42,13 +42,13 @@ function create_dpgce_cluster() {
     --service-account="${GSA}" \
     --tags="${TAGS}" \
     --bucket "${BUCKET}" \
-    --temp-bucket "${TEMP_BUCKET}" \
     --enable-component-gateway \
     --metadata "public_secret_name=${public_secret_name}" \
     --metadata "private_secret_name=${private_secret_name}" \
     --metadata "secret_project=${secret_project}" \
     --metadata "secret_version=${secret_version}" \
     --metadata "modulus_md5sum=${modulus_md5sum}" \
+    --metadata cuda-version="${CUDA_VERSION}" \
     --metadata "install-gpu-agent=true" \
     --metadata "gpu-driver-provider=NVIDIA" \
     --metadata "gpu-conda-env=dpgce" \
@@ -56,24 +56,21 @@ function create_dpgce_cluster() {
     --metadata "rapids-mirror-host=${RAPIDS_REGIONAL_MIRROR_ADDR[${REGION}]}"   \
     --metadata "init-actions-repo=${INIT_ACTIONS_ROOT}" \
     --metadata "dask-cloud-logging=true" \
-    --metadata "debug-nm=true" \
     --metadata dask-runtime="standalone" \
     --metadata rapids-runtime="SPARK" \
     --metadata bigtable-instance=${BIGTABLE_INSTANCE} \
     --metadata include-gpus=1 \
-    --initialization-actions ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh \
     --image-version "${IMAGE_VERSION}" \
     --no-shielded-secure-boot \
     --initialization-action-timeout=90m \
     --optional-components DOCKER,JUPYTER \
     --max-idle="${IDLE_TIMEOUT}" \
-    --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog" \
+    --properties spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog \
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   date
   set +x
 }
 
-#    --initialization-actions ${INIT_ACTIONS_ROOT}/spark-rapids/spark-rapids.sh \
 #    --metadata include-pytorch=1 \
 #    --properties "hive:hive.metastore.warehouse.dir=gs://${HIVE_DATA_BUCKET}/hive-warehouse" \
 #    --metadata "hive-metastore-instance=${PROJECT_ID}:${REGION}:${HIVE_INSTANCE_NAME}" \
@@ -470,11 +467,6 @@ function enable_services () {
     dataproc.googleapis.com \
     compute.googleapis.com \
     secretmanager.googleapis.com \
-    certificatemanager.googleapis.com \
-    networksecurity.googleapis.com \
-    networkservices.googleapis.com \
-    networkmanagement.googleapis.com \
-    privateca.googleapis.com \
     --project=${PROJECT_ID}
   set +x
 }
@@ -589,7 +581,7 @@ gcloud beta billing projects \
 
 once you have credentials to run the above command,
 
-Press enter >
+Press enter > 
 "
       read
 
@@ -846,79 +838,37 @@ function delete_phs_cluster() {
 
 function create_service_account() {
   set -x
+  if gcloud iam service-accounts describe "${GSA}" > /dev/null ; then
+    echo "service account ${SA_NAME} already exists"
+    return 0 ; fi
 
-  # Attempt to describe the service account
-  echo "Checking for service account ${GSA}..."
-  # Use list with a filter on the SA NAME part of the email
-  SA_EXISTS=$(gcloud iam service-accounts list \
-    --project="${PROJECT_ID}" \
-    --filter="email=${GSA}" \
-    --format="value(email)")
+  gcloud iam service-accounts create "${SA_NAME}" \
+    --description="Service account for use with cluster ${CLUSTER_NAME}" \
+    --display-name="${SA_NAME}"
 
-  if [[ -n "${SA_EXISTS}" ]]; then
-    echo "Service account ${GSA} already exists."
-  else
-    echo "Service account ${GSA} not found, attempting to create..."
-    if ! gcloud iam service-accounts create "${SA_NAME}" \
-      --project="${PROJECT_ID}" \
-      --description="Service account for use with cluster ${CLUSTER_NAME}" \
-      --display-name="${SA_NAME}"; then
-      echo "ERROR: Failed to create service account ${SA_NAME}."
-      exit 1
-    fi
-    echo "Service account ${GSA} created successfully."
-    echo "Waiting 10s for IAM propagation..."
-    sleep 10
-  fi
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/dataproc.worker
 
-  # Bind roles to the service account
-  ROLES=(
-    roles/dataproc.worker
-    roles/dataproc.editor
-    roles/dataproc.admin
-    roles/bigquery.dataEditor
-    roles/bigquery.dataViewer
-    roles/bigquery.user
-    roles/storage.admin
-    roles/storage.objectCreator
-    roles/storage.objectViewer
-    roles/secretmanager.secretAccessor
-    roles/compute.admin
-    roles/compute.viewer
-    roles/compute.instanceAdmin.v1
-    roles/iam.serviceAccountUser
-  )
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/storage.objectCreator
 
-  for role in "${ROLES[@]}"; do
-    echo "Binding ${role} to ${GSA}..."
-    MAX_RETRIES=5
-    RETRY_COUNT=0
-    SLEEP_TIME=10
-    while [[ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]]; do
-      # Capture output and error
-      BIND_OUTPUT=$(gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="serviceAccount:${GSA}" \
-        --role="${role}" --condition=None 2>&1)
-      BIND_EXIT_CODE=$?
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/storage.objectViewer
 
-      if [[ ${BIND_EXIT_CODE} -eq 0 ]]; then
-        echo "${role} bound successfully to ${GSA}."
-        break # Exit the while loop on success
-      fi
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/secretmanager.secretAccessor
 
-      RETRY_COUNT=$((RETRY_COUNT + 1))
-      echo "Attempt ${RETRY_COUNT}/${MAX_RETRIES} failed for ${role}."
-      echo "Error: ${BIND_OUTPUT}"
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/compute.viewer
 
-      if [[ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]]; then
-        echo "Retrying in ${SLEEP_TIME} seconds..."
-        sleep ${SLEEP_TIME}
-      else
-        echo "Failed to bind ${role} to ${GSA} after ${MAX_RETRIES} attempts."
-        exit 1
-      fi
-    done
-  done
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${GSA}" \
+    --role=roles/compute.instanceAdmin.v1
 
    gcloud iam service-accounts add-iam-policy-binding "${GSA}" \
     --member="serviceAccount:${GSA}" \
@@ -1077,40 +1027,25 @@ function delete_dpgke_cluster() {
 
 source lib/database-functions.sh
 source lib/net-functions.sh
-source lib/swp-functions.sh
 
 function create_bucket () {
-  if ! gsutil ls -b "gs://${BUCKET}" &>/dev/null ; then
-    echo "Creating staging bucket: gs://${BUCKET}"
-    gsutil mb -l ${REGION} gs://${BUCKET}
-    echo "======================"
-    echo "Staging bucket created"
-    echo "======================"
-  else
-    echo "Staging bucket gs://${BUCKET} already exists."
+  if gsutil ls -b "gs://${BUCKET}" ; then
+    echo "bucket already exists, skipping creation."
+    return
   fi
-  # Grant SA permissions on BUCKET
-  echo "Granting Storage Admin to ${GSA} on gs://${BUCKET}"
-  gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${BUCKET}"
+  set -x
+  gsutil mb -l ${REGION} gs://${BUCKET}
+  set +x
 
-  if ! gsutil ls -b "gs://${TEMP_BUCKET}" &>/dev/null ; then
-     echo "Creating temp bucket: gs://${TEMP_BUCKET}"
-    gsutil mb -l ${REGION} gs://${TEMP_BUCKET} || echo -n ''
-    echo "==================="
-    echo "Temp bucket created"
-    echo "==================="
-  else
-    echo "Temp bucket gs://${TEMP_BUCKET} already exists."
-  fi
-  # Grant SA permissions on TEMP_BUCKET
-  echo "Granting Storage Admin to ${GSA} on gs://${TEMP_BUCKET}"
-  gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${TEMP_BUCKET}"
+  echo "==================="
+  echo "Temp bucket created"
+  echo "==================="
 
   # Copy initialization action scripts
-  if [[ -d init ]] ; then
+  if [ -d init ]
+  then
     set -x
-    gsutil -m cp -r "init/*" "${INIT_ACTIONS_ROOT}/" > /dev/null 2>&1
-#    gcloud storage cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+    gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
     set +x
   fi
 
@@ -1122,8 +1057,7 @@ function create_bucket () {
 
 function delete_bucket () {
   set -x
-  gsutil -m rm -r "gs://${BUCKET}" || echo -n ""
-#  gsutil -m rm -r "gs://${TEMP_BUCKET}" || echo -n "" # huge cache here, not so great to lose it
+  gsutil -m rm -r gs://${BUCKET}
   set +x
 
   echo "bucket removed"

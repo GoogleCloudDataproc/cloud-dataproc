@@ -20,6 +20,31 @@ set -e
 
 source lib/env.sh
 
+parse_args "$@"
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
+# Source function files
+source lib/gcp/project.sh
+source lib/gcp/misc.sh
+source lib/misc.sh
+source lib/gcp/iam.sh
+source lib/gcp/gcs.sh
+source lib/network/network.sh
+source lib/network/subnet.sh
+source lib/network/router.sh
+source lib/network/routes.sh
+source lib/network/firewall.sh
+source lib/dataproc/cluster.sh
+source lib/dataproc/autoscaling.sh
+# Add others as needed, e.g.:
+# source lib/network/peering.sh
+# source lib/bigtable.sh
+# source lib/database/mysql.sh
+# source lib/database/mssql.sh
+
 create_project
 
 configure_gcloud
@@ -40,15 +65,15 @@ create_vpc_network
 
 # Create a cloud router
 
+create_vpc_network
+
+create_subnet
+
 create_router
 
 create_default_route
 
 add_nat_policy
-
-# create subnet
-
-create_subnet
 
 create_firewall_rules
 
@@ -69,7 +94,17 @@ create_firewall_rules
 
 create_autoscaling_policy
 
-create_dpgce_cluster
+if [[ "${CREATE_CLUSTER}" = true ]]; then
+  print_status "Creating Dataproc Cluster ${CLUSTER_NAME}..."
+  if create_dpgce_cluster; then
+    print_result "Pass"
+  else
+    print_result "Fail"
+    exit 1
+  fi
+else
+  echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
+fi
 
 # Perform some connectivity tests
 

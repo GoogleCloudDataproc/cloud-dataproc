@@ -20,6 +20,31 @@ set -e
 
 source lib/env.sh
 
+source lib/gcp/project.sh
+source lib/gcp/iam.sh
+source lib/gcp/gcs.sh
+source lib/gcp/misc.sh
+source lib/misc.sh # Added this line
+source lib/network/network.sh
+source lib/network/subnet.sh
+source lib/network/router.sh
+source lib/network/firewall.sh
+source lib/swp/subnet.sh
+source lib/swp/certs.sh
+source lib/swp/policy.sh
+source lib/swp/gateway.sh
+source lib/swp/firewall.sh # Added this line
+source lib/dataproc/cluster.sh
+source lib/dataproc/autoscaling.sh
+# source lib/database/mysql.sh
+# source lib/database/mssql.sh
+
+parse_args "$@"
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
 create_project
 
 configure_gcloud
@@ -56,10 +81,6 @@ create_gateway_security_policy
 
 create_swp_gateway
 
-create_router
-
-add_nat_policy
-
 create_firewall_rules
 
 create_allow_swp_ingress_rule
@@ -81,7 +102,17 @@ create_allow_swp_ingress_rule
 
 create_autoscaling_policy
 
-create_dpgce_cluster
+if [[ "${CREATE_CLUSTER}" = true ]]; then
+  print_status "Creating Dataproc Cluster ${CLUSTER_NAME}..."
+  if create_dpgce_cluster; then
+    print_result "Pass"
+  else
+    print_result "Fail"
+    exit 1
+  fi
+else
+  echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
+fi
 
 # Perform some connectivity tests
 

@@ -15,9 +15,29 @@
 # limitations under the License.
 #
 
-#set -e
+set -e
 
 source lib/env.sh
+
+source lib/dataproc/cluster.sh
+source lib/dataproc/autoscaling.sh
+source lib/gcp/iam.sh
+source lib/gcp/gcs.sh
+source lib/network/network.sh
+source lib/network/subnet.sh
+source lib/network/router.sh
+source lib/network/firewall.sh
+source lib/swp/subnet.sh
+source lib/swp/certs.sh
+source lib/swp/policy.sh
+source lib/swp/gateway.sh
+source lib/swp/firewall.sh
+
+parse_args "$@"
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
 
 delete_dpgce_cluster
 
@@ -29,6 +49,8 @@ delete_autoscaling_policy
 
 #delete_mysql_instance
 #delete_legacy_mssql_instance
+
+delete_nat_configs
 
 delete_router
 
@@ -58,6 +80,11 @@ delete_vpc_network
 
 #delete_vpc_peering
 
-delete_bucket
+if [[ "${FORCE_DELETE}" = true ]]; then
+  delete_bucket
+else
+  print_status "Skipping Bucket Deletion. Use --force to delete buckets."
+  report_result "Skipped"
+fi
 
 set +x
