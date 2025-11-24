@@ -22,6 +22,23 @@ set -e
 
 source lib/env.sh
 
+parse_args "$@"
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
+# Source function files
+source lib/misc.sh
+source lib/gcp/gcs.sh
+source lib/gcp/misc.sh
+source lib/network/network.sh
+source lib/network/subnet.sh
+source lib/network/router.sh
+source lib/network/firewall.sh
+source lib/gcp/iam.sh
+source lib/gke.sh # Assuming gke functions will be here
+
 set_cluster_name
 
 create_bucket
@@ -47,11 +64,25 @@ create_service_account
 
 grant_gke_roles
 
-create_gke_cluster
+if [[ "${CREATE_CLUSTER}" = true ]]; then
+  print_status "Creating GKE Cluster ${GKE_CLUSTER_NAME}..."
+  if create_gke_cluster; then
+    print_result "Pass"
+  else
+    print_result "Fail"
+    exit 1
+  fi
 
-# Create gke dataproc cluster
-
-create_dpgke_cluster
+  print_status "Creating Dataproc on GKE Cluster ${DPGKE_CLUSTER_NAME}..."
+  if create_dpgke_cluster; then
+    print_result "Pass"
+  else
+    print_result "Fail"
+    exit 1
+  fi
+else
+  echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
+fi
 
 # Perform some connectivity tests
 

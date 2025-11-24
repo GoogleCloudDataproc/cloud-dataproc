@@ -19,18 +19,19 @@ set -e
 
 source lib/env.sh
 
-# Source function files
 source lib/dataproc/cluster.sh
-source lib/gcp/iam.sh
 source lib/dataproc/autoscaling.sh
-source lib/network/routes.sh
+source lib/gcp/iam.sh
+source lib/gcp/gcs.sh
+source lib/network/network.sh
+source lib/network/subnet.sh
 source lib/network/router.sh
 source lib/network/firewall.sh
-source lib/network/subnet.sh
-source lib/network/network.sh
-source lib/gcp/gcs.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
+source lib/swp/subnet.sh
+source lib/swp/certs.sh
+source lib/swp/policy.sh
+source lib/swp/gateway.sh
+source lib/swp/firewall.sh
 
 parse_args "$@"
 
@@ -49,17 +50,29 @@ delete_autoscaling_policy
 #delete_mysql_instance
 #delete_legacy_mssql_instance
 
-delete_default_route
-
-delete_nat_configs # Should be called before delete_router
+delete_nat_configs
 
 delete_router
 
 delete_firewall_rules
 
+delete_allow_swp_ingress_rule
+
 #delete_logging_firewall_rules
 
 #delete_ip_allocation
+
+delete_swp_gateway
+
+delete_gateway_security_policy
+
+#delete_certificate
+
+delete_managed_certificate
+
+delete_swp_subnet
+
+delete_private_subnet
 
 delete_subnet
 

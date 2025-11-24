@@ -20,30 +20,30 @@ set -e
 
 source lib/env.sh
 
+source lib/gcp/project.sh
+source lib/gcp/iam.sh
+source lib/gcp/gcs.sh
+source lib/gcp/misc.sh
+source lib/misc.sh # Added this line
+source lib/network/network.sh
+source lib/network/subnet.sh
+source lib/network/router.sh
+source lib/network/firewall.sh
+source lib/swp/subnet.sh
+source lib/swp/certs.sh
+source lib/swp/policy.sh
+source lib/swp/gateway.sh
+source lib/swp/firewall.sh # Added this line
+source lib/dataproc/cluster.sh
+source lib/dataproc/autoscaling.sh
+# source lib/database/mysql.sh
+# source lib/database/mssql.sh
+
 parse_args "$@"
 
 if (( DEBUG != 0 )); then
   set -x
 fi
-
-# Source function files
-source lib/gcp/project.sh
-source lib/gcp/misc.sh
-source lib/misc.sh
-source lib/gcp/iam.sh
-source lib/gcp/gcs.sh
-source lib/network/network.sh
-source lib/network/subnet.sh
-source lib/network/router.sh
-source lib/network/routes.sh
-source lib/network/firewall.sh
-source lib/dataproc/cluster.sh
-source lib/dataproc/autoscaling.sh
-# Add others as needed, e.g.:
-# source lib/network/peering.sh
-# source lib/bigtable.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
 
 create_project
 
@@ -65,17 +65,25 @@ create_vpc_network
 
 # Create a cloud router
 
-create_vpc_network
+# create subnet
 
 create_subnet
 
-create_router
+create_private_subnet
 
-create_default_route
+create_swp_subnet
 
-add_nat_policy
+#create_certificate
+
+create_managed_certificate
+
+create_gateway_security_policy
+
+create_swp_gateway
 
 create_firewall_rules
+
+create_allow_swp_ingress_rule
 
 # Create logging firewall rules
 

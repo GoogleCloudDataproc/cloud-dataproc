@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Script to audit resource cleanup after destroy-dpgce.sh
+
+source lib/env.sh
+source lib/gcp/misc.sh # Source the file containing configure_gcloud
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
+
+configure_gcloud # Set gcloud context
+
+parse_args "$@" # Sets FORCE_AUDIT based on --force
+
+if [[ -z "${CLUSTER_NAME}" || "${CLUSTER_NAME}" == "null" ]]; then
+  echo "ERROR: CLUSTER_NAME is not set. Please source lib/env.sh after env.json is configured."
+  exit 1
+fi
+
+LOG_DIR="tmp/destroy_audit_${CLUSTER_NAME}_$(date +%Y%m%d-%H%M%S)"
+mkdir -p "${LOG_DIR}"
+echo "Detailed logs will be saved in ${LOG_DIR}"
+
+# --- Start Audit ---
+echo "Starting resource cleanup audit for cluster: ${CLUSTER_NAME}"
+if [[ "${FORCE_AUDIT}" == "true" ]]; then
+  echo "--force flag detected, expecting ALL resources to be deleted."
+fi
+
+# 1. Dataproc Clusters
+check_resource_exact "Dataproc Clusters" \
+  "gcloud dataproc clusters list --region=\"${REGION}\" --project=\"${PROJECT_ID}\" --filter=\"clusterName = ${CLUSTER_NAME}\" --format=\"value(clusterName)\""
+
+# 2. Service Accounts
+check_resource_exact "Service Account" \
+  "gcloud iam service-accounts list --project=\"${PROJECT_ID}\" --filter=\"email = ${GSA}\" --format=\"value(email)\""
+
+# 3. Autoscaling Policies
+check_resource "Autoscaling Policies" \
+  "gcloud dataproc autoscaling-policies list --region=\"${REGION}\" --project=\"${PROJECT_ID}\" --format=\"value(id)\"" \
+  "${AUTOSCALING_POLICY_NAME}"
+
+# 4. Cloud Routers & NAT
+check_resource "Cloud Router ${ROUTER_NAME}" \
+  "gcloud compute routers list --regions=\"${REGION}\" --project=\"${PROJECT_ID}\" --filter=\"network ~ ${NETWORK}$\" --format=\"value(name)\"" \
+  "${ROUTER_NAME}"
+check_resource "NAT on ${ROUTER_NAME}" \
+  "gcloud compute routers nats list --router='${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}' --format='value(name)'" \
+  "nat-config"
+
+# 5. Firewall Rules
+check_resource "Cluster Firewall Rules" \
+  "gcloud compute firewall-rules list --project=\"${PROJECT_ID}\" --filter='network ~ \"${NETWORK}\" AND name ~ \"${CLUSTER_NAME}\"' --format=\"value(name)\"" \
+  "${CLUSTER_NAME}"
+
+# 6. Subnets
+check_resource "Main Subnet" \
+  "gcloud compute networks subnets list --network=\"${NETWORK}\" --project=\"${PROJECT_ID}\" --format=\"value(name)\"" \
+  "${SUBNET}"
+
+# 7. VPC Network
+check_resource_exact "VPC Network ${NETWORK}" "gcloud compute networks describe \"${NETWORK}\" --project=\"${PROJECT_ID}\""
+
+# 8. GCS Buckets (Optional without --force)
+check_resource_exact "GCS Staging Bucket gs://${BUCKET}" "gsutil ls -b 'gs://${BUCKET}'" true
+check_resource_exact "GCS Temp Bucket gs://${TEMP_BUCKET}" "gsutil ls -b 'gs://${TEMP_BUCKET}'" true
+
+echo -e "\nAudit complete."
+echo -e "[${YELLOW}Pass*${NC}] indicates the resource was not found (which is expected after destroy)."
+echo -e "[${BLUE}Kept${NC}] indicates the resource was found, which is expected as --force was not used."

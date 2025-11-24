@@ -14,6 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Set RESOURCE_SUFFIX based on TIMESTAMP env var or generate new
+if [[ -n "${TIMESTAMP}" ]]; then
+  export RESOURCE_SUFFIX="${TIMESTAMP}"
+  echo "Using provided TIMESTAMP for resources: ${RESOURCE_SUFFIX}"
+else
+  export RESOURCE_SUFFIX="$(date +%s)"
+  echo "Generated new TIMESTAMP for resources: ${RESOURCE_SUFFIX}"
+fi
+export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${RESOURCE_SUFFIX}}"
+mkdir -p "${REPRO_TMPDIR}"
+export SENTINEL_DIR="${SENTINEL_DIR:-${REPRO_TMPDIR}/sentinels}"
+mkdir -p "${SENTINEL_DIR}"
+
+source lib/script-utils.sh
+
 export PATH_SEPARATOR=";"
 export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER env.json)"
 export DOMAIN="$(jq -r .DOMAIN env.json)"
@@ -27,11 +42,13 @@ fi
 export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT env.json)"
 export CLUSTER_NAME="$(jq -r .CLUSTER_NAME env.json)"
 export BUCKET="$(jq -r .BUCKET env.json)"
+export TEMP_BUCKET="$(jq -r .TEMP_BUCKET env.json)"
 export RANGE="$(jq -r .RANGE env.json)"
 export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT env.json)"
 export ASN_NUMBER="$(jq -r .ASN_NUMBER env.json)"
 export IMAGE_VERSION="$(jq -r .IMAGE_VERSION env.json)"
 export REGION="$(jq -r .REGION env.json)"
+export DEBUG="${DEBUG:-0}"
 
 export ZONE="${REGION}-b"
 #export ZONE="${REGION}-b"
@@ -57,7 +74,16 @@ export DATAPROC_IMAGE_VERSION="${IMAGE_VERSION}"
 #export INIT_ACTIONS_ROOT="gs://goog-dataproc-initialization-actions-${REGION}"
 export AUTOSCALING_POLICY_NAME=aspolicy-${CLUSTER_NAME}
 export SA_NAME=sa-${CLUSTER_NAME}
-export GSA=${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com
+
+if [[ "${PROJECT_ID}" == *":"* ]]; then
+  # Domain-scoped project
+  DOMAIN=$(echo "${PROJECT_ID}" | cut -d':' -f1)
+  PROJECT_NAME=$(echo "${PROJECT_ID}" | cut -d':' -f2)
+  export GSA="${SA_NAME}@${PROJECT_NAME}.${DOMAIN}.iam.gserviceaccount.com"
+else
+  # Regular project
+  export GSA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+fi
 
 export INIT_ACTIONS_ROOT="gs://${BUCKET}/dataproc-initialization-actions"
 export YARN_DOCKER_IMAGE="gcr.io/${PROJECT_ID}/${USER}/cudatest-ubuntu18:latest"
@@ -109,6 +135,9 @@ export MYSQL_SECRET_NAME="mysql-secret-${CLUSTER_NAME}"
 
 # MSSQL
 export MSSQL_INSTANCE="mssql-${CLUSTER_NAME}"
+
+# Oracle
+export ORACLE_VM_NAME="oracle-vm-${CLUSTER_NAME}"
 export MSSQL_DATABASE_VERSION="SQLSERVER_2019_STANDARD"
 # Legacy MSSQL
 export MSSQL_IMAGE_FAMILY="sql-ent-2014-win-2012-r2"
@@ -195,7 +224,7 @@ export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
 #export DRIVER_VERSION="550.135"
 #export CUDA_VERSION="12.6"
 #export CUDA_VERSION="12.6.2"
-export CUDA_VERSION="12.6.3"
+#export CUDA_VERSION="12.6.3"
 #export DRIVER_VERSION="550.142"
 #export DRIVER_VERSION="460.73.01"
 #export DRIVER_VERSION="550.54.14"
@@ -237,39 +266,37 @@ export HIVE_CLUSTER_NAME="hive-${CLUSTER_NAME}"
 export HIVE_DATA_BUCKET="${BUCKET}"
 export WAREHOUSE_BUCKET="gs://${HIVE_DATA_BUCKET}"
 export HIVE_METASTORE_WAREHOUSE_DIR="${WAREHOUSE_BUCKET}/datasets"
-echo -n "sourcing functions..."
-source lib/shared-functions.sh
 
 function configure_environment() {
   dataproc_repro_configure_environment=1
 
-  echo -n "setting gcloud config..."
-  CURRENT_ACCOUNT="$(gcloud config get account)"
-  if [[ "${CURRENT_ACCOUNT}" != "${PRINCIPAL}" ]]; then
-    echo "setting gcloud account"
-    gcloud config set account "${PRINCIPAL}"
+  # echo -n "setting gcloud config..."
+  # CURRENT_ACCOUNT="$(gcloud config get account)"
+  # if [[ "${CURRENT_ACCOUNT}" != "${PRINCIPAL}" ]]; then
+  #   echo "setting gcloud account"
+  #   gcloud config set account "${PRINCIPAL}"
 
-  fi
-  CURRENT_COMPUTE_REGION="$(gcloud config get compute/region)"
-  if [[ "${CURRENT_COMPUTE_REGION}" != "${REGION}" ]]; then
-    echo "setting compute region"
-    gcloud config set compute/region "${REGION}"
-  fi
-  CURRENT_DATAPROC_REGION="$(gcloud config get dataproc/region)"
-  if [[ "${CURRENT_DATAPROC_REGION}" != "${REGION}" ]]; then
-    echo "setting dataproc region"
-    gcloud config set dataproc/region "${REGION}"
-  fi
-  CURRENT_COMPUTE_ZONE="$(gcloud config get compute/zone)"
-  if [[ "${CURRENT_COMPUTE_ZONE}" != "${ZONE}" ]]; then
-    echo "setting compute zone"
-    gcloud config set compute/zone "${ZONE}"
-  fi
-  CURRENT_PROJECT_ID="$(gcloud config get project)"
-  if [[ "${CURRENT_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
-    echo "setting gcloud project"
-    gcloud config set project ${PROJECT_ID}
-  fi
+  # fi
+  # CURRENT_COMPUTE_REGION="$(gcloud config get compute/region)"
+  # if [[ "${CURRENT_COMPUTE_REGION}" != "${REGION}" ]]; then
+  #   echo "setting compute region"
+  #   gcloud config set compute/region "${REGION}"
+  # fi
+  # CURRENT_DATAPROC_REGION="$(gcloud config get dataproc/region)"
+  # if [[ "${CURRENT_DATAPROC_REGION}" != "${REGION}" ]]; then
+  #   echo "setting dataproc region"
+  #   gcloud config set dataproc/region "${REGION}"
+  # fi
+  # CURRENT_COMPUTE_ZONE="$(gcloud config get compute/zone)"
+  # if [[ "${CURRENT_COMPUTE_ZONE}" != "${ZONE}" ]]; then
+  #   echo "setting compute zone"
+  #   gcloud config set compute/zone "${ZONE}"
+  # fi
+  # CURRENT_PROJECT_ID="$(gcloud config get project)"
+  # if [[ "${CURRENT_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+  #   echo "setting gcloud project"
+  #   gcloud config set project ${PROJECT_ID}
+  # fi
 
   # echo "setting gcloud parameters"
   # gcloud config set account ${PRINCIPAL}
@@ -298,7 +325,6 @@ function configure_environment() {
   #enable_secret_manager
   #eval $(bash ../custom-images/examples/secure-boot/create-key-pair.sh)
 
-
   # To boot a secure-boot capable cluster from a pre-init image, the
   # reader will have already performed the steps from
   # ../custom-images/examples/secure-boot/README.md including creation of creating
@@ -314,5 +340,3 @@ function configure_environment() {
 }
 
 [[ -v dataproc_repro_configure_environment ]] || configure_environment
-
-echo "done"

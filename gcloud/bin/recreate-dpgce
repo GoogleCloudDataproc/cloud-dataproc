@@ -16,6 +16,8 @@
 #
 
 source lib/env.sh
+source lib/dataproc/cluster.sh
+source lib/gcp/iam.sh
 
 # Copy latest initialization action scripts
 #echo -n "copying actions to gcs bucket..."
@@ -31,6 +33,7 @@ source lib/env.sh
 
 # re-create dpgce dataproc cluster
 delete_dpgce_cluster
+create_service_account # Ensure SA and roles exist
 create_dpgce_cluster
 
 echo "========================================"

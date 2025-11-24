@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-source env.sh
+source lib/env.sh
 
 worker_num="$1"
 
@@ -23,7 +23,7 @@ if [[ -n "$worker_num" ]]; then
   echo "worker_num: $worker_num"
   WORKER_HOSTNAME="${WORKER_HOSTNAME}-${worker_num}"
 else
-  WORKER_HOSTNAME="${WORKER_HOSTNAME}-0"  
+  WORKER_HOSTNAME="${WORKER_HOSTNAME}-0"
 fi
 
 gcloud compute ssh --zone ${ZONE} ${WORKER_HOSTNAME}  --tunnel-through-iap --project ${PROJECT_ID} -- -o ConnectTimeout=360
