@@ -581,7 +581,7 @@ gcloud beta billing projects \
 
 once you have credentials to run the above command,
 
-Press enter > 
+Press enter >
 "
       read
 
@@ -838,37 +838,72 @@ function delete_phs_cluster() {
 
 function create_service_account() {
   set -x
-  if gcloud iam service-accounts describe "${GSA}" > /dev/null ; then
-    echo "service account ${SA_NAME} already exists"
-    return 0 ; fi
 
-  gcloud iam service-accounts create "${SA_NAME}" \
-    --description="Service account for use with cluster ${CLUSTER_NAME}" \
-    --display-name="${SA_NAME}"
+  # Attempt to describe the service account
+  echo "Checking for service account ${GSA}..."
+  # Use list with a filter on the SA NAME part of the email
+  SA_EXISTS=$(gcloud iam service-accounts list \
+    --project="${PROJECT_ID}" \
+    --filter="email=${GSA}" \
+    --format="value(email)")
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/dataproc.worker
+  if [[ -n "${SA_EXISTS}" ]]; then
+    echo "Service account ${GSA} already exists."
+  else
+    echo "Service account ${GSA} not found, attempting to create..."
+    if ! gcloud iam service-accounts create "${SA_NAME}" \
+      --project="${PROJECT_ID}" \
+      --description="Service account for use with cluster ${CLUSTER_NAME}" \
+      --display-name="${SA_NAME}"; then
+      echo "ERROR: Failed to create service account ${SA_NAME}."
+      exit 1
+    fi
+    echo "Service account ${GSA} created successfully."
+    echo "Waiting 10s for IAM propagation..."
+    sleep 10
+  fi
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/storage.objectCreator
+  # Bind roles to the service account
+  ROLES=(
+    roles/dataproc.worker
+    roles/bigquery.dataEditor
+    roles/storage.objectCreator
+    roles/storage.objectViewer
+    roles/secretmanager.secretAccessor
+    roles/compute.viewer
+    roles/compute.instanceAdmin.v1
+  )
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/storage.objectViewer
+  for role in "${ROLES[@]}"; do
+    echo "Binding ${role} to ${GSA}..."
+    MAX_RETRIES=5
+    RETRY_COUNT=0
+    SLEEP_TIME=10
+    while [[ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]]; do
+      # Capture output and error
+      BIND_OUTPUT=$(gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+        --member="serviceAccount:${GSA}" \
+        --role="${role}" --condition=None 2>&1)
+      BIND_EXIT_CODE=$?
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/secretmanager.secretAccessor
+      if [[ ${BIND_EXIT_CODE} -eq 0 ]]; then
+        echo "${role} bound successfully to ${GSA}."
+        break # Exit the while loop on success
+      fi
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/compute.viewer
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      echo "Attempt ${RETRY_COUNT}/${MAX_RETRIES} failed for ${role}."
+      echo "Error: ${BIND_OUTPUT}"
 
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/compute.instanceAdmin.v1
+      if [[ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]]; then
+        echo "Retrying in ${SLEEP_TIME} seconds..."
+        sleep ${SLEEP_TIME}
+      else
+        echo "Failed to bind ${role} to ${GSA} after ${MAX_RETRIES} attempts."
+        exit 1
+      fi
+    done
+  done
 
    gcloud iam service-accounts add-iam-policy-binding "${GSA}" \
     --member="serviceAccount:${GSA}" \
