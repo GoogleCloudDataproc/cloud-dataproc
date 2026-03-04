@@ -47,7 +47,7 @@ def upload_results():
                             attributes/dataproc-cluster-name") \
         .read()
     output_path = "{}/{}/{}/hibench.report".format(sys.argv[1], sys.argv[2], cluster_name)
-    cmd = "gsutil cp /HiBench/report/hibench.report {}".format(output_path)
+    cmd = "gcloud storage cp /HiBench/report/hibench.report {}".format(output_path)
     execute_shell(cmd)
 
 

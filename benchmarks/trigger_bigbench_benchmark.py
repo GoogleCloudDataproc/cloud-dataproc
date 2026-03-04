@@ -48,7 +48,7 @@ def upload_results():
     for file in os.listdir('/Big-Data-Benchmark-for-Big-Bench/logs/'):
         if file.__contains__(".csv") or file.__contains__(".zip"):
             output_path = "{}/{}/{}/".format(sys.argv[1], sys.argv[2], cluster_name)
-            command = "gsutil cp /Big-Data-Benchmark-for-Big-Bench/logs/{} {}{}" \
+            command = "gcloud storage cp /Big-Data-Benchmark-for-Big-Bench/logs/{} {}{}" \
                 .format(file, output_path, file)
             execute_shell(command)
 

@@ -1029,12 +1029,12 @@ source lib/database-functions.sh
 source lib/net-functions.sh
 
 function create_bucket () {
-  if gsutil ls -b "gs://${BUCKET}" ; then
+  if gcloud storage ls --buckets "gs://${BUCKET}" ; then
     echo "bucket already exists, skipping creation."
     return
   fi
   set -x
-  gsutil mb -l ${REGION} gs://${BUCKET}
+  gcloud storage buckets create --location=${REGION} gs://${BUCKET}
   set +x
 
   echo "==================="
@@ -1045,7 +1045,7 @@ function create_bucket () {
   if [ -d init ]
   then
     set -x
-    gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+    gcloud storage cp --recursive init/* gs://${BUCKET}/dataproc-initialization-actions
     set +x
   fi
 
@@ -1057,7 +1057,7 @@ function create_bucket () {
 
 function delete_bucket () {
   set -x
-  gsutil -m rm -r gs://${BUCKET}
+  gcloud storage rm --recursive gs://${BUCKET}
   set +x
 
   echo "bucket removed"
@@ -1144,7 +1144,7 @@ function diagnose {
 
   DIAG_URL=$(echo $DIAG_OUT | perl -ne 'print if m{^gs://.*/diagnostic.tar.gz\s*$}')
   mkdir -p tmp
-  gsutil cp -q ${DIAG_URL} tmp/
+  gcloud storage cp ${DIAG_URL} tmp/
 
   if [[ ! -f venv/${CLUSTER_NAME}/pyvenv.cfg ]]; then
     mkdir -p venv/

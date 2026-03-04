@@ -19,7 +19,7 @@ source lib/env.sh
 source lib/gke.sh # Assuming gke functions are here
 
 # Copy latest initialization action scripts
-gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+gcloud storage cp --recursive init/* gs://${BUCKET}/dataproc-initialization-actions
 
 # re-create normal dataproc cluster
 delete_gke_cluster
@@ -28,4 +28,3 @@ create_gke_cluster
 echo "========================"
 echo "DPGKE Cluster re-created"
 echo "========================"
-

@@ -131,8 +131,8 @@ check_resource "Main Subnet" \
 check_resource_exact "VPC Network ${NETWORK}" "gcloud compute networks describe \"${NETWORK}\" --project=\"${PROJECT_ID}\""
 
 # 14. GCS Buckets (Optional without --force)
-check_resource_exact "GCS Staging Bucket gs://${BUCKET}" "gsutil ls -b 'gs://${BUCKET}'" true
-check_resource_exact "GCS Temp Bucket gs://${TEMP_BUCKET}" "gsutil ls -b 'gs://${TEMP_BUCKET}'" true
+check_resource_exact "GCS Staging Bucket gs://${BUCKET}" "gcloud storage ls --buckets 'gs://${BUCKET}'" true
+check_resource_exact "GCS Temp Bucket gs://${TEMP_BUCKET}" "gcloud storage ls --buckets 'gs://${TEMP_BUCKET}'" true
 
 echo -e "\nAudit complete."
 echo -e "[${YELLOW}Pass*${NC}] indicates the resource was not found (which is expected after destroy)."

@@ -37,12 +37,12 @@ Google's Translation API and running on Cloud Dataproc.
 
 4. Create a bucket:
    ```
-   gsutil mb gs://$PROJECT-bucket
+   gcloud storage buckets create gs://$PROJECT-bucket
    ```
 
 5. Upload `words.txt` to the bucket:
    ```
-   gsutil cp ../words.txt gs://$PROJECT-bucket
+   gcloud storage cp ../words.txt gs://$PROJECT-bucket
    ```
    The file `words.txt` contains the following:
    ```
@@ -69,7 +69,7 @@ Google's Translation API and running on Cloud Dataproc.
 
 8. Verify that the words have been translated:
    ```
-   gsutil cat gs://$PROJECT-bucket/translated-fr/part-*
+   gcloud storage cat gs://$PROJECT-bucket/translated-fr/part-*
    ```
    The output is:
    ```

@@ -21,9 +21,9 @@ source lib/gcp/iam.sh
 
 # Copy latest initialization action scripts
 #echo -n "copying actions to gcs bucket..."
-#gsutil -m cp \
-#       -L action-update.log \
-#       -r init/* gs://${BUCKET}/dataproc-initialization-actions
+#gcloud storage cp \
+#       --manifest-path action-update.log \
+#       --recursive init/* gs://${BUCKET}/dataproc-initialization-actions
 #if [[ $? == 0 ]]; then
 #  echo "done"
 #else
@@ -39,4 +39,3 @@ create_dpgce_cluster
 echo "========================================"
 echo "General Purpose DPGCE Cluster re-created"
 echo "========================================"
-
