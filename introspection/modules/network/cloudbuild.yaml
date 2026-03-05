@@ -1,0 +1,26 @@
+steps:
+  # Build the test container
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'docker-build'
+    args: ['build', '--tag=gcr.io/$PROJECT_ID/network-introspection-test:$BUILD_ID', '-f', 'modules/network/Dockerfile', '.']
+
+  # Push the image to GCR
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'docker-push'
+    args: ['push', 'gcr.io/$PROJECT_ID/network-introspection-test:$BUILD_ID']
+
+  # Run the integration tests for the network module
+  - name: 'gcr.io/$PROJECT_ID/network-introspection-test:$BUILD_ID'
+    id: 'run-tests'
+    entrypoint: 'python'
+    args: ['modules/network/integration_test.py']
+    env:
+      - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+      - 'REGION=${_REGION}'
+      - 'INSPECT_MODULES=network' # Ensure only network tests are run
+    waitFor: ['docker-push']
+
+substitutions:
+  _REGION: 'us-central1' # Default region, can be overridden
+
+timeout: 1800s # 30 minutes
