@@ -79,95 +79,39 @@ function parse_args() {
 }
 export -f parse_args
 
-# --- Sentinel Functions ---
-function get_sentinel_file() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  echo "${SENTINEL_DIR}/${phase_name}-${sentinel_name}"
+# --- State Management Functions ---
+function get_state() {
+    if [[ ! -f "${STATE_FILE}" ]]; then
+        echo "{}"
+        return
+    fi
+    cat "${STATE_FILE}"
 }
-export -f get_sentinel_file
 
-function create_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  touch "$(get_sentinel_file "${phase_name}" "${sentinel_name}")"
+function update_state() {
+    local resource_key=$1
+    local resource_value=$2 # This should be a JSON string or "null"
+    
+    local current_state=$(get_state)
+    local new_state=$(jq --arg key "${resource_key}" --argjson value "${resource_value}" '.[$key] = $value' <<< "${current_state}")
+    echo "${new_state}" > "${STATE_FILE}"
 }
-export -f create_sentinel
-
-function check_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  [[ -f "$(get_sentinel_file "${phase_name}" "${sentinel_name}")" ]]
-}
-export -f check_sentinel
-
-function remove_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  rm -f "$(get_sentinel_file "${phase_name}" "${sentinel_name}")"
-}
-export -f remove_sentinel
-
-function clear_sentinels() {
-  local phase_name="$1"
-  rm -f "${SENTINEL_DIR}/${phase_name}-*"
-}
-export -f clear_sentinels
 
 # --- Audit Check Functions ---
-function check_resource() {
-  local test_name="$1"
-  local command_to_run="$2"
-  local grep_pattern="$3"
-  local optional="${4:-false}"
-  local log_file="${LOG_DIR}/$(echo "$test_name" | tr ' /:' '___').log"
-
-  print_status "Checking: ${test_name}... "
-
-  eval "${command_to_run}" > "${log_file}" 2>&1
-
-  if grep -q "${grep_pattern}" "${log_file}"; then
-    if [[ "${optional}" == "true" && "${FORCE_AUDIT}" == "false" ]]; then
-      report_result "Kept"
-      return 0
-    else
-      report_result "Fail"
-      return 1
-    fi
+# These functions are now designed to be called by the audit script.
+# They return a JSON object with details if a resource is found, or the string "null".
+function _check_exists() {
+  local command_to_run="$1"
+  local json_output
+  
+  # The command_to_run should be a gcloud command with --format=json
+  # that returns a JSON object if the resource exists and fails otherwise.
+  json_output=$(eval "${command_to_run}" 2>/dev/null)
+  
+  if [[ -n "${json_output}" ]]; then
+    echo "${json_output}"
   else
-    report_result "Not Found"
-    return 0
+    echo "null"
   fi
 }
-export -f check_resource
-
-function check_resource_exact() {
-  local test_name="$1"
-  local command_to_run="$2"
-  local optional="${3:-false}"
-  local log_file="${LOG_DIR}/$(echo "$test_name" | tr ' /:' '___').log"
-
-  print_status "Checking: ${test_name}... "
-  if eval "${command_to_run}" > "${log_file}" 2>&1; then
-    # Command succeeded, check if it produced output
-    if [[ $(wc -l < "${log_file}") -gt 0 ]]; then
-      # Output found
-      if [[ "${optional}" == "true" && "${FORCE_AUDIT}" == "false" ]]; then
-        report_result "Kept"
-        return 0
-      else
-        report_result "Fail"
-        return 1
-      fi
-    else
-      # Command succeeded but no output, so Not Found
-      report_result "Not Found"
-      return 0
-    fi
-  else
-    # Command failed, resource likely does not exist
-    report_result "Not Found"
-    return 0
-  fi
-}
-export -f check_resource_exact
+export -f _check_exists

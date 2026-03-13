@@ -1,0 +1,21 @@
+#!/bin/bash
+source lib/env.sh
+
+echo "Uploading latest init scripts to gs://${BUCKET}/dataproc-initialization-actions..."
+gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+
+echo " "
+echo "SSH to the -m node:"
+echo "gcloud compute ssh --zone ${ZONE} ${CLUSTER_NAME}-m --project ${PROJECT_ID}"
+echo " "
+echo "Once SSHed, run these commands:"
+echo "----"
+echo "sudo -i"
+echo "rm -f /tmp/install_gpu_driver.sh /tmp/install.log"
+echo "gsutil cp gs://${BUCKET}/dataproc-initialization-actions/gpu/install_gpu_driver.sh /tmp/"
+echo "chmod +x /tmp/install_gpu_driver.sh"
+echo "time bash -x /tmp/install_gpu_driver.sh 2>&1 | tee /tmp/install.log"
+echo "----"
+echo " "
+echo "After the script finishes on the VM, download the log on your local machine:"
+echo "gcloud compute scp --zone ${ZONE} ${CLUSTER_NAME}-m:/tmp/install.log ./tmp --tunnel-through-iap --project ${PROJECT_ID}"

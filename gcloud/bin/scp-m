@@ -17,25 +17,25 @@
 source lib/env.sh
 
 if [[ -z "$1" ]]; then
-  echo "$0 [master number] <files to copy to worker:/tmp>"
+  echo "$0 [-m node index] <local_path>"
   exit 1
 fi
 
-# If the first argument is a number, assume it indicates which master to send file to
-MASTER_HOSTNAME="${CLUSTER_NAME}-m"
+# If the first argument is a number, assume it indicates which m node to send file to
+M_HOSTNAME="${CLUSTER_NAME}-m"
 if [[ $(perl -e "print 1 if q{$1} =~ /^\d+$/") == "1" ]]; then
-  master_num="$1"
-  echo "master_num: $master_num"
-  MASTER_HOSTNAME="${MASTER_HOSTNAME}-${master_num}"
+  m_num="$1"
+  echo "m_num: $m_num"
+  M_HOSTNAME="${M_HOSTNAME}-${m_num}"
   shift 1
 else
-  MASTER_HOSTNAME="${MASTER_HOSTNAME}"
+  M_HOSTNAME="${M_HOSTNAME}"
 fi
 
 date
 
 gcloud compute scp --recurse "$*" \
   --zone ${ZONE} \
-  ${MASTER_HOSTNAME}:/tmp  \
+  ${M_HOSTNAME}:/tmp  \
   --tunnel-through-iap \
   --project ${PROJECT_ID}

@@ -1,112 +1,110 @@
 #!/bin/bash
-#
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS-IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
 # Exit on failure
 set -e
 
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 
-parse_args "$@"
+# --- Source environment variables and utility functions ---
+source "${GCLOUD_DIR}/lib/env.sh"
+
+# --- Argument Parsing ---
+IS_CUSTOM=false
+IS_PRIVATE=false
+CREATE_CLUSTER=true
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --custom) IS_CUSTOM=true ;;
+        --private) IS_PRIVATE=true ;;
+        --no-create-cluster) CREATE_CLUSTER=false ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
 
 if (( DEBUG != 0 )); then
   set -x
 fi
 
-# Source function files
-source lib/gcp/project.sh
-source lib/gcp/misc.sh
-source lib/misc.sh
-source lib/gcp/iam.sh
-source lib/gcp/gcs.sh
-source lib/network/network.sh
-source lib/network/subnet.sh
-source lib/network/router.sh
-source lib/network/routes.sh
-source lib/network/firewall.sh
-source lib/dataproc/cluster.sh
-source lib/dataproc/autoscaling.sh
-# Add others as needed, e.g.:
-# source lib/network/peering.sh
-# source lib/bigtable.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
+# Source all function files needed for checks and creation
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gcp/project.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+source "${GCLOUD_DIR}/lib/misc.sh"
+source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh" 
 
-create_project
+
+# --- Main Logic ---
+print_status "Auditing environment to determine current state..."
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+report_result "Done"
 
 configure_gcloud
-
+check_project
+check_billing
 set_cluster_name
-
 enable_services
 
-create_service_account
+if [[ $(jq -r '.serviceAccount == null' "${STATE_FILE}") == "true" ]]; then
+  create_service_account
+else
+  print_status "Skipping Service Account creation (already exists)..."
+  report_result "Exists"
+fi
 
-create_bucket
+create_gcs_bucket "${BUCKET}" "Standard"
+grant_gcs_bucket_perms "${BUCKET}"
+create_gcs_bucket "${TEMP_BUCKET}" "Standard"
+grant_gcs_bucket_perms "${TEMP_BUCKET}"
+upload_init_actions
 
-create_vpc_network
+if [[ $(jq -r '.vpcNetwork == null' "${STATE_FILE}") == "true" ]]; then
+  create_vpc_network
+fi
 
-#create_ip_allocation
+if [[ $(jq -r '.standardSubnet == null' "${STATE_FILE}") == "true" ]]; then
+  create_subnet
+fi
 
-#create_vpc_peering
+if [[ $(jq -r '.cloudRouter == null' "${STATE_FILE}") == "true" ]]; then
+  create_router
+  add_nat_to_router
+fi
 
-# Create a cloud router
+if [[ $(jq -r '.firewallRule == null' "${STATE_FILE}") == "true" ]]; then
+  create_firewall_rules
+fi
 
-create_vpc_network
+if [[ $(jq -r '.autoscalingPolicy == null' "${STATE_FILE}") == "true" ]]; then
+  create_autoscaling_policy
+fi
 
-create_subnet
-
-create_router
-
-create_default_route
-
-add_nat_policy
-
-create_firewall_rules
-
-# Create logging firewall rules
-
-#create_logging_firewall_rules
-
-#create_bigtable_instance
-
-#create_mysql_instance
-#create_legacy_mssql_instance
-
-# Create PHS dataproc cluster
-
-#create_phs_cluster
-
-# Create normal dataproc cluster
-
-create_autoscaling_policy
-
+# --- Conditional Cluster Creation ---
 if [[ "${CREATE_CLUSTER}" = true ]]; then
-  print_status "Creating Dataproc Cluster ${CLUSTER_NAME}..."
-  if create_dpgce_cluster; then
-    print_result "Pass"
+  if [[ "$IS_PRIVATE" == "true" ]]; then
+    source "${GCLOUD_DIR}/lib/gcp/private-network.sh"
+    create_private_subnet
+    create_dpgce_private_cluster
   else
-    print_result "Fail"
-    exit 1
+    if [[ "$IS_CUSTOM" == "true" ]]; then
+      source "${GCLOUD_DIR}/lib/dataproc/cluster-custom.sh"
+    fi
+    create_dpgce_cluster
   fi
+  
+  # After creation, run audit again to update state file with new resource details
+  "${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
 else
   echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
 fi
-
-# Perform some connectivity tests
-
-#perform_connectivity_tests
-

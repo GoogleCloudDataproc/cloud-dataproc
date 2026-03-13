@@ -16,12 +16,14 @@
 #
 source lib/env.sh
 
-master_num="$1"
-
-MASTER_HOSTNAME="${CLUSTER_NAME}-m"
-if [[ -n "$master_num" ]]; then
-  echo "master_num: $master_num"
-  MASTER_HOSTNAME="${MASTER_HOSTNAME}-${master_num}"
+M_HOSTNAME="${CLUSTER_NAME}-m"
+# If the first argument is a number, treat it as the master index for HA
+if [[ "$1" =~ ^[0-9]+$ ]]; then
+  M_HOSTNAME="${M_HOSTNAME}-${1}"
+  shift # Remove the index from the arguments
 fi
 
-gcloud compute ssh --zone ${ZONE} ${MASTER_HOSTNAME}  --tunnel-through-iap --project ${PROJECT_ID} -- -o ConnectTimeout=360
+# The rest of the arguments are the command to be executed
+COMMAND_TO_RUN="$@"
+
+gcloud compute ssh --zone "${ZONE}" "${M_HOSTNAME}" --tunnel-through-iap --project "${PROJECT_ID}" -- -t -o ConnectTimeout=360 -AY ${COMMAND_TO_RUN}

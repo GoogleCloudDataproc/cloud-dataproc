@@ -1,77 +1,106 @@
 #!/bin/bash
-#
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS-IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
+# Exit on failure
 set -e
 
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 
-# Source function files
-source lib/dataproc/cluster.sh
-source lib/gcp/iam.sh
-source lib/dataproc/autoscaling.sh
-source lib/network/routes.sh
-source lib/network/router.sh
-source lib/network/firewall.sh
-source lib/network/subnet.sh
-source lib/network/network.sh
-source lib/gcp/gcs.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
+# --- Source environment variables and utility functions ---
+source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/routes.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
 
-parse_args "$@"
+# --- Argument Parsing ---
+FORCE_DELETE=false
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --force) FORCE_DELETE=true ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
 
-if (( DEBUG != 0 )); then
-  set -x
+# --- Main Logic ---
+configure_gcloud
+
+echo "========================================"
+echo "Starting DPGCE Environment Teardown"
+echo "========================================"
+
+# Run audit to get the current state
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+
+# --- Teardown Logic ---
+# Read the state file and delete resources that are not null.
+# The order is important to handle dependencies.
+
+if [[ $(jq -r '.dataprocCluster != null' "${STATE_FILE}") == "true" ]]; then
+    delete_dpgce_cluster
 fi
 
-delete_dpgce_cluster
+if [[ $(jq -r '.autoscalingPolicy != null' "${STATE_FILE}") == "true" ]]; then
+    delete_autoscaling_policy
+fi
 
-delete_service_account
+if [[ $(jq -r '.cloudRouter != null' "${STATE_FILE}") == "true" ]]; then
+    delete_router
+fi
 
-delete_autoscaling_policy
+if [[ $(jq -r '.firewallRule != null' "${STATE_FILE}") == "true" ]]; then
+    delete_firewall_rules
+fi
 
-#delete_phs_cluster()
+# Delete routes after firewall rules
+if [[ $(jq -r '.routes | length > 0' "${STATE_FILE}") == "true" ]]; then
+    mapfile -t route_names < <(jq -r '.routes[].name' "${STATE_FILE}")
+    for route_name in "${route_names[@]}"; do
+        delete_route "${route_name}"
+    done
+fi
 
-#delete_mysql_instance
-#delete_legacy_mssql_instance
+if [[ $(jq -r '.privateSubnet != null' "${STATE_FILE}") == "true" ]]; then
+    delete_subnet "${PRIVATE_SUBNET}"
+fi
 
-delete_default_route
+if [[ $(jq -r '.standardSubnet != null' "${STATE_FILE}") == "true" ]]; then
+    delete_subnet "${SUBNET}"
+fi
 
-delete_nat_configs # Should be called before delete_router
+if [[ $(jq -r '.serviceAccount != null' "${STATE_FILE}") == "true" ]]; then
+    delete_service_account
+fi
 
-delete_router
+# Finally, attempt to delete the network. It should be empty now.
+if [[ $(jq -r '.vpcNetwork != null' "${STATE_FILE}") == "true" ]]; then
+    delete_vpc_network
+fi
 
-delete_firewall_rules
-
-#delete_logging_firewall_rules
-
-#delete_ip_allocation
-
-delete_subnet
-
-delete_vpc_network
-
-#delete_vpc_peering
-
+# Conditionally delete buckets if --force is specified
 if [[ "${FORCE_DELETE}" = true ]]; then
-  delete_bucket
+  delete_gcs_bucket "${BUCKET}"
+  delete_gcs_bucket "${TEMP_BUCKET}"
 else
   print_status "Skipping Bucket Deletion. Use --force to delete buckets."
   report_result "Skipped"
 fi
 
-set +x
+# After attempting deletion, run audit one last time to generate the final, clean state file.
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+
+echo "========================================"
+echo "DPGCE Environment teardown complete"
+echo "Final state written to ${STATE_FILE}"
+echo "========================================"
+jq . < "${STATE_FILE}"

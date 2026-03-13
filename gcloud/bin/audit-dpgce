@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# Universal audit script for all Dataproc on GCE environment variations.
+#
+# This script generates a state.json file that is the canonical source of truth
+# for the environment's state.
+
+# Exit on failure
+set -e
+
+# --- Get script's real directory ---
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+
+# --- Main Audit Logic ---
+# This script will now generate a state.json file.
+# It does not need to print a human-readable report, as that can be done by
+# another script that reads the state file.
+
+# Initialize an empty JSON object
+echo "{}" > "${STATE_FILE}"
+
+# --- Infrastructure State Checks ---
+update_state "project" "$(_check_exists "gcloud projects describe '${PROJECT_ID}' --format='json(lifecycleState,projectId)'")"
+update_state "billing" "$(_check_exists "gcloud beta billing projects describe '${PROJECT_ID}' --format='json(billingEnabled)'")"
+
+# --- Resource Existence Checks ---
+update_state "vpcNetwork" "$(exists_network)"
+update_state "standardSubnet" "$(exists_subnet "${SUBNET}")"
+update_state "privateSubnet" "$(exists_subnet "${PRIVATE_SUBNET}")"
+update_state "cloudRouter" "$(exists_router)"
+update_state "firewallRule" "$(exists_firewall)"
+update_state "routes" "$(_check_exists "gcloud compute routes list --project='${PROJECT_ID}' --filter='network~\"/${NETWORK}$\"' --format='json(name,selfLink)'" | jq 'if . == [] then null else . end')"
+update_state "serviceAccount" "$(exists_service_account)"
+update_state "autoscalingPolicy" "$(exists_autoscaling_policy)"
+update_state "dataprocCluster" "$(exists_dpgce_cluster)"
+
+# --- Final Output ---
+# For convenience, pretty-print the state file to stdout
+jq . < "${STATE_FILE}"
