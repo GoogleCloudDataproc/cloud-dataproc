@@ -56,166 +56,285 @@ function is_rocky()    {  [[ "$(os_id)" == "rocky" ]] ; }
 # --- End OS Detection Helpers ---
 
 function set_proxy(){
-  METADATA_HTTP_PROXY="$(get_metadata_attribute http-proxy '')"
+  local meta_http_proxy meta_https_proxy meta_proxy_uri
+  meta_http_proxy=$(get_metadata_attribute 'http-proxy' '')
+  meta_https_proxy=$(get_metadata_attribute 'https-proxy' '')
+  meta_proxy_uri=$(get_metadata_attribute 'proxy-uri' '')
 
-  if [[ -z "${METADATA_HTTP_PROXY}" ]] ; then return ; fi
+  echo "DEBUG: set_proxy: meta_http_proxy='${meta_http_proxy}'"
+  echo "DEBUG: set_proxy: meta_https_proxy='${meta_https_proxy}'"
+  echo "DEBUG: set_proxy: meta_proxy_uri='${meta_proxy_uri}'"
 
-default_no_proxy_list=("localhost" "127.0.0.0/8" "::1" "*.googleapis.com"
-			"metadata.google.internal" "169.254.169.254")
+  local http_proxy_val=""
+  local https_proxy_val=""
 
+  # Determine HTTP_PROXY value
+  if [[ -n "${meta_http_proxy}" ]] && [[ "${meta_http_proxy}" != ":" ]]; then
+    http_proxy_val="${meta_http_proxy}"
+  elif [[ -n "${meta_proxy_uri}" ]] && [[ "${meta_proxy_uri}" != ":" ]]; then
+    http_proxy_val="${meta_proxy_uri}"
+  fi
+
+  # Determine HTTPS_PROXY value
+  if [[ -n "${meta_https_proxy}" ]] && [[ "${meta_https_proxy}" != ":" ]]; then
+    https_proxy_val="${meta_https_proxy}"
+  elif [[ -n "${meta_proxy_uri}" ]] && [[ "${meta_proxy_uri}" != ":" ]]; then
+    https_proxy_val="${meta_proxy_uri}"
+  fi
+
+  if [[ -z "${http_proxy_val}" && -z "${https_proxy_val}" ]]; then
+    echo "DEBUG: set_proxy: No valid proxy metadata found (http-proxy, https-proxy, or proxy-uri). Skipping proxy setup."
+    return 0
+  fi
+
+  local default_no_proxy_list=(
+    "localhost"
+    "127.0.0.1"
+    "::1"
+    "metadata.google.internal"
+    "169.254.169.254"
+    # *** Add Google APIs to NO_PROXY for Private Google Access ***
+    ".google.com"
+    ".googleapis.com"
+  )
+
+  local user_no_proxy
   user_no_proxy=$(get_metadata_attribute 'no-proxy' '')
-  user_no_proxy_list=()
+  local user_no_proxy_list=()
   if [[ -n "${user_no_proxy}" ]]; then
     # Replace spaces with commas, then split by comma
     IFS=',' read -r -a user_no_proxy_list <<< "${user_no_proxy// /,}"
   fi
 
-  combined_no_proxy_list=("${default_no_proxy_list[@]}" "${user_no_proxy_list[@]}")
+  local combined_no_proxy_list=( "${default_no_proxy_list[@]}" "${user_no_proxy_list[@]}" )
+  local no_proxy
   no_proxy=$( IFS=',' ; echo "${combined_no_proxy_list[*]}" )
-
-  export http_proxy="http://${METADATA_HTTP_PROXY}"
-  export https_proxy="http://${METADATA_HTTP_PROXY}"
-  export no_proxy
-  export HTTP_PROXY="http://${METADATA_HTTP_PROXY}"
-  export HTTPS_PROXY="http://${METADATA_HTTP_PROXY}"
   export NO_PROXY="${no_proxy}"
+  export no_proxy="${no_proxy}"
 
-  # configure gcloud
-  # There is no no_proxy config for gcloud so we cannot use these settings until https://github.com/psf/requests/pull/7068 is merged
-#  gcloud config set proxy/type http
-#  gcloud config set proxy/address "${METADATA_HTTP_PROXY%:*} "
-#  gcloud config set proxy/port "${METADATA_HTTP_PROXY#*:}"
+  # Export environment variables
+  if [[ -n "${http_proxy_val}" ]]; then
+    export HTTP_PROXY="http://${http_proxy_val}"
+    export http_proxy="http://${http_proxy_val}"
+  else
+    unset HTTP_PROXY
+    unset http_proxy
+  fi
+  echo "DEBUG: set_proxy: Initial HTTP_PROXY='${HTTP_PROXY:-}'"
 
-  # add proxy environment variables to /etc/environment
-  grep http_proxy /etc/environment || echo "http_proxy=${http_proxy}" >> /etc/environment
-  grep https_proxy /etc/environment || echo "https_proxy=${https_proxy}" >> /etc/environment
-  grep no_proxy /etc/environment || echo "no_proxy=${no_proxy}" >> /etc/environment
-  grep HTTP_PROXY /etc/environment || echo "HTTP_PROXY=${HTTP_PROXY}" >> /etc/environment
-  grep HTTPS_PROXY /etc/environment || echo "HTTPS_PROXY=${HTTPS_PROXY}" >> /etc/environment
-  grep NO_PROXY /etc/environment || echo "NO_PROXY=${NO_PROXY}" >> /etc/environment
+  if [[ -n "${https_proxy_val}" ]]; then
+    export HTTPS_PROXY="http://${https_proxy_val}"
+    export https_proxy="http://${https_proxy_val}"
+  else
+    unset HTTPS_PROXY
+    unset https_proxy
+  fi
+  echo "DEBUG: set_proxy: Initial HTTPS_PROXY='${HTTPS_PROXY:-}'"
 
-  local pkg_proxy_conf_file
-  if is_debuntu ; then
-    # configure Apt to use the proxy:
-    pkg_proxy_conf_file="/etc/apt/apt.conf.d/99proxy"
-    cat > "${pkg_proxy_conf_file}" <<EOF
-Acquire::http::Proxy "http://${METADATA_HTTP_PROXY}";
-Acquire::https::Proxy "http://${METADATA_HTTP_PROXY}";
-EOF
-elif is_rocky ; then
-    pkg_proxy_conf_file="/etc/dnf/dnf.conf"
+  # Clear existing proxy settings in /etc/environment
+  sed -i -e '/^http_proxy=/d' -e '/^https_proxy=/d' -e '/^no_proxy=/d' \
+    -e '/^HTTP_PROXY=/d' -e '/^HTTPS_PROXY=/d' -e '/^NO_PROXY=/d' /etc/environment
 
-    touch "${pkg_proxy_conf_file}"
+  # Add current proxy environment variables to /etc/environment
+  if [[ -n "${HTTP_PROXY:-}" ]]; then echo "HTTP_PROXY=${HTTP_PROXY}" >> /etc/environment; fi
+  if [[ -n "${http_proxy:-}" ]]; then echo "http_proxy=${http_proxy}" >> /etc/environment; fi
+  if [[ -n "${HTTPS_PROXY:-}" ]]; then echo "HTTPS_PROXY=${HTTPS_PROXY}" >> /etc/environment; fi
+  if [[ -n "${https_proxy:-}" ]]; then echo "https_proxy=${https_proxy}" >> /etc/environment; fi
+  echo "DEBUG: set_proxy: Effective HTTP_PROXY=${HTTP_PROXY:-}"
+  echo "DEBUG: set_proxy: Effective HTTPS_PROXY=${HTTPS_PROXY:-}"
+  echo "DEBUG: set_proxy: Effective NO_PROXY=${NO_PROXY:-}"
 
-    if grep -q "^proxy=" "${pkg_proxy_conf_file}"; then
-      sed -i.bak "s@^proxy=.*@proxy=${HTTP_PROXY}@" "${pkg_proxy_conf_file}"
-    elif grep -q "^\\\[main\\\\]" "${pkg_proxy_conf_file}"; then
-      sed -i.bak "/^\\\[main\\\\]/a proxy=${HTTP_PROXY}" "${pkg_proxy_conf_file}"
+  # Configure gcloud proxy if version is >= 547.0.0
+  local gcloud_version
+  gcloud_version=$(gcloud version --format="value(google_cloud_sdk)")
+  if version_ge "${gcloud_version}" "547.0.0"; then
+    echo "DEBUG: gcloud version ${gcloud_version} >= 547.0.0, configuring gcloud proxy settings."
+    if [[ -n "${http_proxy_val}" ]]; then
+      local proxy_host
+      local proxy_port
+      proxy_host=$(echo "${http_proxy_val}" | cut -d: -f1)
+      proxy_port=$(echo "${http_proxy_val}" | cut -d: -f2)
+      gcloud config set proxy/type http
+      gcloud config set proxy/address "${proxy_host}"
+      gcloud config set proxy/port "${proxy_port}"
+      echo "DEBUG: Configured gcloud proxy: ${proxy_host}:${proxy_port}"
     else
-      local TMP_FILE=$(mktemp)
-      printf "[main]\nproxy=%s\n" "${HTTP_PROXY}" > "${TMP_FILE}"
-
-      cat "${TMP_FILE}" "${pkg_proxy_conf_file}" > "${pkg_proxy_conf_file}".new
-      mv "${pkg_proxy_conf_file}".new "${pkg_proxy_conf_file}"
-
-      rm "${TMP_FILE}"
+      echo "DEBUG: No HTTP proxy value to configure gcloud."
+      gcloud config unset proxy/type
+      gcloud config unset proxy/address
+      gcloud config unset proxy/port
     fi
   else
-    echo "unknown OS"
-    exit 1
-  fi
-  # configure gpg to use the proxy:
-  if ! grep 'keyserver-options http-proxy' /etc/gnupg/dirmngr.conf ; then
-    mkdir -p /etc/gnupg
-    cat >> /etc/gnupg/dirmngr.conf <<EOF
-http-proxy http://${METADATA_HTTP_PROXY}
-EOF
+    echo "DEBUG: gcloud version ${gcloud_version} < 547.0.0, skipping gcloud proxy config."
   fi
 
-  # Install the HTTPS proxy's certificate in the system and Java trust databases
+  if [[ -n "${http_proxy_val}" ]]; then
+    local proxy_host=$(echo "${http_proxy_val}" | cut -d: -f1)
+    local proxy_port=$(echo "${http_proxy_val}" | cut -d: -f2)
+
+    echo "DEBUG: set_proxy: Testing TCP connection to proxy ${proxy_host}:${proxy_port}..."
+    if ! nc -zv -w 5 "${proxy_host}" "${proxy_port}"; then
+      echo "ERROR: Failed to establish TCP connection to proxy ${proxy_host}:${proxy_port}."
+      exit 1
+    else
+      echo "DEBUG: set_proxy: TCP connection to proxy successful."
+    fi
+
+    echo "DEBUG: set_proxy: Testing external site access via proxy..."
+    local test_url="https://www.google.com"
+    if curl -vL ${curl_retry_args} -o /dev/null "${test_url}"; then
+      echo "DEBUG: set_proxy: Successfully fetched ${test_url} via proxy."
+    else
+      echo "ERROR: Failed to fetch ${test_url} via proxy ${HTTP_PROXY}."
+      exit 1
+    fi
+  fi
+
+  # Configure package managers
+  local pkg_proxy_conf_file
+  local effective_proxy="${http_proxy_val:-${https_proxy_val}}" # Use a single value for apt/dnf
+
+  if [[ -z "${effective_proxy}" ]]; then
+      echo "DEBUG: set_proxy: No HTTP or HTTPS proxy set for package managers."
+  elif is_debuntu ; then
+    pkg_proxy_conf_file="/etc/apt/apt.conf.d/99proxy"
+    echo "Acquire::http::Proxy \"http://${effective_proxy}\";" > "${pkg_proxy_conf_file}"
+    echo "Acquire::https::Proxy \"http://${effective_proxy}\";" >> "${pkg_proxy_conf_file}"
+    echo "DEBUG: set_proxy: Configured apt proxy: ${pkg_proxy_conf_file}"
+  elif is_rocky ; then
+    pkg_proxy_conf_file="/etc/dnf/dnf.conf"
+    touch "${pkg_proxy_conf_file}"
+    sed -i.bak '/^proxy=/d' "${pkg_proxy_conf_file}"
+    if grep -q "^\[main\]" "${pkg_proxy_conf_file}"; then
+      sed -i.bak "/^\\[main\\]/a proxy=http://${effective_proxy}" "${pkg_proxy_conf_file}"
+    else
+      echo -e "[main]\nproxy=http://${effective_proxy}" >> "${pkg_proxy_conf_file}"
+    fi
+    echo "DEBUG: set_proxy: Configured dnf proxy: ${pkg_proxy_conf_file}"
+  fi
+
+  # Configure dirmngr to use the HTTP proxy if set
+  if is_debuntu ; then
+    if ! dpkg -l | grep -q dirmngr; then
+      echo "DEBUG: set_proxy: dirmngr package not found, installing..."
+      execute_with_retries apt-get install -y -qq dirmngr
+    fi
+  elif is_rocky ; then
+    if ! rpm -q gnupg2-smime; then
+      echo "DEBUG: set_proxy: gnupg2-smime package not found, installing..."
+      execute_with_retries dnf install -y -q gnupg2-smime
+    fi
+  fi
+
+  mkdir -p /etc/gnupg
+  local dirmngr_conf="/etc/gnupg/dirmngr.conf"
+  touch "${dirmngr_conf}" # Ensure the file exists
+
+  sed -i.bak '/^http-proxy/d' "${dirmngr_conf}"
+  if [[ -n "${http_proxy_val}" ]]; then
+    echo "http-proxy http://${http_proxy_val}" >> "${dirmngr_conf}"
+    echo "DEBUG: set_proxy: Configured dirmngr proxy in ${dirmngr_conf}"
+  fi
+
+  # Install the HTTPS proxy's certificate
   METADATA_HTTP_PROXY_PEM_URI="$(get_metadata_attribute http-proxy-pem-uri '')"
+  if [[ -z "${METADATA_HTTP_PROXY_PEM_URI}" ]] ; then
+    echo "DEBUG: set_proxy: No http-proxy-pem-uri metadata found. Skipping cert install."
+    return 0
+  fi
+  if [[ ! "${METADATA_HTTP_PROXY_PEM_URI}" =~ ^gs:// ]] ; then echo "ERROR: http-proxy-pem-uri value must start with gs://" ; exit 1 ; fi
 
-  if [[ -z "${METADATA_HTTP_PROXY_PEM_URI}" ]] ; then return ; fi
-  if [[ ! "${METADATA_HTTP_PROXY_PEM_URI}" =~ ^gs ]] ; then echo "http-proxy-pem-uri value should start with gs://" ; exit 1 ; fi
-
-  local trusted_pem_dir
-  # Add this certificate to the OS trust database
-  # When proxy cert is provided, speak to the proxy over https
+  echo "DEBUG: set_proxy: http-proxy-pem-uri='${METADATA_HTTP_PROXY_PEM_URI}'"
+  local trusted_pem_dir proxy_ca_pem ca_subject
   if is_debuntu ; then
     trusted_pem_dir="/usr/local/share/ca-certificates"
-    mkdir -p "${trusted_pem_dir}"
     proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
     gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}"
     update-ca-certificates
-    trusted_pem_path="/etc/ssl/certs/ca-certificates.crt"
-    sed -i -e 's|http://|https://|' "${pkg_proxy_conf_file}"
-elif is_rocky ; then
+    export trusted_pem_path="/etc/ssl/certs/ca-certificates.crt"
+    if [[ -n "${effective_proxy}" ]]; then
+      sed -i -e 's|http://|https://|' "${pkg_proxy_conf_file}"
+    fi
+  elif is_rocky ; then
     trusted_pem_dir="/etc/pki/ca-trust/source/anchors"
-    mkdir -p "${trusted_pem_dir}"
     proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
     gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}"
     update-ca-trust
-    trusted_pem_path="/etc/ssl/certs/ca-bundle.crt"
-    sed -i -e 's|^proxy=http://|proxy=https://|' "${pkg_proxy_conf_file}"
-  else
-    echo "unknown OS"
-    exit 1
+    export trusted_pem_path="/etc/ssl/certs/ca-bundle.crt"
+     if [[ -n "${effective_proxy}" ]]; then
+        sed -i -e "s|^proxy=http://|proxy=https://|" "${pkg_proxy_conf_file}"
+    fi
+  fi
+  export REQUESTS_CA_BUNDLE="${trusted_pem_path}"
+  echo "DEBUG: set_proxy: trusted_pem_path='${trusted_pem_path}'"
+
+  local proxy_host="${http_proxy_val:-${https_proxy_val}}"
+
+  # Update env vars to use https
+  if [[ -n "${http_proxy_val}" ]]; then
+    export HTTP_PROXY="https://${http_proxy_val}"
+    export http_proxy="https://${http_proxy_val}"
+  fi
+  if [[ -n "${https_proxy_val}" ]]; then
+    export HTTPS_PROXY="https://${https_proxy_val}"
+    export https_proxy="https://${https_proxy_val}"
+  fi
+  sed -i -e 's|http://|https://|g' /etc/environment
+  echo "DEBUG: set_proxy: Final HTTP_PROXY='${HTTP_PROXY:-}'"
+  echo "DEBUG: set_proxy: Final HTTPS_PROXY='${HTTPS_PROXY:-}'"
+
+  if [[ -n "${http_proxy_val}" ]]; then
+    sed -i -e "s|^http-proxy http://.*|http-proxy https://${http_proxy_val}|" /etc/gnupg/dirmngr.conf
   fi
 
-  # configure gcloud to respect proxy ca cert
-  #gcloud config set core/custom_ca_certs_file "${proxy_ca_pem}"
-
+  # Verification steps from original script...
   ca_subject="$(openssl crl2pkcs7 -nocrl -certfile "${proxy_ca_pem}" | openssl pkcs7 -print_certs -noout | grep ^subject)"
-  # Verify that the proxy certificate is trusted
-  local output
-  output=$(echo | openssl s_client \
-           -connect "${METADATA_HTTP_PROXY}" \
-           -proxy "${METADATA_HTTP_PROXY}" \
-           -CAfile "${proxy_ca_pem}") || {
-    echo "proxy certificate verification failed"
-    echo "${output}"
-    exit 1
-  }
-  output=$(echo | openssl s_client \
-           -connect "${METADATA_HTTP_PROXY}" \
-           -proxy "${METADATA_HTTP_PROXY}" \
-           -CAfile "${trusted_pem_path}") || {
-    echo "proxy ca certificate not included in system bundle"
-    echo "${output}"
-    exit 1
-  }
-  output=$(curl --verbose -fsSL --retry-connrefused --retry 10 --retry-max-time 30 --head "https://google.com" 2>&1)|| {
-    echo "curl rejects proxy configuration"
-    echo "${output}"
-    exit 1
-  }
-  output=$(curl --verbose -fsSL --retry-connrefused --retry 10 --retry-max-time 30 --head "https://developer.download.nvidia.com/compute/cuda/12.6.3/local_installers/cuda_12.6.3_560.35.05_linux.run" 2>&1)|| {
-    echo "curl rejects proxy configuration"
-    echo "${output}"
-    exit 1
-  }
+  openssl s_client -connect "${proxy_host}" -CAfile "${proxy_ca_pem}" < /dev/null || { echo "ERROR: proxy cert verification failed" ; exit 1 ; }
+  openssl s_client -connect "${proxy_host}" -CAfile "${trusted_pem_path}" < /dev/null || { echo "ERROR: proxy ca not in system bundle" ; exit 1 ; }
 
-  # Instruct conda to use the system certificate
-  echo "Attempting to install pip-system-certs using the proxy certificate..."
-  export REQUESTS_CA_BUNDLE="${trusted_pem_path}"
+  curl --verbose --cacert "${trusted_pem_path}" -x "${HTTPS_PROXY}" -fsSL --retry-connrefused --retry 10 --retry-max-time 30 --head "https://google.com" || { echo "ERROR: curl rejects proxy config for google.com" ; exit 1 ; }
+  curl --verbose --cacert "${trusted_pem_path}" -x "${HTTPS_PROXY}" -fsSL --retry-connrefused --retry 10 --retry-max-time 30 --head "https://developer.download.nvidia.com" || { echo "ERROR: curl rejects proxy config for nvidia.com" ; exit 1 ; }
+
   pip install pip-system-certs
   unset REQUESTS_CA_BUNDLE
 
-  # For the binaries bundled with conda, append our certificate to the bundle
-  openssl crl2pkcs7 -nocrl -certfile /opt/conda/default/ssl/cacert.pem | openssl pkcs7 -print_certs -noout | grep -Fx "${ca_subject}" || {
-    cat "${proxy_ca_pem}" >> /opt/conda/default/ssl/cacert.pem
-  }
+  if command -v conda &> /dev/null ; then
+    local conda_cert_file="/opt/conda/default/ssl/cacert.pem"
+    if [[ -f "${conda_cert_file}" ]]; then
+      openssl crl2pkcs7 -nocrl -certfile "${conda_cert_file}" | openssl pkcs7 -print_certs -noout | grep -Fxq "${ca_subject}" || {
+        cat "${proxy_ca_pem}" >> "${conda_cert_file}"
+      }
+    fi
+  fi
 
-  sed -i -e 's|http://|https://|' /etc/gnupg/dirmngr.conf
-  export http_proxy="https://${METADATA_HTTP_PROXY}"
-  export https_proxy="https://${METADATA_HTTP_PROXY}"
-  export HTTP_PROXY="https://${METADATA_HTTP_PROXY}"
-  export HTTPS_PROXY="https://${METADATA_HTTP_PROXY}"
-  sed -i -e 's|proxy=http://|proxy=https://|'  -e 's|PROXY=http://|PROXY=https://|' /etc/environment
+  if [[ -f "/etc/environment" ]]; then
+      JAVA_HOME="$(awk -F= '/^JAVA_HOME=/ {print $2}' /etc/environment)"
+      if [[ -n "${JAVA_HOME:-}" && -f "${JAVA_HOME}/bin/keytool" ]]; then
+          "${JAVA_HOME}/bin/keytool" -import -cacerts -storepass changeit -noprompt -alias swp_ca -file "${proxy_ca_pem}"
+      fi
+  fi
 
-  # Instruct the JRE to trust the certificate
-  JAVA_HOME="$(awk -F= '/^JAVA_HOME=/ {print $2}' /etc/environment)"
-  "${JAVA_HOME}/bin/keytool" -import -cacerts -storepass changeit -noprompt -alias swp_ca -file "${proxy_ca_pem}"
+  echo "DEBUG: set_proxy: Verifying proxy connectivity..."
+
+  # Test fetching a file through the proxy
+  local test_url="https://www.gstatic.com/generate_204"
+#  local test_url="https://raw.githubusercontent.com/GoogleCloudDataproc/initialization-actions/master/README.md"
+  local test_output="${tmpdir}/proxy_test.md"
+
+  echo "DEBUG: set_proxy: Attempting to download ${test_url} via proxy ${HTTPS_PROXY}"
+#  if curl --verbose --cacert "${trusted_pem_path}" -x "${HTTPS_PROXY}" -fsSL --retry-connrefused --retry 3 --retry-max-time 10 -o "${test_output}" "${test_url}"; then
+  if curl -vL ${curl_retry_args} -o /dev/null "${test_url}"; then
+    echo "DEBUG: set_proxy: Successfully downloaded test file through proxy."
+    rm -f "${test_output}"
+  else
+    echo "ERROR: Proxy test failed. Unable to download ${test_url} via ${HTTPS_PROXY}"
+    # Optionally print more debug info from curl if needed
+    exit 1
+  fi
+
+  echo "DEBUG: set_proxy: Proxy verification successful."
+
+  echo "DEBUG: set_proxy: Proxy setup complete."
 }
 
 set_proxy
