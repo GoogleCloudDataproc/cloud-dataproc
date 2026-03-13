@@ -38,14 +38,36 @@ function configure_gcloud() {
   fi
 }
 
-function enable_services () {
-  local phase_name="enable_services"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Enabling GCP Services..."
-    report_result "Exists"
-    return 0
-  fi
+function check_project() {
+    print_status "Verifying project ${PROJECT_ID}..."
+    local project_state
+    project_state=$(jq -r '.project.lifecycleState // "NOT_FOUND"' "${STATE_FILE}")
 
+    if [[ "${project_state}" == "ACTIVE" ]]; then
+        report_result "Pass"
+    else
+        report_result "Fail"
+        echo "  - Project ${PROJECT_ID} is not ACTIVE or does not exist (state: ${project_state})." >&2
+        exit 1
+    fi
+}
+
+function check_billing() {
+    print_status "Verifying billing for ${PROJECT_ID}..."
+    local billing_enabled
+    billing_enabled=$(jq -r '.billing.billingEnabled // false' "${STATE_FILE}")
+
+    if [[ "${billing_enabled}" == "true" ]]; then
+        report_result "Pass"
+    else
+        report_result "Fail"
+        echo "  - Billing is not enabled for project ${PROJECT_ID} according to state file." >&2
+        echo "  - Please run: gcloud beta billing projects link ${PROJECT_ID} --billing-account <ACCOUNT_ID>" >&2
+        exit 1
+    fi
+}
+
+function enable_services () {
   print_status "Enabling GCP Services..."
   local log_file="enable_services.log"
   if run_gcloud "${log_file}" gcloud services enable \
@@ -59,27 +81,18 @@ function enable_services () {
     privateca.googleapis.com \
     --project=${PROJECT_ID}; then
     report_result "Pass"
-    create_sentinel "${phase_name}" "done"
   else
     report_result "Fail"
   fi
 }
 
 function enable_secret_manager() {
-  local phase_name="enable_secret_manager"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Enabling Secret Manager API..."
-    report_result "Exists"
-    return 0
-  fi
-
   print_status "Enabling Secret Manager API..."
   local log_file="enable_secret_manager.log"
   if run_gcloud "${log_file}" gcloud services enable \
     secretmanager.googleapis.com \
     --project=${PROJECT_ID}; then
     report_result "Pass"
-    create_sentinel "${phase_name}" "done"
   else
     report_result "Fail"
   fi
@@ -87,27 +100,24 @@ function enable_secret_manager() {
 
 function create_secret() {
   local secret_name="${1:-${MYSQL_SECRET_NAME}}"
-  local phase_name="create_secret_${secret_name}"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Creating Secret ${secret_name}..."
-    report_result "Exists"
-    return 0
-  fi
-
   print_status "Creating Secret ${secret_name}..."
   local log_file="create_secret_${secret_name}.log"
-  if gcloud secrets describe "${secret_name}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
-    report_result "Exists"
-    create_sentinel "${phase_name}" "done"
+  if echo -n "super secret" | run_gcloud "${log_file}" gcloud secrets create "${secret_name}" \
+    --project="${PROJECT_ID}" \
+    --replication-policy="automatic" \
+    --data-file=-; then
+    report_result "Created"
   else
-    if echo -n "super secret" | run_gcloud "${log_file}" gcloud secrets create "${secret_name}" \
-      --project="${PROJECT_ID}" \
-      --replication-policy=\"automatic\" \
-      --data-file=-; then
-      report_result "Created"
-      create_sentinel "${phase_name}" "done"
-    else
-      report_result "Fail"
-    fi
+    report_result "Fail"
   fi
+}
+
+function check_image_exists() {
+  local image_uri="$1"
+  if [[ -z "${image_uri}" || "${image_uri}" == "null" ]]; then
+    return 1 # Not found if URI is empty or null
+  fi
+  # Extracts image name from full URI if necessary
+  local image_name=$(basename "${image_uri}")
+  gcloud compute images describe "${image_name}" --project="${PROJECT_ID}" > /dev/null 2>&1
 }

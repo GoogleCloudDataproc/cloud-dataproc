@@ -2,14 +2,12 @@
 #
 # Firewall rule functions
 
-function create_firewall_rules() {
-  local phase_name="create_firewall_rules"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Creating base Firewall Rules for ${NETWORK}..."
-    report_result "Exists"
-    return 0
-  fi
+function exists_firewall() {
+    # This is a basic check. A more robust version might check for a list of rules.
+    _check_exists "gcloud compute firewall-rules describe '${FIREWALL}-in-ssh' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
+}
 
+function create_firewall_rules() {
   print_status "Creating base Firewall Rules for ${NETWORK}..."
   local log_file="create_firewalls_${NETWORK}.log"
   local created_some=false
@@ -83,15 +81,11 @@ function create_firewall_rules() {
     else
       report_result "Exists"
     fi
-    create_sentinel "${phase_name}" "done"
   fi
 }
 export -f create_firewall_rules
 
 function delete_firewall_rules () {
-  local phase_name="create_firewall_rules"
-  remove_sentinel "${phase_name}" "done"
-
   print_status "Deleting Cluster Firewall Rules..."
   local log_file="delete_firewalls_${NETWORK}.log"
   # Delete any rule containing the cluster name
@@ -124,15 +118,3 @@ function delete_firewall_rules () {
   fi
 }
 export -f delete_firewall_rules
-
-function create_logging_firewall_rules () {
-  print_status "Creating Logging Firewall Rules for ${NETWORK}..."
-  # ... (implementation with run_gcloud and report_result) ...
-}
-export -f create_logging_firewall_rules
-
-function delete_logging_firewall_rules () {
-  print_status "Deleting Logging Firewall Rules for ${NETWORK}..."
-  # ... (implementation with run_gcloud and report_result) ...
-}
-export -f delete_logging_firewall_rules

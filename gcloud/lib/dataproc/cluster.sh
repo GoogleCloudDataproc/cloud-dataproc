@@ -3,89 +3,79 @@
 # Dataproc Cluster Management Functions
 
 function exists_dpgce_cluster() {
-  # print_status "  Checking if cluster ${CLUSTER_NAME} exists..."
-  if gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > /dev/null 2>&1;
- then
-    # report_result "Exists"
-    return 0 # Found
-  else
-    # report_result "Not Found"
-    return 1 # Not found
-  fi
+  _check_exists "gcloud dataproc clusters describe '${CLUSTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(clusterName,clusterUuid,status.selfLink)'"
 }
 export -f exists_dpgce_cluster
 
 function create_dpgce_cluster() {
-  local phase_name="create_dpgce_cluster"
-  # Note: No sentinel check here because this is the main resource being created/recreated.
-  # We rely on the --no-create-cluster flag to skip this if needed.
-
   print_status "Creating Dataproc Cluster ${CLUSTER_NAME}..."
+
+  local metadata_array=(
+    "public_secret_name=${public_secret_name}"
+    "private_secret_name=${private_secret_name}"
+    "secret_project=${secret_project}"
+    "secret_version=${secret_version}"
+    "modulus_md5sum=${modulus_md5sum}"
+    "install-gpu-agent=true"
+    "gpu-driver-provider=NVIDIA"
+    "cuda-version=${CUDA_VERSION}"
+    "gpu-driver-version=${DRIVER_VERSION}"
+    "cuda-url=https://developer.download.nvidia.com/compute/cuda/13.1.0/local_installers/cuda_13.1.0_590.44.01_linux.run"
+    "gpu-driver-url=https://us.download.nvidia.com/XFree86/Linux-x86_64/590.48.01/NVIDIA-Linux-x86_64-590.48.01.run"
+    "gpu-conda-env=dpgce"
+    "init-actions-repo=${INIT_ACTIONS_ROOT}"
+    "debug=true"
+    "include-pytorch=yes"
+    "enable-oslogin=TRUE"
+    "dask-runtime=standalone"
+    "rapids-runtime=SPARK"
+    "bigtable-instance=${BIGTABLE_INSTANCE}"
+    "include-gpus=1"
+    "http-proxy=${SWP_IP}:${SWP_PORT}"
+    "https-proxy=${SWP_IP}:${SWP_PORT}"
+    "proxy-uri=${SWP_IP}:${SWP_PORT}"
+  )
+
+  local all_metadata
+  all_metadata="$(IFS='|'; echo "${metadata_array[*]}")"
+  all_metadata="^|^${all_metadata}"
 
   local gcloud_cmd=(
     gcloud dataproc clusters create "${CLUSTER_NAME}"
     --single-node
-    --master-accelerator "type=${MASTER_ACCELERATOR_TYPE}"
-    --worker-accelerator "type=${PRIMARY_ACCELERATOR_TYPE}"
-    --secondary-worker-accelerator "type=${SECONDARY_ACCELERATOR_TYPE}"
-    --master-machine-type "${MASTER_MACHINE_TYPE}"
-    --worker-machine-type "${PRIMARY_MACHINE_TYPE}"
-    --master-boot-disk-size 60
-    --worker-boot-disk-size 60
-    --secondary-worker-boot-disk-size 60
+    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
+    --master-machine-type "${M_MACHINE_TYPE}"
+    --master-boot-disk-size 600
+    --master-local-ssd-interface=NVME
+    --num-master-local-ssds=1
     --master-boot-disk-type pd-ssd
-    --worker-boot-disk-type pd-ssd
-    --secondary-worker-boot-disk-type pd-ssd
     --region "${REGION}"
     --zone "${ZONE}"
     --subnet "${SUBNET}"
     --no-address
-    --service-account="${GSA}"
-    --tags="${TAGS}"
+    --service-account "${GSA}"
+    --tags "${TAGS}"
     --bucket "${BUCKET}"
     --temp-bucket "${TEMP_BUCKET}"
     --enable-component-gateway
-    --metadata "public_secret_name=${public_secret_name}"
-    --metadata "private_secret_name=${private_secret_name}"
-    --metadata "secret_project=${secret_project}"
-    --metadata "secret_version=${secret_version}"
-    --metadata "modulus_md5sum=${modulus_md5sum}"
-    --metadata "install-gpu-agent=true"
-    --metadata "gpu-driver-provider=NVIDIA"
-    --metadata "gpu-conda-env=dpgce"
-    --metadata "rapids-mirror-disk=${RAPIDS_MIRROR_DISK_NAME}"
-    --metadata "rapids-mirror-host=${RAPIDS_REGIONAL_MIRROR_ADDR[${REGION}]}"
-    --metadata "init-actions-repo=${INIT_ACTIONS_ROOT}"
-    --metadata "dask-cloud-logging=true"
-    --metadata "debug=true"
-    --metadata "http-proxy=${SWP_IP}:${SWP_PORT}"
-    --metadata dask-runtime="standalone"
-    --metadata rapids-runtime="SPARK"
-    --metadata bigtable-instance=${BIGTABLE_INSTANCE}
-    --metadata include-gpus=1
-    --image "projects/${PROJECT_ID}/global/images/dataproc-2-2-deb12-20251108-180659-tf" \
-    --initialization-action-timeout=90m
-    --optional-components DOCKER,JUPYTER
-    --max-idle="${IDLE_TIMEOUT}"
+    --metadata "${all_metadata}"
+    --no-shielded-secure-boot
+    --image-version "${IMAGE_VERSION}"
+    --initialization-action-timeout 90m
+    --optional-components "DOCKER,JUPYTER"
     --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog"
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   )
-
-#    --no-shielded-secure-boot
-#    --image-version "${IMAGE_VERSION}"
-#    --initialization-actions ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh
-#    --metadata=startup-script-url="gs://dataproc-staging-us-west4-kf7bmp/dataproc-initialization-actions/gce-proxy-setup.sh"
-
 
   if [[ "${GCLOUD_QUIET}" != "true" ]]; then
     echo
     echo "Command to be executed:"
     cmd_str=$(printf "%s " "${gcloud_cmd[@]}")
-    # Replace " --" with " \\\n  --" for pretty printing
-    echo "${cmd_str}" | perl -pe 's/ --/ \\\n  --/g'
+    echo "${cmd_str}" | perl -pe 's/ --/ 
+  --/g'
   fi
 
-  if "${gcloud_cmd[@]}"; then
+  if time "${gcloud_cmd[@]}"; then
     report_result "Created"
   else
     report_result "Fail"
@@ -96,16 +86,11 @@ export -f create_dpgce_cluster
 
 function delete_dpgce_cluster() {
   print_status "Deleting Dataproc Cluster ${CLUSTER_NAME}..."
-  if exists_dpgce_cluster;
- then
-    local log_file="delete_dpgce_cluster_${CLUSTER_NAME}.log"
-    if run_gcloud "${log_file}" gcloud dataproc clusters delete --quiet --region ${REGION} ${CLUSTER_NAME}; then
-      report_result "Deleted"
-    else
-      report_result "Fail"
-    fi
+  local log_file="delete_dpgce_cluster_${CLUSTER_NAME}.log"
+  if run_gcloud "${log_file}" gcloud dataproc clusters delete --quiet "${CLUSTER_NAME}" --region "${REGION}"; then
+    report_result "Deleted"
   else
-    report_result "Not Found"
+    report_result "Fail"
   fi
 }
 export -f delete_dpgce_cluster

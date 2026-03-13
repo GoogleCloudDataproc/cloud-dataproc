@@ -23,10 +23,10 @@ function create_dpgce_cluster() {
   date
   time gcloud dataproc clusters create ${CLUSTER_NAME} \
     --single-node \
-    --master-accelerator "type=${MASTER_ACCELERATOR_TYPE}" \
+    --master-accelerator "type=${M_ACCELERATOR_TYPE}" \
     --worker-accelerator "type=${PRIMARY_ACCELERATOR_TYPE}" \
     --secondary-worker-accelerator "type=${SECONDARY_ACCELERATOR_TYPE}" \
-    --master-machine-type "${MASTER_MACHINE_TYPE}" \
+    --master-machine-type "${M_MACHINE_TYPE}" \
     --worker-machine-type "${PRIMARY_MACHINE_TYPE}" \
     --master-boot-disk-size           50 \
     --worker-boot-disk-size           50 \
@@ -90,7 +90,7 @@ function create_dpgce_cluster() {
 #    --initialization-actions "${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh" \
 #    --num-masters=1 \
 #    --num-workers=2 \
-#    --master-machine-type "${MASTER_MACHINE_TYPE}" \
+#    --master-machine-type "${M_MACHINE_TYPE}" \
 #    --worker-machine-type "${PRIMARY_MACHINE_TYPE}" \
 #    --metadata cuda-url="https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_550.54.15_linux.run" \
 #    --metadata gpu-driver-url="https://us.download.nvidia.com/XFree86/Linux-x86_64/550.135/NVIDIA-Linux-x86_64-550.135.run" \
@@ -99,7 +99,7 @@ function create_dpgce_cluster() {
 #    --initialization-actions ${INIT_ACTIONS_ROOT}/rapids/rapids.sh \
 #    --metadata rapids-runtime="SPARK" \
 #    --worker-accelerator "type=${PRIMARY_ACCELERATOR_TYPE}" \
-#    --master-accelerator "type=${MASTER_ACCELERATOR_TYPE}" \
+#    --master-accelerator "type=${M_ACCELERATOR_TYPE}" \
 #    --single-node \
 #    --num-masters=1 \
 #    --num-workers=2 \
@@ -206,7 +206,7 @@ function create_dpgce_cluster() {
 #
 # Oozie
 #
-#    --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-masters-startup.sh" \
+#    --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-ms-startup.sh" \
 #    --initialization-actions "${INIT_ACTIONS_ROOT}/oozie/oozie.sh" \
 #    --properties "dataproc:dataproc.master.custom.init.actions.mode=RUN_AFTER_SERVICES" \
 
@@ -217,7 +217,7 @@ function create_dpgce_cluster() {
 
 # complex init actions on 2.1 repro
 
-    # --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-masters-startup.sh" \
+    # --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-ms-startup.sh" \
     # --initialization-actions "${INIT_ACTIONS_ROOT}/oozie/oozie.sh,${INIT_ACTIONS_ROOT}/bigtable/bigtable.sh,${INIT_ACTIONS_ROOT}/sqoop/sqoop.sh" \
     # --initialization-action-timeout=15m \
     # --optional-components ZOOKEEPER \
@@ -229,14 +229,14 @@ function create_dpgce_cluster() {
     # --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
 
 #    --enable-component-gateway \
-#    --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-masters-startup.sh" \
+#    --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-ms-startup.sh" \
 #    --initialization-actions "${INIT_ACTIONS_ROOT}/oozie/oozie.sh,${INIT_ACTIONS_ROOT}/bigtable/bigtable.sh,${INIT_ACTIONS_ROOT}/sqoop/sqoop.sh" \
 #    --initialization-action-timeout=15m \
 #    --properties "dataproc:dataproc.master.custom.init.actions.mode=RUN_AFTER_SERVICES" \
 #    --initialization-action-timeout=15m \
 #    --metadata bigtable-instance=${BIGTABLE_INSTANCE} \
 
-#     --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-masters-startup.sh" \
+#     --metadata startup-script-url="${INIT_ACTIONS_ROOT}/delay-ms-startup.sh" \
 #     --properties "dataproc:dataproc.master.custom.init.actions.mode=RUN_AFTER_SERVICES" \
 
 #    --initialization-actions "${INIT_ACTION_PATHS}" \
