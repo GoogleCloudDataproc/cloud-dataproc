@@ -7,7 +7,6 @@ function create_oracle_vm() {
     print_status "Checking Oracle VM ${ORACLE_VM_NAME}..."
     report_result "Exists"
     return 0
-  fi
 
   print_status "Creating Oracle VM ${ORACLE_VM_NAME}..."
   local log_file="create_oracle_vm_${ORACLE_VM_NAME}.log"
@@ -124,3 +123,8 @@ function delete_oracle_vm() {
   fi
 }
 export -f delete_oracle_vm
+
+function exists_oracle_vm() {
+  _check_exists "gcloud compute instances describe '${ORACLE_VM_NAME}' --zone '${ZONE}' --project='${PROJECT_ID}' --format='json(name,status)'"
+}
+export -f exists_oracle_vm

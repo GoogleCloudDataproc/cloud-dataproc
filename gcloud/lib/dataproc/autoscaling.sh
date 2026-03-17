@@ -5,6 +5,7 @@
 function exists_autoscaling_policy() {
   _check_exists "gcloud dataproc autoscaling-policies describe '${AUTOSCALING_POLICY_NAME}' --region='${REGION}' --format='json(id,name)'"
 }
+export -f exists_autoscaling_policy
 
 function create_autoscaling_policy() {
   print_status "Creating Autoscaling Policy ${AUTOSCALING_POLICY_NAME}..."

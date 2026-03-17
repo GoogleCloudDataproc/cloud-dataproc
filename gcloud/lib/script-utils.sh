@@ -23,6 +23,17 @@ function report_result() {
 }
 export -f report_result
 
+# Usage: report_audit_status "Exists" | "Not Found"
+function report_audit_status() {
+  local status="$1"
+  case "${status}" in
+    Exists) echo -e " [${GREEN}Exists${NC}]" ;;
+    "Not Found") echo -e " [${YELLOW}Not Found${NC}]" ;;
+    *) echo -e " [${YELLOW}${status}${NC}]" ;;
+  esac
+}
+export -f report_audit_status
+
 # Usage: run_gcloud <log_file_name> <gcloud command ...>
 function run_gcloud() {
   local log_file_name=$1
@@ -80,22 +91,68 @@ function parse_args() {
 export -f parse_args
 
 # --- State Management Functions ---
-function get_state() {
-    if [[ ! -f "${STATE_FILE}" ]]; then
-        echo "{}"
-        return
+function init_state_db() {
+    local db_file="${STATE_DB}"
+    if [[ ! -f "${db_file}" ]]; then
+        sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS resource_state (key TEXT PRIMARY KEY, json_data TEXT);"
     fi
-    cat "${STATE_FILE}"
 }
+export -f init_state_db
 
 function update_state() {
     local resource_key=$1
-    local resource_value=$2 # This should be a JSON string or "null"
-    
-    local current_state=$(get_state)
-    local new_state=$(jq --arg key "${resource_key}" --argjson value "${resource_value}" '.[$key] = $value' <<< "${current_state}")
-    echo "${new_state}" > "${STATE_FILE}"
+    local resource_value=$2 # JSON string or "null"
+    local db_file="${STATE_DB}"
+
+    init_state_db
+
+    local sql
+    if [[ "${resource_value}" == "null" ]]; then
+        sql="DELETE FROM resource_state WHERE key = '${resource_key}';"
+    else
+        local escaped_value=$(echo "${resource_value}" | sed "s/'/''/g")
+        sql="INSERT OR REPLACE INTO resource_state (key, json_data) VALUES ('${resource_key}', '${escaped_value}');"
+    fi
+    sqlite3 "${db_file}" "${sql}"
 }
+export -f update_state
+
+function get_state() {
+    local resource_key=$1
+    local db_file="${STATE_DB}"
+    init_state_db
+    local result=$(sqlite3 "${db_file}" "SELECT json_data FROM resource_state WHERE key = '${resource_key}';")
+    if [[ -z "${result}" ]]; then
+        echo "null"
+    else
+        echo "${result}"
+    fi
+}
+export -f get_state
+
+function refresh_resource_state() {
+    local resource_key=$1
+    local check_command=$2
+    local source_file=$3 # Optional: file to source for exists_*
+
+    local json_output
+    if [[ -n "${source_file}" ]]; then
+        # Extract the function name from the command string
+        local func_name=$(echo "${check_command}" | awk '{print $1}')
+        # Source in a subshell and export the specific function needed
+        json_output=$(source "${GCLOUD_DIR}/${source_file}" && export -f "${func_name}" && eval "${check_command}")
+    else
+        # For shared functions like _check_exists, they are already exported from script-utils.sh
+        json_output=$(eval "${check_command}")
+    fi
+
+    if [[ -z "${json_output}" ]]; then
+      json_output="null"
+    fi
+
+    update_state "${resource_key}" "${json_output}"
+}
+export -f refresh_resource_state
 
 # --- Audit Check Functions ---
 # These functions are now designed to be called by the audit script.

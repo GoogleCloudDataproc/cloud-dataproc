@@ -6,6 +6,7 @@ function exists_subnet() {
     local subnet_name="$1"
     _check_exists "gcloud compute networks subnets describe '${subnet_name}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
 }
+export -f exists_subnet
 
 function create_subnet () {
   print_status "Creating Subnet ${SUBNET}..."

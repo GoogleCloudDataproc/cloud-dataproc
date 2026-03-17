@@ -39,15 +39,10 @@ echo "========================================"
 echo "Starting DPGCE Cluster Recreation"
 echo "========================================"
 
-# Run audit to get the current state of the cluster
-print_status "Auditing environment to determine current state..."
-"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+# Attempt to delete the cluster, any errors will be logged by delete_dpgce_cluster
+print_status "Attempting to ensure any pre-existing cluster named '${CLUSTER_NAME}' is deleted..."
+delete_dpgce_cluster
 report_result "Done"
-
-# Check if a cluster exists and delete it
-if [[ $(jq -r '.dataprocCluster != null' "${STATE_FILE}") == "true" ]]; then
-    delete_dpgce_cluster
-fi
 
 # Re-create the cluster based on the flags provided
 if [[ "$IS_PRIVATE" == "true" ]]; then

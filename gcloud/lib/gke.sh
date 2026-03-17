@@ -71,3 +71,8 @@ function delete_dpgke_cluster() {
   fi
 }
 export -f delete_dpgke_cluster
+
+function exists_dpgke_cluster() {
+  _check_exists "gcloud dataproc clusters describe '${DPGKE_CLUSTER_NAME}' --region '${REGION}' --project='${PROJECT_ID}' --format='json(clusterName,status.state)'"
+}
+export -f exists_dpgke_cluster

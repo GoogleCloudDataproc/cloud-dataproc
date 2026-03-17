@@ -121,3 +121,10 @@ function check_image_exists() {
   local image_name=$(basename "${image_uri}")
   gcloud compute images describe "${image_name}" --project="${PROJECT_ID}" > /dev/null 2>&1
 }
+
+# Check for any debug VMs
+function exists_debug_vms() {
+  _check_exists "gcloud compute instances list --project='${PROJECT_ID}' --filter='name~^debug-' --format='json(name,zone,status)'" | jq 'if . == [] then null else . end'
+}
+export -f exists_debug_vms
+export -f exists_debug_vms

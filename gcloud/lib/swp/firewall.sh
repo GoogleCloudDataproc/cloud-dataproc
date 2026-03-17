@@ -1,5 +1,11 @@
 #!/bin/bash
 
+function exists_firewall_rule() {
+  local rule_name="$1"
+  _check_exists "gcloud compute firewall-rules describe '${rule_name}' --project='${PROJECT_ID}' --format='json(name,direction)'"
+}
+export -f exists_firewall_rule
+
 function create_allow_swp_ingress_rule() {
   local rule_name="${1:-allow-swp-ingress-${CLUSTER_NAME}}"
   local network_name="${2:-${NETWORK}}"

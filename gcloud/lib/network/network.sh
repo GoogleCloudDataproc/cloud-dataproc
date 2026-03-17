@@ -5,6 +5,7 @@
 function exists_network() {
   _check_exists "gcloud compute networks describe '${NETWORK}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
 }
+export -f exists_network
 
 function create_vpc_network () {
   print_status "Creating VPC Network ${NETWORK}..."

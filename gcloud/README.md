@@ -40,7 +40,8 @@ These scripts are designed to deploy and manage Dataproc clusters in various con
 1.  **Prerequisites:** Ensure you have the following tools installed:
     *   `gcloud` CLI
     *   `gsutil` (usually part of `gcloud`)
-    *   `jq`
+    *   `jq`: Used to parse and manipulate JSON responses from the `gcloud` API.
+    *   `sqlite3`: Used to maintain a local cache database (`state.db`) of resource states, providing atomic and concurrent-safe updates.
     *   `perl`
 
 2.  **Clone the repository:**

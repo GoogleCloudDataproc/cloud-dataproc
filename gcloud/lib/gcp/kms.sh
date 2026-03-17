@@ -57,6 +57,12 @@ function create_kerberos_kdc_key() {
 }
 export -f create_kerberos_kdc_key
 
+function exists_kms_key() {
+  local key_name="$1"
+  _check_exists "gcloud kms keys describe '${key_name}' --keyring='${KMS_KEYRING}' --location=global --project='${PROJECT_ID}' --format='json(name,primary.state)'"
+}
+export -f exists_kms_key
+
 function create_mysql_admin_password() {
     print_status "Creating Encrypted MySQL Admin Password..."
     local log_file="create_mysql_admin_password.log"

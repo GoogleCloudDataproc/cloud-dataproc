@@ -15,6 +15,11 @@ function create_artifacts_repository(){
 }
 export -f create_artifacts_repository
 
+function exists_artifacts_repository() {
+  _check_exists "gcloud artifacts repositories describe '${ARTIFACT_REPOSITORY}' --location='${REGION}' --project='${PROJECT_ID}' --format='json(name,format)'"
+}
+export -f exists_artifacts_repository
+
 function push_container_image() {
   print_status "Pushing Container Image..."
   local log_file="push_container_image.log"

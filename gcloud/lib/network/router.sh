@@ -5,6 +5,7 @@
 function exists_router() {
     _check_exists "gcloud compute routers describe '${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
 }
+export -f exists_router
 
 function create_router () {
   print_status "Creating Router ${ROUTER_NAME}..."

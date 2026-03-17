@@ -37,6 +37,7 @@ source "${GCLOUD_DIR}/lib/network/network.sh"
 source "${GCLOUD_DIR}/lib/network/subnet.sh"
 source "${GCLOUD_DIR}/lib/network/router.sh"
 source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/network/routes.sh"
 source "${GCLOUD_DIR}/lib/gcp/iam.sh"
 source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 source "${GCLOUD_DIR}/lib/misc.sh"
@@ -71,6 +72,7 @@ upload_init_actions
 
 if [[ $(jq -r '.vpcNetwork == null' "${STATE_FILE}") == "true" ]]; then
   create_vpc_network
+  ensure_default_internet_route
 fi
 
 if [[ $(jq -r '.standardSubnet == null' "${STATE_FILE}") == "true" ]]; then

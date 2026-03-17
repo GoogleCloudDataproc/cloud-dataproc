@@ -35,6 +35,13 @@ function delete_ip_allocation () {
   fi
 }
 
+function exists_vpc_peering() {
+   # Naming format: <servicenetworking-googleapis-com>
+   local peering_name="servicenetworking-googleapis-com"
+  _check_exists "gcloud compute networks peerings list --network='${NETWORK}' --project='${PROJECT_ID}' --filter='name=${peering_name}' --format='json(name,state)'" | jq 'if . == [] then null else .[0] end'
+}
+export -f exists_vpc_peering
+
 function create_vpc_peering () {
   print_status "Creating VPC Peering for ${NETWORK}..."
   local log_file="create_peering_${NETWORK}.log"

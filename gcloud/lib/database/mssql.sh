@@ -28,6 +28,11 @@ function create_legacy_mssql_instance() {
 }
 export -f create_legacy_mssql_instance
 
+function exists_legacy_mssql_instance() {
+  _check_exists "gcloud compute instances describe '${MSSQL_INSTANCE}' --zone '${ZONE}' --project='${PROJECT_ID}' --format='json(name,status)'"
+}
+export -f exists_legacy_mssql_instance
+
 function delete_legacy_mssql_instance() {
   print_status "Deleting Legacy MSSQL Instance ${MSSQL_INSTANCE}..."
   local log_file="delete_legacy_mssql_${MSSQL_INSTANCE}.log"

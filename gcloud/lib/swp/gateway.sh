@@ -42,6 +42,14 @@ EOF
 }
 export -f create_swp_gateway
 
+function exists_swp_gateway() {
+  local swp_instance_name="${1:-${SWP_INSTANCE_NAME}}"
+  local region="${2:-${REGION}}"
+  local project_id="${3:-${PROJECT_ID}}"
+  _check_exists "gcloud network-services gateways describe '${swp_instance_name}' --location='${region}' --project='${project_id}' --format='json(name,type)'"
+}
+export -f exists_swp_gateway
+
 function delete_swp_gateway() {
   local swp_instance_name="${1:-${SWP_INSTANCE_NAME}}"
   local region="${2:-${REGION}}"

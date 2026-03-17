@@ -26,7 +26,7 @@ export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${RESOURCE_SUFFIX}}"
 mkdir -p "${REPRO_TMPDIR}"
 export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
 mkdir -p "${LOG_DIR}"
-export STATE_FILE="${REPRO_TMPDIR}/state.json"
+export STATE_DB="${REPRO_TMPDIR}/state.db"
 
 
 source lib/script-utils.sh
@@ -54,6 +54,7 @@ export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT env.json)"
 export ASN_NUMBER="$(jq -r .ASN_NUMBER env.json)"
 export IMAGE_VERSION="$(jq -r .IMAGE_VERSION env.json)"
 export REGION="$(jq -r .REGION env.json)"
+export ZONE="$(jq -r .ZONE env.json)"
 export SWP_IP="$(jq -r .SWP_IP env.json)"
 export SWP_PORT="$(jq -r .SWP_PORT env.json)"
 export SWP_HOSTNAME="$(jq -r .SWP_HOSTNAME env.json)"
@@ -61,8 +62,6 @@ export SWP_POLICY_NAME="swp-policy-${CLUSTER_NAME}"
 export SWP_INSTANCE_NAME="swp-gateway-${CLUSTER_NAME}"
 export SWP_CERT_NAME="swp-cert-${CLUSTER_NAME}-${RESOURCE_SUFFIX}"
 export DEBUG="${DEBUG:-0}"
-
-export ZONE="${REGION}-a"
 #export ZONE="${REGION}-b"
 #export IMAGE_VERSION="2.0"
 #export IMAGE_VERSION="2.0.67-debian10" # final proprietary gpu support - April 26, 2024 - 5.10.0-0.deb10.16-amd64

@@ -28,6 +28,11 @@ function create_kdc_server() {
 }
 export -f create_kdc_server
 
+function exists_kdc_server() {
+  _check_exists "gcloud compute instances describe '${KDC_NAME}' --zone '${ZONE}' --project='${PROJECT_ID}' --format='json(name,status)'"
+}
+export -f exists_kdc_server
+
 function delete_kdc_server() {
   print_status "Deleting KDC Server ${KDC_NAME}..."
   local log_file="delete_kdc_server_${KDC_NAME}.log"

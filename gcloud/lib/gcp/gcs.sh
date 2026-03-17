@@ -2,6 +2,16 @@
 #
 # GCS Bucket functions
 
+function exists_gcs_bucket() {
+  local bucket_name="$1"
+  if gcloud storage ls --buckets "gs://${bucket_name}" > /dev/null 2>&1; then
+    echo "{\"name\": \"${bucket_name}\", \"exists\": true}"
+  else
+    echo "null"
+  fi
+}
+export -f exists_gcs_bucket
+
 function create_bucket () {
   local phase_name="create_bucket"
   if check_sentinel "${phase_name}" "done"; then

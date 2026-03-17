@@ -31,9 +31,9 @@ function create_dpgce_cluster() {
     "rapids-runtime=SPARK"
     "bigtable-instance=${BIGTABLE_INSTANCE}"
     "include-gpus=1"
-    "http-proxy=${SWP_IP}:${SWP_PORT}"
-    "https-proxy=${SWP_IP}:${SWP_PORT}"
-    "proxy-uri=${SWP_IP}:${SWP_PORT}"
+#    "http-proxy=${SWP_IP}:${SWP_PORT}"
+#    "https-proxy=${SWP_IP}:${SWP_PORT}"
+#    "proxy-uri=${SWP_IP}:${SWP_PORT}"
   )
 
   local all_metadata
@@ -43,7 +43,7 @@ function create_dpgce_cluster() {
   local gcloud_cmd=(
     gcloud dataproc clusters create "${CLUSTER_NAME}"
     --single-node
-    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
+#    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
     --master-machine-type "${M_MACHINE_TYPE}"
     --master-boot-disk-size 600
     --master-local-ssd-interface=NVME

@@ -49,6 +49,14 @@ EOF
 }
 export -f create_gateway_security_policy
 
+function exists_gateway_security_policy() {
+  local policy_name="${1:-${SWP_POLICY_NAME}}"
+  local region="${2:-${REGION}}"
+  local project_id="${3:-${PROJECT_ID}}"
+  _check_exists "gcloud network-security gateway-security-policies describe '${policy_name}' --location='${region}' --project='${project_id}' --format='json(name)'"
+}
+export -f exists_gateway_security_policy
+
 function delete_gateway_security_policy() {
   local policy_name="${1:-${SWP_POLICY_NAME}}"
   local region="${2:-${REGION}}"

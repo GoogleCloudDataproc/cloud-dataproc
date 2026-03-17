@@ -5,6 +5,7 @@
 function exists_bigtable_instance() {
     _check_exists "gcloud bigtable instances describe '${BIGTABLE_INSTANCE}' --format='json(name,displayName)'"
 }
+export -f exists_bigtable_instance
 
 function create_bigtable_instance() {
   print_status "Creating Bigtable Instance ${BIGTABLE_INSTANCE}..."

@@ -131,3 +131,39 @@ function delete_managed_certificate() {
   fi
 }
 export -f delete_managed_certificate
+
+function exists_swp_ca_pool() {
+  local region="${1:-${REGION}}"
+  local project_id="${2:-${PROJECT_ID}}"
+  local suffix="${3:-${RESOURCE_SUFFIX}}"
+  local ca_pool_name="swp-ca-pool-${CLUSTER_NAME}-${suffix}"
+  _check_exists "gcloud privateca pools describe '${ca_pool_name}' --location='${region}' --project='${project_id}' --format='json(name,tier)'"
+}
+export -f exists_swp_ca_pool
+
+function exists_swp_root_ca() {
+  local region="${1:-${REGION}}"
+  local project_id="${2:-${PROJECT_ID}}"
+  local suffix="${3:-${RESOURCE_SUFFIX}}"
+  local ca_pool_name="swp-ca-pool-${CLUSTER_NAME}-${suffix}"
+  local ca_name="swp-root-ca-${CLUSTER_NAME}-${suffix}"
+  _check_exists "gcloud privateca roots describe '${ca_name}' --pool='${ca_pool_name}' --location='${region}' --project='${project_id}' --format='json(name,state)'"
+}
+export -f exists_swp_root_ca
+
+function exists_swp_cic() {
+  local region="${1:-${REGION}}"
+  local project_id="${2:-${PROJECT_ID}}"
+  local suffix="${3:-${RESOURCE_SUFFIX}}"
+  local cic_name="swp-cic-${CLUSTER_NAME}-${suffix}"
+  _check_exists "gcloud certificate-manager issuance-configs describe '${cic_name}' --location='${region}' --project='${project_id}' --format='json(name)'"
+}
+export -f exists_swp_cic
+
+function exists_swp_managed_certificate() {
+  local region="${1:-${REGION}}"
+  local project_id="${2:-${PROJECT_ID}}"
+  local cert_name="${SWP_CERT_NAME}"
+  _check_exists "gcloud certificate-manager certificates describe '${cert_name}' --location='${region}' --project='${project_id}' --format='json(name,managed.state)'"
+}
+export -f exists_swp_managed_certificate
