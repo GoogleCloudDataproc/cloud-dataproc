@@ -29,7 +29,7 @@ function create_kdc_server() {
 export -f create_kdc_server
 
 function exists_kdc_server() {
-  _check_exists "gcloud compute instances describe '${KDC_NAME}' --zone '${ZONE}' --project='${PROJECT_ID}' --format='json(name,status)'"
+  _check_exists gcloud compute instances describe "${KDC_NAME}" --zone "${ZONE}" --project="${PROJECT_ID}" --format="json(name,status)"
 }
 export -f exists_kdc_server
 

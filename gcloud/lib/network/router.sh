@@ -3,7 +3,7 @@
 # Router and NAT functions
 
 function exists_router() {
-    _check_exists "gcloud compute routers describe '${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
+    _check_exists gcloud compute routers describe "${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="json(name,selfLink)"
 }
 export -f exists_router
 
@@ -16,7 +16,7 @@ function create_router () {
     --asn="${ASN_NUMBER}" \
     --region="${REGION}"; then
     report_result "Created"
-    refresh_resource_state "cloudRouter" "exists_router" "lib/network/router.sh"
+    refresh_resource_state "cloudRouter" "lib/network/router.sh" exists_router
   else
     report_result "Fail"
     return 1
@@ -27,6 +27,14 @@ export -f create_router
 function add_nat_to_router () {
   print_status "Adding NAT to Router ${ROUTER_NAME}..."
   local log_file="add_nat_${ROUTER_NAME}.log"
+
+  # Attempt to delete nat-config first, ignore errors
+  gcloud compute routers nats delete "nat-config" \
+    --router-region "${REGION}" \
+    --router "${ROUTER_NAME}" \
+    --project="${PROJECT_ID}" --quiet > /dev/null 2>&1 || true
+  sleep 5 # Brief pause to allow delete to propagate
+
   if run_gcloud "${log_file}" gcloud compute routers nats create "nat-config" \
     --router-region "${REGION}" \
     --router "${ROUTER_NAME}" \
@@ -34,7 +42,7 @@ function add_nat_to_router () {
     --nat-custom-subnet-ip-ranges "${SUBNET}" \
     --auto-allocate-nat-external-ips; then
     report_result "Created"
-    refresh_resource_state "cloudRouter" "exists_router" "lib/network/router.sh"
+    refresh_resource_state "cloudRouter" "lib/network/router.sh" exists_router
   else
     report_result "Fail"
     return 1

@@ -137,6 +137,6 @@ function check_image_exists() {
 
 # Check for any debug VMs
 function exists_debug_vms() {
-  _check_exists "gcloud compute instances list --project='${PROJECT_ID}' --filter='name~^debug-' --format='json(name,zone,status)'" | jq 'if . == [] then null else . end'
+  _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter='name~^debug-' --format="json(name,zone,status)" | jq 'if . == [] then null else . end'
 }
 export -f exists_debug_vms

@@ -32,6 +32,6 @@ function delete_mysql_instance() {
 export -f delete_mysql_instance
 
 function exists_mysql_instance() {
-  _check_exists "gcloud sql instances describe '${MYSQL_INSTANCE}' --project='${PROJECT_ID}' --format='json(name,state)'"
+  _check_exists gcloud sql instances describe "${MYSQL_INSTANCE}" --project="${PROJECT_ID}" --format="json(name,state)"
 }
 export -f exists_mysql_instance

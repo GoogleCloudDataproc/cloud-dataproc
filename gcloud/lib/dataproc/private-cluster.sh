@@ -2,7 +2,7 @@
 #
 # Dataproc Private Cluster Management Functions
 
-source lib/dataproc/cluster.sh # Source the base cluster functions to reuse exists_dpgce_cluster
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh" # Source the base cluster functions to reuse exists_dpgce_cluster
 
 function create_dpgce_private_cluster() {
   print_status "Creating Private Dataproc Cluster ${CLUSTER_NAME}..."
@@ -82,7 +82,7 @@ function create_dpgce_private_cluster() {
 
   if "${gcloud_cmd[@]}"; then
     report_result "Created"
-    refresh_resource_state "dataprocCluster" "exists_dpgce_cluster" "lib/dataproc/cluster.sh"
+    refresh_resource_state "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
   else
     report_result "Fail"
     return 1

@@ -35,7 +35,7 @@ function create_kms_keyring() {
   local log_file="create_kms_keyring_${KMS_KEYRING}.log"
   if run_gcloud "${log_file}" gcloud kms keyrings create "${KMS_KEYRING}" --location=global --project="${PROJECT_ID}"; then
     report_result "Created"
-    refresh_resource_state "kmsKeyring" "exists_kms_keyring" "lib/gcp/kms.sh"
+    refresh_resource_state "kmsKeyring" "lib/gcp/kms.sh" exists_kms_keyring
   else
     report_result "Fail"
     return 1
@@ -60,7 +60,7 @@ export -f create_kerberos_kdc_key
 
 function exists_kms_key() {
   local key_name="$1"
-  _check_exists "gcloud kms keys describe '${key_name}' --keyring='${KMS_KEYRING}' --location=global --project='${PROJECT_ID}' --format='json(name,primary.state)'"
+  _check_exists gcloud kms keys describe "${key_name}" --keyring="${KMS_KEYRING}" --location=global --project="${PROJECT_ID}" --format="json(name,primary.state)"
 }
 export -f exists_kms_key
 

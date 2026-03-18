@@ -3,7 +3,7 @@
 # Bigtable functions
 
 function exists_bigtable_instance() {
-    _check_exists "gcloud bigtable instances describe '${BIGTABLE_INSTANCE}' --format='json(name,displayName)'"
+    _check_exists gcloud bigtable instances describe "${BIGTABLE_INSTANCE}" --format="json(name,displayName)"
 }
 export -f exists_bigtable_instance
 

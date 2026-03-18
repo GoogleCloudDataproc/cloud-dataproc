@@ -3,7 +3,7 @@
 # IAM related functions
 
 function exists_service_account() {
-  _check_exists "gcloud iam service-accounts describe '${GSA}' --project='${PROJECT_ID}' --format='json(email,name)'"
+  _check_exists gcloud iam service-accounts describe "${GSA}" --project="${PROJECT_ID}" --format="json(email,name)"
 }
 export -f exists_service_account
 

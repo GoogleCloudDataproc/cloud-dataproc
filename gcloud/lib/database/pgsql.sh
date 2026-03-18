@@ -33,6 +33,6 @@ function delete_pgsql_instance() {
 export -f delete_pgsql_instance
 
 function exists_pgsql_instance() {
-  _check_exists "gcloud sql instances describe '${PGSQL_INSTANCE}' --project='${PROJECT_ID}' --format='json(name,state)'"
+  _check_exists gcloud sql instances describe "${PGSQL_INSTANCE}" --project="${PROJECT_ID}" --format="json(name,state)"
 }
 export -f exists_pgsql_instance

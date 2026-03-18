@@ -164,6 +164,6 @@ function exists_swp_managed_certificate() {
   local region="${1:-${REGION}}"
   local project_id="${2:-${PROJECT_ID}}"
   local cert_name="${SWP_CERT_NAME}"
-  _check_exists "gcloud certificate-manager certificates describe '${cert_name}' --location='${region}' --project='${project_id}' --format='json(name,managed.state)'"
+  _check_exists gcloud certificate-manager certificates describe "${cert_name}" --location="${region}" --project="${project_id}" --format="json(name,managed.state)"
 }
 export -f exists_swp_managed_certificate

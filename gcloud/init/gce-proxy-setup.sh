@@ -173,10 +173,11 @@ function set_proxy(){
     local proxy_port=$(echo "${http_proxy_val}" | cut -d: -f2)
 
     echo "DEBUG: set_proxy: Testing TCP connection to proxy ${proxy_host}:${proxy_port}..."
-    if ! nc -zv -w 5 "${proxy_host}" "${proxy_port}"; then
-      echo "ERROR: Failed to establish TCP connection to proxy ${proxy_host}:${proxy_port}."
-      exit 1
-    else
+
+        if ! nc -zv -w 5 "${proxy_host}" "${proxy_port}"; then
+          echo "ERROR: Failed to establish TCP connection to proxy ${proxy_host}:${proxy_port}."
+          exit 1
+        else
       echo "DEBUG: set_proxy: TCP connection to proxy successful."
     fi
 

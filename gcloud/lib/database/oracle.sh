@@ -125,6 +125,6 @@ function delete_oracle_vm() {
 export -f delete_oracle_vm
 
 function exists_oracle_vm() {
-  _check_exists "gcloud compute instances describe '${ORACLE_VM_NAME}' --zone '${ZONE}' --project='${PROJECT_ID}' --format='json(name,status)'"
+  _check_exists gcloud compute instances describe "${ORACLE_VM_NAME}" --zone "${ZONE}" --project="${PROJECT_ID}" --format="json(name,status)"
 }
 export -f exists_oracle_vm

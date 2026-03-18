@@ -4,7 +4,7 @@
 
 function exists_subnet() {
     local subnet_name="$1"
-    _check_exists "gcloud compute networks subnets describe '${subnet_name}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
+    _check_exists gcloud compute networks subnets describe "${subnet_name}" --region="${REGION}" --project="${PROJECT_ID}" --format="json(name,selfLink)"
 }
 export -f exists_subnet
 
@@ -22,7 +22,7 @@ function create_subnet () {
     --region="${REGION}" \
     --description="subnet for use with Dataproc cluster ${CLUSTER_NAME}"; then
     report_result "Created"
-    refresh_resource_state "${subnet_key}" "exists_subnet ${subnet_name}" "lib/network/subnet.sh"
+    refresh_resource_state "${subnet_key}" "lib/network/subnet.sh" exists_subnet "${subnet_name}"
   else
     report_result "Fail"
     return 1

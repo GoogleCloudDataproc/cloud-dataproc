@@ -34,7 +34,7 @@ run_check() {
 
   (
     source "${GCLOUD_DIR}/${source_file}"
-    "${func_name}" "$@" > "${cmd_out}" 2>/dev/null
+    "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
   ) &
   PIDS+=($!)
 }
@@ -46,14 +46,14 @@ run_shared_check() {
   shift 2
   local cmd_out="${AUDIT_TEMP_DIR}/${key}.json"
   (
-    "${func_name}" "$@" > "${cmd_out}" 2>/dev/null
+    "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
   ) &
   PIDS+=($!)
 }
 
 # --- Infrastructure State Checks ---
-run_shared_check "project" _check_exists "gcloud projects describe '${PROJECT_ID}' --format='json(lifecycleState,projectId)'"
-run_shared_check "billing" _check_exists "gcloud beta billing projects describe '${PROJECT_ID}' --format='json(billingEnabled)'"
+run_shared_check "project" _check_exists gcloud projects describe "${PROJECT_ID}" --format="json(lifecycleState,projectId)"
+run_shared_check "billing" _check_exists gcloud beta billing projects describe "${PROJECT_ID}" --format="json(billingEnabled)"
 
 # --- Resource Existence Checks ---
 run_check "vpcNetwork" "lib/network/network.sh" exists_network
@@ -63,7 +63,7 @@ run_check "swpSubnet" "lib/network/subnet.sh" exists_subnet "${SWP_SUBNET}"
 run_check "cloudRouter" "lib/network/router.sh" exists_router
 run_check "firewallRule-ssh" "lib/swp/firewall.sh" exists_firewall_rule "${FIREWALL}-in-ssh"
 run_check "firewallRule-internal" "lib/swp/firewall.sh" exists_firewall_rule "${FIREWALL}-in-internal"
-run_shared_check "routes" _check_exists "gcloud compute routes list --project='${PROJECT_ID}' --filter='network~"/${NETWORK}$"' --format='json(name,selfLink)'"
+run_shared_check "routes" _check_exists gcloud compute routes list --project="${PROJECT_ID}" --filter="network~/${NETWORK}$" --format="json(name,selfLink)"
 run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
 run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
 run_check "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster

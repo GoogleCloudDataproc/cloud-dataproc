@@ -38,26 +38,26 @@ export -f report_audit_status
 function run_gcloud() {
   local log_file_name=$1
   shift
-  local log_file="${REPRO_TMPDIR}/${log_file_name}"
+  local log_file="${LOG_DIR}/${log_file_name}"
   local log_dir=$(dirname "${log_file}") # Get the directory part
   mkdir -p "${log_dir}" # Create the directory if it doesn't exist
 
   if (( DEBUG != 0 )); then
-    echo "  RUNNING: $*" >&2
+    echo "  RUNNING: ${@}" >&2
   fi
-  "$@" > "${log_file}" 2>&1
+  "${@}" > "${log_file}" 2>&1
   local exit_code=$?
   if [[ ${exit_code} -ne 0 ]]; then
     if grep -q -e "Reauthentication failed" -e "gcloud auth login" -e "gcloud config set account" "${log_file}"; then
       echo -e "\n  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}"
       echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
-    elif (( DEBUG != 0 )); then
-      cat "${log_file}" >&2
-    else
-      :
+      exit 1
     fi
+    echo -e "${RED}ERROR: ${NC}Command failed with exit code ${exit_code}. Log: ${log_file}" >&2
+    cat "${log_file}" >&2
+    return ${exit_code}
   fi
-  return ${exit_code}
+  return 0
 }
 export -f run_gcloud
 
@@ -132,21 +132,28 @@ export -f get_state
 
 function refresh_resource_state() {
     local resource_key=$1
-    local check_command=$2
-    local source_file=$3 # Optional: file to source for exists_*
+    local source_file=$2  # e.g., lib/dataproc/cluster.sh or ""
+    shift 2
+    local check_command=("$@") # Remaining arguments form the command
 
     local json_output
+    local func_name="${check_command[0]}"
+
     if [[ -n "${source_file}" ]]; then
-        # Extract the function name from the command string
-        local func_name=$(echo "${check_command}" | awk '{print $1}')
-        # Source in a subshell and export the specific function needed
-        json_output=$(source "${GCLOUD_DIR}/${source_file}" && export -f "${func_name}" && eval "${check_command}")
+        # Source in a subshell, export the function, then run the command
+        if ! json_output=$(source "${GCLOUD_DIR}/${source_file}" && export -f "${func_name}" && "${check_command[@]}"); then
+            echo "ERROR: Failed to execute check_command in refresh_resource_state for key ${resource_key} from ${source_file}" >&2
+            json_output="null"
+        fi
     else
-        # For shared functions like _check_exists, they are already exported from script-utils.sh
-        json_output=$(eval "${check_command}")
+        # Function should already be in the environment (e.g., _check_exists)
+        if ! json_output=$("${check_command[@]}"); then
+             echo "ERROR: Failed to execute check_command in refresh_resource_state for key ${resource_key}" >&2
+             json_output="null"
+        fi
     fi
 
-    if [[ -z "${json_output}" ]]; then
+    if [[ -z "${json_output}" || "${json_output}" == "[]" ]]; then
       json_output="null"
     fi
 
@@ -157,18 +164,26 @@ export -f refresh_resource_state
 # --- Audit Check Functions ---
 # These functions are now designed to be called by the audit script.
 # They return a JSON object with details if a resource is found, or the string "null".
+# Call this with command and arguments as separate words, not a single string.
 function _check_exists() {
-  local command_to_run="$1"
-  local json_output
-  
-  # The command_to_run should be a gcloud command with --format=json
-  # that returns a JSON object if the resource exists and fails otherwise.
-  json_output=$(eval "${command_to_run}" 2>/dev/null)
-  
-  if [[ -n "${json_output}" ]]; then
-    echo "${json_output}"
-  else
-    echo "null"
-  fi
+    echo "DEBUG _check_exists called with: $@" >&2
+    local json_output
+    # Execute the command, capturing stdout. Stderr is suppressed.
+    json_output=$("$@" 2> /dev/null)
+    local exit_code=$?
+    echo "DEBUG INSIDE _check_exists:" >&2
+    echo "DEBUG CMD: $@" >&2
+    echo "DEBUG EXIT CODE: ${exit_code}" >&2
+    echo "DEBUG JSON OUTPUT: ${json_output}" >&2
+
+    if [[ ${exit_code} -eq 0 && -n "${json_output}" && "${json_output}" != "[]" ]]; then
+        # If the command was successful and output is not empty or an empty JSON array, resource exists.
+        echo "DEBUG _check_exists: Returning JSON" >&2
+        echo "${json_output}"
+    else
+        # Otherwise, resource does not exist or an error occurred.
+        echo "DEBUG _check_exists: Returning null" >&2
+        echo "null"
+    fi
 }
 export -f _check_exists

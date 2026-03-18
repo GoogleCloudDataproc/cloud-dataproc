@@ -3,7 +3,7 @@
 # VPC Network functions
 
 function exists_network() {
-  _check_exists "gcloud compute networks describe '${NETWORK}' --project='${PROJECT_ID}' --format='json(name,selfLink)'"
+  _check_exists gcloud compute networks describe "${NETWORK}" --project="${PROJECT_ID}" --format="json(name,selfLink)"
 }
 export -f exists_network
 
@@ -16,7 +16,7 @@ function create_vpc_network () {
     --bgp-routing-mode="regional" \
     --description="network for use with Dataproc cluster ${CLUSTER_NAME}"; then
     report_result "Created"
-    refresh_resource_state "vpcNetwork" "exists_network" "lib/network/network.sh"
+    refresh_resource_state "vpcNetwork" "lib/network/network.sh" exists_network
   else
     report_result "Fail"
     return 1

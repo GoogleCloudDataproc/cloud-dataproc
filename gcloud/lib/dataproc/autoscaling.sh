@@ -3,15 +3,16 @@
 # Dataproc Autoscaling Policy functions
 
 function exists_autoscaling_policy() {
-  _check_exists "gcloud dataproc autoscaling-policies describe '${AUTOSCALING_POLICY_NAME}' --region='${REGION}' --format='json(id,name)'"
+  _check_exists gcloud dataproc autoscaling-policies describe "${AUTOSCALING_POLICY_NAME}" --region="${REGION}" --format="json(id,name)"
 }
 export -f exists_autoscaling_policy
 
 function create_autoscaling_policy() {
   print_status "Creating Autoscaling Policy ${AUTOSCALING_POLICY_NAME}..."
   local log_file="create_autoscaling_${AUTOSCALING_POLICY_NAME}.log"
-  if run_gcloud "${log_file}" gcloud dataproc autoscaling-policies import "${AUTOSCALING_POLICY_NAME}" --region="${REGION}" --source=autoscaling-policy.yaml; then
+  if run_gcloud "${log_file}" gcloud dataproc autoscaling-policies import "${AUTOSCALING_POLICY_NAME}" --region="${REGION}" --source="${GCLOUD_DIR}/autoscaling-policy.yaml" --quiet; then
     report_result "Created"
+    refresh_resource_state "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
   else
     report_result "Fail"
     return 1

@@ -2,7 +2,7 @@
 
 function exists_firewall_rule() {
   local rule_name="$1"
-  _check_exists "gcloud compute firewall-rules describe '${rule_name}' --project='${PROJECT_ID}' --format='json(name,direction)'"
+  _check_exists gcloud compute firewall-rules describe "${rule_name}" --project="${PROJECT_ID}" --format="json(name,direction)"
 }
 export -f exists_firewall_rule
 

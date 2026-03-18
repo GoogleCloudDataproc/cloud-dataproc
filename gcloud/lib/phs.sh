@@ -24,7 +24,7 @@ export -f create_phs_cluster
 
 function exists_phs_cluster() {
   local phs_cluster_name="${CLUSTER_NAME}-phs"
-  _check_exists "gcloud dataproc clusters describe '${phs_cluster_name}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(clusterName,status.state)'"
+  _check_exists gcloud dataproc clusters describe "${phs_cluster_name}" --region="${REGION}" --project="${PROJECT_ID}" --format="json(clusterName,status.state)"
 }
 export -f exists_phs_cluster
 

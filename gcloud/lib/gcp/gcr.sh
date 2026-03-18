@@ -8,7 +8,7 @@ function create_artifacts_repository(){
     --repository-format=docker \
     --location="${REGION}" --project="${PROJECT_ID}"; then
     report_result "Created"
-    refresh_resource_state "artifactsRepository" "exists_artifacts_repository" "lib/gcp/gcr.sh"
+    refresh_resource_state "artifactsRepository" "lib/gcp/gcr.sh" exists_artifacts_repository
   else
     report_result "Fail"
     return 1
@@ -17,7 +17,7 @@ function create_artifacts_repository(){
 export -f create_artifacts_repository
 
 function exists_artifacts_repository() {
-  _check_exists "gcloud artifacts repositories describe '${ARTIFACT_REPOSITORY}' --location='${REGION}' --project='${PROJECT_ID}' --format='json(name,format)'"
+  _check_exists gcloud artifacts repositories describe "${ARTIFACT_REPOSITORY}" --location="${REGION}" --project="${PROJECT_ID}" --format="json(name,format)"
 }
 export -f exists_artifacts_repository
 

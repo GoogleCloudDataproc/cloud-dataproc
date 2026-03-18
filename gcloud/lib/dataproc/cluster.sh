@@ -3,7 +3,7 @@
 # Dataproc Cluster Management Functions
 
 function exists_dpgce_cluster() {
-  _check_exists "gcloud dataproc clusters describe '${CLUSTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}' --format='json(clusterName,clusterUuid,status.selfLink)'"
+  _check_exists gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="json(clusterName,clusterUuid,status.selfLink,config.softwareConfig.imageVersion,config.masterConfig.imageUri)"
 }
 export -f exists_dpgce_cluster
 
@@ -77,7 +77,7 @@ function create_dpgce_cluster() {
 
   if time "${gcloud_cmd[@]}"; then
     report_result "Created"
-    refresh_resource_state "dataprocCluster" "exists_dpgce_cluster" "lib/dataproc/cluster.sh"
+    refresh_resource_state "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
   else
     report_result "Fail"
     return 1
@@ -97,6 +97,6 @@ function delete_dpgce_cluster() {
 export -f delete_dpgce_cluster
 
 function exists_dataproc_cluster_vms() {
-  _check_exists "gcloud compute instances list --project='${PROJECT_ID}' --filter='labels.goog-dataproc-cluster-name=${CLUSTER_NAME}' --format='json(name,zone,status)'" | jq 'if . == [] then null else . end'
+  _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter="labels.goog-dataproc-cluster-name=${CLUSTER_NAME}" --format="json(name,zone,status)" | jq 'if . == [] then null else . end'
 }
 export -f exists_dataproc_cluster_vms

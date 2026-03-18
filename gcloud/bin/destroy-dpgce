@@ -100,8 +100,9 @@ ROUTES_RAW=$(get_state "routes")
 if [[ "${ROUTES_RAW}" != "null" && "${ROUTES_RAW}" != "[]" ]]; then
     mapfile -t route_names < <(echo "${ROUTES_RAW}" | jq -r '.[].name')
     for route_name in "${route_names[@]}"; do
-        # Exclude the default internet gateway route and local routes
-        if [[ "${route_name}" != "default-internet-${NETWORK}" && ! "${route_name}" =~ ^default-route-r- ]]; then
+        # Exclude only local routes (default-route-r-.*), allow default internet route to be deleted.
+        # The delete_route function is called for each route name found in the state cache.
+        if [[ ! "${route_name}" =~ ^default-route-r- ]]; then
           delete_route "${route_name}"
         fi
     done
