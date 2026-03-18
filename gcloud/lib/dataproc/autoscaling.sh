@@ -24,6 +24,7 @@ function delete_autoscaling_policy() {
   local log_file="delete_autoscaling_${AUTOSCALING_POLICY_NAME}.log"
   if run_gcloud "${log_file}" gcloud dataproc autoscaling-policies delete --quiet "${AUTOSCALING_POLICY_NAME}" --region="${REGION}"; then
     report_result "Deleted"
+    update_state "autoscalingPolicy" "null"
   else
     report_result "Fail"
   fi

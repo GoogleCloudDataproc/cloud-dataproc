@@ -9,16 +9,20 @@ function exists_subnet() {
 export -f exists_subnet
 
 function create_subnet () {
-  print_status "Creating Subnet ${SUBNET}..."
-  local log_file="create_subnet_${SUBNET}.log"
-  if run_gcloud "${log_file}" gcloud compute networks subnets create "${SUBNET}" \
+  local subnet_name="$1"
+  local subnet_key="$2"
+  local range="$3"
+  print_status "Creating Subnet ${subnet_name}..."
+  local log_file="create_subnet_${subnet_name}.log"
+  if run_gcloud "${log_file}" gcloud compute networks subnets create "${subnet_name}" \
     --project="${PROJECT_ID}" \
     --network="${NETWORK}" \
-    --range="${RANGE}" \
+    --range="${range}" \
     --enable-private-ip-google-access \
     --region="${REGION}" \
     --description="subnet for use with Dataproc cluster ${CLUSTER_NAME}"; then
     report_result "Created"
+    refresh_resource_state "${subnet_key}" "exists_subnet ${subnet_name}" "lib/network/subnet.sh"
   else
     report_result "Fail"
     return 1

@@ -57,4 +57,5 @@ fi
 echo "========================================"
 echo "DPGCE Cluster re-created"
 echo "========================================"
-print_cluster_details
+# Display cluster details
+gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --format=json

@@ -99,6 +99,7 @@ function delete_service_account() {
 
   if run_gcloud "${log_file}" gcloud iam service-accounts delete --quiet "${GSA}"; then
     report_result "Deleted"
+    update_state "serviceAccount" "null"
   else
     report_result "Fail"
     echo "  - Failed to delete service account ${GSA}. Log content:" >&2

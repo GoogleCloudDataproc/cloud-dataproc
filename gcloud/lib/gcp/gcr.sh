@@ -8,6 +8,7 @@ function create_artifacts_repository(){
     --repository-format=docker \
     --location="${REGION}" --project="${PROJECT_ID}"; then
     report_result "Created"
+    refresh_resource_state "artifactsRepository" "exists_artifacts_repository" "lib/gcp/gcr.sh"
   else
     report_result "Fail"
     return 1

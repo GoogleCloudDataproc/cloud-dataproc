@@ -82,6 +82,7 @@ function create_dpgce_private_cluster() {
 
   if "${gcloud_cmd[@]}"; then
     report_result "Created"
+    refresh_resource_state "dataprocCluster" "exists_dpgce_cluster" "lib/dataproc/cluster.sh"
   else
     report_result "Fail"
     return 1

@@ -16,6 +16,7 @@ function create_router () {
     --asn="${ASN_NUMBER}" \
     --region="${REGION}"; then
     report_result "Created"
+    refresh_resource_state "cloudRouter" "exists_router" "lib/network/router.sh"
   else
     report_result "Fail"
     return 1
@@ -33,6 +34,7 @@ function add_nat_to_router () {
     --nat-custom-subnet-ip-ranges "${SUBNET}" \
     --auto-allocate-nat-external-ips; then
     report_result "Created"
+    refresh_resource_state "cloudRouter" "exists_router" "lib/network/router.sh"
   else
     report_result "Fail"
     return 1
@@ -55,6 +57,7 @@ function delete_router () {
     --region="${REGION}" \
     --project="${PROJECT_ID}"; then
     report_result "Deleted"
+    update_state "cloudRouter" "null"
   else
     report_result "Fail"
   fi

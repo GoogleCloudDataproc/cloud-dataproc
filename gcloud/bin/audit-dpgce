@@ -67,6 +67,7 @@ run_shared_check "routes" _check_exists "gcloud compute routes list --project='$
 run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
 run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
 run_check "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
+run_check "dataprocClusterVMs" "lib/dataproc/cluster.sh" exists_dataproc_cluster_vms
 run_check "debugVms" "lib/gcp/misc.sh" exists_debug_vms
 run_check "bigtableInstance" "lib/bigtable.sh" exists_bigtable_instance
 run_check "legacyMssqlInstance" "lib/database/mssql.sh" exists_legacy_mssql_instance
@@ -158,6 +159,7 @@ print_resource_status "Firewall Rule (Internal)" "firewallRule-internal"
 print_resource_status "Service Account (${GSA})" "serviceAccount"
 print_resource_status "Dataproc Autoscaling Policy (${AUTOSCALING_POLICY_NAME})" "autoscalingPolicy"
 print_resource_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+print_resource_status "Dataproc Cluster ${CLUSTER_NAME} VMs" "dataprocClusterVMs"
 print_resource_status "Bigtable Instance (${BIGTABLE_INSTANCE})" "bigtableInstance"
 print_resource_status "Cloud SQL MSSQL (Legacy VM)" "legacyMssqlInstance"
 print_resource_status "Cloud SQL MSSQL (${MSSQL_INSTANCE})" "mssqlInstance"

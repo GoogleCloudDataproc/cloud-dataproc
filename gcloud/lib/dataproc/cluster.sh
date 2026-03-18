@@ -43,7 +43,7 @@ function create_dpgce_cluster() {
   local gcloud_cmd=(
     gcloud dataproc clusters create "${CLUSTER_NAME}"
     --single-node
-#    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
+    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
     --master-machine-type "${M_MACHINE_TYPE}"
     --master-boot-disk-size 600
     --master-local-ssd-interface=NVME
@@ -77,6 +77,7 @@ function create_dpgce_cluster() {
 
   if time "${gcloud_cmd[@]}"; then
     report_result "Created"
+    refresh_resource_state "dataprocCluster" "exists_dpgce_cluster" "lib/dataproc/cluster.sh"
   else
     report_result "Fail"
     return 1
@@ -94,3 +95,8 @@ function delete_dpgce_cluster() {
   fi
 }
 export -f delete_dpgce_cluster
+
+function exists_dataproc_cluster_vms() {
+  _check_exists "gcloud compute instances list --project='${PROJECT_ID}' --filter='labels.goog-dataproc-cluster-name=${CLUSTER_NAME}' --format='json(name,zone,status)'" | jq 'if . == [] then null else . end'
+}
+export -f exists_dataproc_cluster_vms

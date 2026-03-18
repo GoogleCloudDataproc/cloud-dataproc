@@ -37,31 +37,44 @@ function configure_gcloud() {
     report_result "Pass"
   fi
 }
+export -f configure_gcloud
 
 function check_project() {
     print_status "Verifying project ${PROJECT_ID}..."
-    local project_state
-    project_state=$(jq -r '.project.lifecycleState // "NOT_FOUND"' "${STATE_FILE}")
+    local project_raw
+    project_raw=$(get_state "project")
+    if [[ "${project_raw}" == "null" || -z "${project_raw}" ]]; then
+      print_status "Project not found in state DB" >&2
+      report_result "Fail"
+      exit 1
+    fi
+    local project_state=$(echo "${project_raw}" | jq -r '.lifecycleState // "NOT_FOUND"')
 
     if [[ "${project_state}" == "ACTIVE" ]]; then
         report_result "Pass"
     else
         report_result "Fail"
-        echo "  - Project ${PROJECT_ID} is not ACTIVE or does not exist (state: ${project_state})." >&2
+        echo "  - Project ${PROJECT_ID} is not ACTIVE (state: ${project_state})." >&2
         exit 1
     fi
 }
 
 function check_billing() {
     print_status "Verifying billing for ${PROJECT_ID}..."
-    local billing_enabled
-    billing_enabled=$(jq -r '.billing.billingEnabled // false' "${STATE_FILE}")
+    local billing_raw
+    billing_raw=$(get_state "billing")
+    if [[ "${billing_raw}" == "null" || -z "${billing_raw}" ]]; then
+      print_status "Billing info not found in state DB" >&2
+      report_result "Fail"
+      exit 1
+    fi
+    local billing_enabled=$(echo "${billing_raw}" | jq -r '.billingEnabled // false')
 
     if [[ "${billing_enabled}" == "true" ]]; then
         report_result "Pass"
     else
         report_result "Fail"
-        echo "  - Billing is not enabled for project ${PROJECT_ID} according to state file." >&2
+        echo "  - Billing is not enabled for project ${PROJECT_ID}." >&2
         echo "  - Please run: gcloud beta billing projects link ${PROJECT_ID} --billing-account <ACCOUNT_ID>" >&2
         exit 1
     fi
@@ -126,5 +139,4 @@ function check_image_exists() {
 function exists_debug_vms() {
   _check_exists "gcloud compute instances list --project='${PROJECT_ID}' --filter='name~^debug-' --format='json(name,zone,status)'" | jq 'if . == [] then null else . end'
 }
-export -f exists_debug_vms
 export -f exists_debug_vms

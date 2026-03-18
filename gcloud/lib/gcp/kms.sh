@@ -35,6 +35,7 @@ function create_kms_keyring() {
   local log_file="create_kms_keyring_${KMS_KEYRING}.log"
   if run_gcloud "${log_file}" gcloud kms keyrings create "${KMS_KEYRING}" --location=global --project="${PROJECT_ID}"; then
     report_result "Created"
+    refresh_resource_state "kmsKeyring" "exists_kms_keyring" "lib/gcp/kms.sh"
   else
     report_result "Fail"
     return 1

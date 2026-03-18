@@ -31,6 +31,7 @@ function delete_route() {
   if gcloud compute routes describe "${route_name}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
     if run_gcloud "${log_file}" gcloud compute routes delete --quiet "${route_name}" --project="${PROJECT_ID}"; then
       report_result "Deleted"
+      refresh_resource_state "routes" "_check_exists \"gcloud compute routes list --project='${PROJECT_ID}' --filter='network~\\"/${NETWORK}$\\"' --format='json(name,selfLink)'\""
     else
       report_result "Fail"
       echo "  - Failed to delete route ${route_name}. Log content:" >&2

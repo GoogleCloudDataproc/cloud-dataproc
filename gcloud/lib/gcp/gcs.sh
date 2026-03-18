@@ -25,6 +25,10 @@ function create_bucket () {
   if ! gcloud storage ls --buckets "gs://${BUCKET}" > /dev/null 2>&1 ; then
     if run_gcloud "${log_file}" gcloud storage buckets create --location ${REGION} gs://${BUCKET}; then
       report_result "Created"
+      local cache_key="gcsBucket-${bucket_name}"
+      if [[ "${bucket_name}" == "${BUCKET}" ]]; then cache_key="gcsBucket"; fi
+      if [[ "${bucket_name}" == "${TEMP_BUCKET}" ]]; then cache_key="gcsTempBucket"; fi
+      refresh_resource_state "${cache_key}" "exists_gcs_bucket ${bucket_name}" "lib/gcp/gcs.sh"
     else
       report_result "Fail"
       return 1

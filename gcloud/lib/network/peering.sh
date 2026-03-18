@@ -27,6 +27,7 @@ function delete_ip_allocation () {
   if gcloud compute addresses describe ${ALLOCATION_NAME} --global --project="${PROJECT_ID}" > /dev/null 2>&1; then
     if run_gcloud "${log_file}" gcloud compute addresses delete --quiet --global ${ALLOCATION_NAME}; then
       report_result "Deleted"
+      update_state "ipAllocation" "null"
     else
       report_result "Fail"
     fi

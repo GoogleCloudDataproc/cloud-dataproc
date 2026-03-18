@@ -6,6 +6,7 @@ set -e
 # --- Get script's real directory ---
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
 
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
@@ -45,58 +46,89 @@ source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
 source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh" 
 
-
 # --- Main Logic ---
-print_status "Auditing environment to determine current state..."
-"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
-report_result "Done"
-
 configure_gcloud
-check_project
-check_billing
-set_cluster_name
-enable_services
+init_state_db
 
-if [[ $(jq -r '.serviceAccount == null' "${STATE_FILE}") == "true" ]]; then
-  create_service_account
-else
-  print_status "Skipping Service Account creation (already exists)..."
-  report_result "Exists"
+echo "--- Current Environment State (from cache) --- "
+# Function to display resource status from DB
+display_status() {
+  local display_name="$1"
+  local key="$2"
+  local value=$(get_state "${key}")
+  echo -n "- ${display_name}: "
+  if [[ "${value}" == "null" || "${value}" == "" ]]; then
+    report_audit_status "Not Found"
+  else
+    report_audit_status "Exists"
+  fi
+}
+
+# Display status for all potentially relevant resources
+display_status "Service Account" "serviceAccount"
+display_status "GCS Bucket (${BUCKET})" "gcsBucket"
+display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
+display_status "VPC Network (${NETWORK})" "vpcNetwork"
+display_status "Standard Subnet (${SUBNET})" "standardSubnet"
+display_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
+display_status "Cloud Router" "cloudRouter"
+display_status "Firewall Rules" "firewallRule-ssh" # Assuming this key represents all base rules
+display_status "Autoscaling Policy" "autoscalingPolicy"
+display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+echo "----------------------------------------------"
+
+# --- Determine Intended State & Generate Plan ---
+PLAN=()
+INTENDED=()
+
+# Basic resources for all types
+INTENDED+=("serviceAccount" "gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "cloudRouter" "firewallRule-ssh" "autoscalingPolicy")
+
+if [[ "${IS_PRIVATE}" == "true" ]]; then
+  INTENDED+=("privateSubnet")
+  # TODO: Add SWP components to INTENDED
+fi
+if [[ "${CREATE_CLUSTER}" == "true" ]]; then
+  INTENDED+=("dataprocCluster")
 fi
 
-create_gcs_bucket "${BUCKET}" "Standard"
-grant_gcs_bucket_perms "${BUCKET}"
-create_gcs_bucket "${TEMP_BUCKET}" "Standard"
-grant_gcs_bucket_perms "${TEMP_BUCKET}"
-upload_init_actions
+for resource in "${INTENDED[@]}"; do
+  if [[ $(get_state "${resource}") == "null" ]]; then
+    PLAN+=("CREATE_${resource}")
+  fi
+done
 
-if [[ $(jq -r '.vpcNetwork == null' "${STATE_FILE}") == "true" ]]; then
-  create_vpc_network
-  ensure_default_internet_route
+if [[ ${#PLAN[@]} -eq 0 ]]; then
+  echo "No actions needed. Environment matches target state."
+  exit 0
 fi
 
-if [[ $(jq -r '.standardSubnet == null' "${STATE_FILE}") == "true" ]]; then
-  create_subnet
-fi
+echo "--- Execution Plan ---"
+for action in "${PLAN[@]}"; do
+  echo "- ${action}"
+done
+echo "----------------------"
 
-if [[ $(jq -r '.cloudRouter == null' "${STATE_FILE}") == "true" ]]; then
-  create_router
-  add_nat_to_router
-fi
+# --- Plan Execution ---
+echo "Executing plan..."
 
-if [[ $(jq -r '.firewallRule == null' "${STATE_FILE}") == "true" ]]; then
-  create_firewall_rules
-fi
+# Order matters here for dependencies
+if [[ " ${PLAN[*]} " =~ " CREATE_serviceAccount " ]]; then create_service_account; fi
 
-if [[ $(jq -r '.autoscalingPolicy == null' "${STATE_FILE}") == "true" ]]; then
-  create_autoscaling_policy
-fi
+# GCS Buckets - No strong dependencies between them
+if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " ]]; then create_gcs_bucket "${BUCKET}" "Standard"; grant_gcs_bucket_perms "${BUCKET}"; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then create_gcs_bucket "${TEMP_BUCKET}" "Standard"; grant_gcs_bucket_perms "${TEMP_BUCKET}"; fi
+upload_init_actions # Always run if buckets were created or might be missing init actions
 
-# --- Conditional Cluster Creation ---
-if [[ "${CREATE_CLUSTER}" = true ]]; then
-  if [[ "$IS_PRIVATE" == "true" ]]; then
-    source "${GCLOUD_DIR}/lib/gcp/private-network.sh"
-    create_private_subnet
+if [[ " ${PLAN[*]} " =~ " CREATE_vpcNetwork " ]]; then create_vpc_network; ensure_default_internet_route; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_standardSubnet " ]]; then create_subnet "${SUBNET}" "standardSubnet" "${RANGE}"; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_privateSubnet " ]]; then source "${GCLOUD_DIR}/lib/swp/subnet.sh"; create_private_subnet; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then create_router; add_nat_to_router; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_firewallRule-ssh " ]]; then create_firewall_rules; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_autoscalingPolicy " ]]; then create_autoscaling_policy; fi
+
+if [[ " ${PLAN[*]} " =~ " CREATE_dataprocCluster " ]]; then
+  if [[ "${IS_PRIVATE}" == "true" ]]; then
     create_dpgce_private_cluster
   else
     if [[ "$IS_CUSTOM" == "true" ]]; then
@@ -104,9 +136,11 @@ if [[ "${CREATE_CLUSTER}" = true ]]; then
     fi
     create_dpgce_cluster
   fi
-  
-  # After creation, run audit again to update state file with new resource details
-  "${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
-else
-  echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
 fi
+
+echo "Plan execution finished."
+
+# --- Final Audit ---
+print_status "Running final audit to update cache..."
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+report_result "Done"
