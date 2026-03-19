@@ -140,3 +140,20 @@ function exists_debug_vms() {
   _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter='name~^debug-' --format="json(name,zone,status)" | jq 'if . == [] then null else . end'
 }
 export -f exists_debug_vms
+
+# Check for any VMs in the default network
+function exists_any_vms_in_network() {
+  local vms=$(gcloud compute instances list --project="${PROJECT_ID}" --filter="networkInterfaces.network ~ /${NETWORK}$" --format="value(name)" 2>/dev/null)
+  if [[ -n "${vms}" ]]; then
+    echo "true"
+  else
+    echo "false"
+  fi
+}
+export -f exists_any_vms_in_network
+
+# Get state of any VMs in the default network for audit
+function get_any_network_vms_state() {
+  _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter="networkInterfaces.network ~ /${NETWORK}$" --format="json(name,zone,status)" | jq 'if . == [] then null else . end'
+}
+export -f get_any_network_vms_state

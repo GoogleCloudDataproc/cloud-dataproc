@@ -126,6 +126,7 @@ run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
 run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
 run_check "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
 run_check "dataprocClusterVMs" "lib/dataproc/cluster.sh" exists_dataproc_cluster_vms
+run_check "anyNetworkVms" "lib/gcp/misc.sh" get_any_network_vms_state
 run_check "debugVms" "lib/gcp/misc.sh" exists_debug_vms
 run_check "bigtableInstance" "lib/bigtable.sh" exists_bigtable_instance
 run_check "legacyMssqlInstance" "lib/database/mssql.sh" exists_legacy_mssql_instance
