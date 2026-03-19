@@ -10,6 +10,15 @@ export GCLOUD_DIR
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
 
+# SET TIMESTAMP for THIS run
+export TIMESTAMP=$(date +%s)
+export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+export LOG_DIR="${REPRO_TMPDIR}/logs"
+export STATE_DB="${REPRO_TMPDIR}/state.db"
+mkdir -p "${REPRO_TMPDIR}"
+mkdir -p "${LOG_DIR}"
+echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
+
 # --- Argument Parsing ---
 IS_CUSTOM=false
 IS_PRIVATE=false
@@ -118,6 +127,10 @@ fi
 # Helper to check if a resource needs creation
 needs_create() {
   local key="$1"
+  if [[ "${key}" == "serviceAccount" ]]; then
+    [[ $(get_state "serviceAccount") == "null" || $(get_state "serviceAccountRolesReady") != "true" ]]
+    return
+  fi
   [[ $(get_state "${key}") == "null" ]]
 }
 
@@ -139,7 +152,6 @@ done
 if [[ "${NAT_EGRESS}" == "true" ]]; then
   if ! needs_create "cloudRouter"; then
     NAT_STATE=$(get_state "cloudRouterNAT")
-    echo "DEBUG: NAT_STATE in if: <${NAT_STATE}>" >&2
     if [[ "${NAT_STATE}" == "null" ]]; then
       PLAN+=("ADD_NAT_TO_ROUTER")
     fi
@@ -216,4 +228,3 @@ echo "Plan execution finished."
 print_status "Running final audit to update cache..."
 "${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
 report_result "Done"
-port_result "Done"

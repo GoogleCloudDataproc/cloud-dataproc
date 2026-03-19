@@ -18,14 +18,8 @@
 LIB_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 GCLOUD_DIR="$(realpath "${LIB_DIR}/..")"
 export GCLOUD_DIR
-if [[ -n "${TIMESTAMP}" ]]; then
-  export TIMESTAMP
-  export RESOURCE_SUFFIX="${TIMESTAMP}"
-else
-  export TIMESTAMP="$(date +%s)"
-  export RESOURCE_SUFFIX="${TIMESTAMP}"
-fi
-export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${RESOURCE_SUFFIX}}"
+
+export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/$(date +%s)}"
 mkdir -p "${REPRO_TMPDIR}"
 export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
 mkdir -p "${LOG_DIR}"

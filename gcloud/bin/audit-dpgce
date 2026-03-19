@@ -123,6 +123,8 @@ run_check "firewallRule-ssh" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CL
 run_check "firewallRule-internal" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CLUSTER_NAME}-in-internal"
 run_shared_check "routes" _check_exists gcloud compute routes list --project="${PROJECT_ID}" --filter="network~/${NETWORK}$" --format="json(name,selfLink)"
 run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
+run_check "serviceAccountBindings" "lib/gcp/iam.sh" get_service_account_bindings
+run_check "serviceAccountRolesReady" "lib/gcp/iam.sh" check_service_account_bindings
 run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
 run_check "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
 run_check "dataprocClusterVMs" "lib/dataproc/cluster.sh" exists_dataproc_cluster_vms

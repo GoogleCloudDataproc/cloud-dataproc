@@ -49,10 +49,27 @@ function run_gcloud() {
   local exit_code=$?
   if [[ ${exit_code} -ne 0 ]]; then
     if grep -q -e "Reauthentication failed" -e "gcloud auth login" -e "gcloud config set account" "${log_file}"; then
-      echo -e "\n  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}"
+      echo -e "
+  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}"
       echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
       exit 1
     fi
+    # Check for ALREADY_EXISTS, and don't print the whole log if found
+    if grep -q "ALREADY_EXISTS" "${log_file}"; then
+      echo -e " [${BLUE}Kept${NC}]"
+      return 0
+    fi
+    # Check for NOT_FOUND on delete operations
+    if [[ "$*" == *delete* ]] && grep -q "NOT_FOUND" "${log_file}"; then
+      echo -e " [${YELLOW}Pass*${NC}]" # Already gone
+      return 0
+    fi
+    # Check for IAM policy binding not found errors
+    if grep -q "Policy binding with the specified principal, role, and condition not found" "${log_file}"; then
+      echo -e " [${YELLOW}Pass*${NC}]" # Binding already gone
+      return 0
+    fi
+
     echo -e "${RED}ERROR: ${NC}Command failed with exit code ${exit_code}. Log: ${log_file}" >&2
     cat "${log_file}" >&2
     return ${exit_code}
@@ -74,17 +91,21 @@ function parse_args() {
       --no-create-cluster)
         CREATE_CLUSTER=false
         shift
-        ;;      --force)
+        ;;
+      --force)
         FORCE_DELETE=true
         FORCE_AUDIT=true # Audit scripts use this too
         shift
-        ;;      --quiet-gcloud)
+        ;;
+      --quiet-gcloud)
         GCLOUD_QUIET=true
         shift
-        ;;      *)
-        PARAMS="$PARAMS \"$1\""
+        ;;
+      *)
+        PARAMS="$PARAMS "$1""
         shift
-        ;;    esac
+        ;;
+    esac
   done
   eval set -- "${PARAMS}"
 }
@@ -93,8 +114,11 @@ export -f parse_args
 # --- State Management Functions ---
 function init_state_db() {
     local db_file="${STATE_DB}"
+    # local db_file="${STATE_DB}"
     if [[ ! -f "${db_file}" ]]; then
-        sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS resource_state (key TEXT PRIMARY KEY, json_data TEXT);"
+        sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);"
+        # Old schema, for reference:
+        # sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS resource_state (key TEXT PRIMARY KEY, json_data TEXT);"
     fi
 }
 export -f init_state_db
@@ -104,14 +128,12 @@ function update_state() {
     local resource_value=$2 # JSON string or "null"
     local db_file="${STATE_DB}"
 
-    init_state_db
-
     local sql
     if [[ "${resource_value}" == "null" ]]; then
-        sql="DELETE FROM resource_state WHERE key = '${resource_key}';"
+        sql="DELETE FROM state WHERE key = '${resource_key}';"
     else
         local escaped_value=$(echo "${resource_value}" | sed "s/'/''/g")
-        sql="INSERT OR REPLACE INTO resource_state (key, json_data) VALUES ('${resource_key}', '${escaped_value}');"
+        sql="INSERT OR REPLACE INTO state (key, value) VALUES ('${resource_key}', '${escaped_value}');"
     fi
     sqlite3 "${db_file}" "${sql}"
 }
@@ -120,8 +142,11 @@ export -f update_state
 function get_state() {
     local resource_key=$1
     local db_file="${STATE_DB}"
-    init_state_db
-    local result=$(sqlite3 "${db_file}" "SELECT json_data FROM resource_state WHERE key = '${resource_key}';")
+    if [[ ! -f "${db_file}" ]]; then
+        echo "null"
+        return
+    fi
+    local result=$(sqlite3 "${db_file}" "SELECT value FROM state WHERE key = '${resource_key}';")
     if [[ -z "${result}" ]]; then
         echo "null"
     else
@@ -166,23 +191,23 @@ export -f refresh_resource_state
 # They return a JSON object with details if a resource is found, or the string "null".
 # Call this with command and arguments as separate words, not a single string.
 function _check_exists() {
-    echo "DEBUG _check_exists called with: $@" >&2
+    # echo "DEBUG _check_exists called with: $@" >&2
     local json_output
     # Execute the command, capturing stdout. Stderr is suppressed.
     json_output=$("$@" 2> /dev/null)
     local exit_code=$?
-    echo "DEBUG INSIDE _check_exists:" >&2
-    echo "DEBUG CMD: $@" >&2
-    echo "DEBUG EXIT CODE: ${exit_code}" >&2
-    echo "DEBUG JSON OUTPUT: ${json_output}" >&2
+    # echo "DEBUG INSIDE _check_exists:" >&2
+    # echo "DEBUG CMD: $@" >&2
+    # echo "DEBUG EXIT CODE: ${exit_code}" >&2
+    # echo "DEBUG JSON OUTPUT: ${json_output}" >&2
 
     if [[ ${exit_code} -eq 0 && -n "${json_output}" && "${json_output}" != "[]" ]]; then
         # If the command was successful and output is not empty or an empty JSON array, resource exists.
-        echo "DEBUG _check_exists: Returning JSON" >&2
+        # echo "DEBUG _check_exists: Returning JSON" >&2
         echo "${json_output}"
     else
         # Otherwise, resource does not exist or an error occurred.
-        echo "DEBUG _check_exists: Returning null" >&2
+        # echo "DEBUG _check_exists: Returning null" >&2
         echo "null"
     fi
 }

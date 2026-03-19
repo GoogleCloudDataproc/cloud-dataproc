@@ -34,6 +34,7 @@ function delete_subnet () {
   print_status "Deleting Subnet ${subnet_name}..."
   local log_file="delete_subnet_${subnet_name}.log"
   if run_gcloud "${log_file}" gcloud compute networks subnets delete --quiet --region "${REGION}" "${subnet_name}"; then
+    update_state "$2" "null"
     report_result "Deleted"
   else
     report_result "Fail"
