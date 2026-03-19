@@ -4,7 +4,7 @@
 set -e
 
 # --- Get script's real directory ---
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 export GCLOUD_DIR
 

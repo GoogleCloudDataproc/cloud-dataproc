@@ -1,32 +1,17 @@
-# Local environment overrides
-my-env.json
-env.cpan.json
+# Env files
+env.json
+*.env
 
-# Temporary files and logs
-/tmp/
-action-update.log
+# Logs
+logs/
 *.log
 
-# TLS / Cert directories
-tls-*/
-tls-*-*/
-
-# Emacs backup files
-*#
+# Temp files
+tmp/
+.DS_Store
 *~
 
-# Other
-dataproc-repro-combined.txt
-hardcopy.2
-ini/
-init/swp_ca.crt
-opt/
-spark-bigquery-demo.py
-t/pyspark-bigquery-command.sh
-bin/#connectivity-test#
-github/
-llm-guidance.md
-plan-for-continued-work-2026-01-20.md
-work-completed-2026-01-20.md
-prompts/
-/tls/
+# State
+state.db
+state.json
+*.db-journal

@@ -3,7 +3,7 @@
 set -e
 
 # --- Get script's real directory ---
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 export GCLOUD_DIR
 
@@ -21,7 +21,7 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --custom) IS_CUSTOM=true; shift ;;
         --no-custom) IS_CUSTOM=false; shift ;;
-        --private) IS_PRIVATE=true; shift ;; 
+        --private) IS_PRIVATE=true; shift ;;
         --swp-egress) SWP_EGRESS=true; shift ;;
         --no-swp-egress) SWP_EGRESS=false; shift ;;
         --nat-egress) NAT_EGRESS=true; shift ;;
@@ -55,18 +55,18 @@ source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 source "${GCLOUD_DIR}/lib/misc.sh"
 source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
-source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh" 
+source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh"
 
 # --- Main Logic ---
 configure_gcloud
 init_state_db
 
 print_status "Auditing environment to ensure cache is fresh..."
-"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
 report_result "Done"
 
 
-echo "--- Current Environment State (from cache) --- "
+echo "--- Current Environment State (from Audit) --- "
 # Function to display resource status from DB
 display_status() {
   local display_name="$1"
@@ -86,11 +86,18 @@ display_status "GCS Bucket (${BUCKET})" "gcsBucket"
 display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
 display_status "VPC Network (${NETWORK})" "vpcNetwork"
 display_status "Standard Subnet (${SUBNET})" "standardSubnet"
-display_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
+if [[ "${IS_PRIVATE}" == "true" ]]; then
+  display_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
+fi
 display_status "Cloud Router" "cloudRouter"
+if [[ "${NAT_EGRESS}" == "true" ]]; then
+  display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
+fi
 display_status "Firewall Rules" "firewallRule-ssh" # Assuming this key represents all base rules
 display_status "Autoscaling Policy" "autoscalingPolicy"
-display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+if [[ "${CREATE_CLUSTER}" == "true" ]]; then
+  display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+fi
 echo "----------------------------------------------"
 
 # --- Determine Intended State & Generate Plan ---
@@ -98,7 +105,7 @@ PLAN=()
 INTENDED=()
 
 # Basic resources for all types
-INTENDED+=("serviceAccount" "gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "cloudRouter" "firewallRule-ssh" "autoscalingPolicy")
+INTENDED+=("serviceAccount" "gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "cloudRouter" "firewallRule-ssh" "autoscalingPolicy" "defaultRoute")
 
 if [[ "${IS_PRIVATE}" == "true" ]]; then
   INTENDED+=("privateSubnet")
@@ -116,34 +123,36 @@ needs_create() {
 
 # Add to plan if resource is missing
 for resource in "${INTENDED[@]}"; do
-  if [[ "${resource}" != "dataprocCluster" ]]; then
-    if needs_create "${resource}"; then
-      PLAN+=("CREATE_${resource}")
+  if [[ "${resource}" == "dataprocCluster" ]]; then continue; fi
+  if [[ "${resource}" == "defaultRoute" ]]; then
+    if ! check_default_route; then
+      PLAN+=("ENSURE_DEFAULT_ROUTE")
     fi
+    continue
+  fi
+  if needs_create "${resource}"; then
+    PLAN+=("CREATE_${resource}")
   fi
 done
 
-# Special handling for dataprocCluster to check for recreation needs
+# NAT Egress logic
+if [[ "${NAT_EGRESS}" == "true" ]]; then
+  if ! needs_create "cloudRouter"; then
+    NAT_STATE=$(get_state "cloudRouterNAT")
+    echo "DEBUG: NAT_STATE in if: <${NAT_STATE}>" >&2
+    if [[ "${NAT_STATE}" == "null" ]]; then
+      PLAN+=("ADD_NAT_TO_ROUTER")
+    fi
+  fi
+  # If cloudRouter needs creation, NAT is added within that function's flow.
+fi
+
+# Special handling for dataprocCluster
 if [[ " ${INTENDED[*]} " =~ " dataprocCluster " ]]; then
-  cluster_state=$(get_state "dataprocCluster")
-  if [[ "${cluster_state}" == "null" ]]; then
+  if needs_create "dataprocCluster"; then
     PLAN+=("CREATE_dataprocCluster")
   else
-    # Cluster exists, check if it matches the image intent
-    existing_image_uri=$(echo "${cluster_state}" | jq -r '.config.masterConfig.imageUri // empty')
-    existing_image_version=$(echo "${cluster_state}" | jq -r '.config.softwareConfig.imageVersion // empty')
-
-    if [[ "${IS_CUSTOM}" == "true" ]]; then
-      if [[ "${existing_image_uri}" != "${CUSTOM_IMAGE_URI}" ]]; then
-        echo "INFO: Plan to recreate cluster: --custom specified, but existing image is not ${CUSTOM_IMAGE_URI}" >&2
-        PLAN+=("RECREATE_dataprocCluster")
-      fi
-    else # Not custom
-      if [[ -n "${existing_image_uri}" || "${existing_image_version}" != "${IMAGE_VERSION}" ]]; then
-         echo "INFO: Plan to recreate cluster: --no-custom specified, but existing cluster seems to use a custom image" >&2
-         PLAN+=("RECREATE_dataprocCluster")
-      fi
-    fi
+    echo "INFO: Dataproc Cluster '${CLUSTER_NAME}' already exists. Skipping creation." >&2
   fi
 fi
 
@@ -170,14 +179,14 @@ if [[ " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then create_gcs_bucket "${T
 if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " || " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then upload_init_actions; fi
 
 if [[ " ${PLAN[*]} " =~ " CREATE_vpcNetwork " ]]; then create_vpc_network; ensure_default_internet_route; fi
+if [[ " ${PLAN[*]} " =~ " ENSURE_DEFAULT_ROUTE " ]]; then ensure_default_internet_route; fi
 if [[ " ${PLAN[*]} " =~ " CREATE_standardSubnet " ]]; then create_subnet "${SUBNET}" "standardSubnet" "${RANGE}"; fi
 if [[ " ${PLAN[*]} " =~ " CREATE_privateSubnet " ]]; then source "${GCLOUD_DIR}/lib/swp/subnet.sh"; create_private_subnet; fi
 
-if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then 
+if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then
   create_router
   if [[ "${NAT_EGRESS}" == "true" ]]; then add_nat_to_router; fi
-elif [[ "${NAT_EGRESS}" == "true" && $(get_state "cloudRouter") != "null" ]]; then
-  # TODO: Check if nat-config is already on the router, beyond just router existence.
+elif [[ " ${PLAN[*]} " =~ " ADD_NAT_TO_ROUTER " ]]; then
   echo "INFO: NAT Egress enabled, ensuring NAT on existing router..."
   add_nat_to_router
 fi
@@ -185,21 +194,15 @@ fi
 if [[ " ${PLAN[*]} " =~ " CREATE_firewallRule-ssh " ]]; then create_firewall_rules; fi
 if [[ " ${PLAN[*]} " =~ " CREATE_autoscalingPolicy " ]]; then create_autoscaling_policy; fi
 
-# Cluster Deletion if RECREATE is in plan
-if [[ " ${PLAN[*]} " =~ " RECREATE_dataprocCluster " ]]; then
-  echo "Recreating cluster due to configuration mismatch..."
-  delete_dpgce_cluster
-  update_state "dataprocCluster" "null" # Ensure state is updated after delete
-fi
-
-# Cluster Creation if CREATE or RECREATE is in plan
-if [[ " ${PLAN[*]} " =~ " CREATE_dataprocCluster " || " ${PLAN[*]} " =~ " RECREATE_dataprocCluster " ]]; then
+# Cluster Creation if CREATE is in plan
+if [[ " ${PLAN[*]} " =~ " CREATE_dataprocCluster " ]]; then
   if [[ "${IS_PRIVATE}" == "true" ]]; then
     create_dpgce_private_cluster
   else
-    # create_dpgce_cluster is already sourced
     create_dpgce_cluster
   fi
+else
+  echo "INFO: Skipping cluster creation, already exists or not requested."
 fi
 
 # TODO: Implement SWP Egress setup if SWP_EGRESS is true
@@ -211,5 +214,6 @@ echo "Plan execution finished."
 
 # --- Final Audit ---
 print_status "Running final audit to update cache..."
-"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
 report_result "Done"
+port_result "Done"

@@ -43,6 +43,7 @@ function add_nat_to_router () {
     --auto-allocate-nat-external-ips; then
     report_result "Created"
     refresh_resource_state "cloudRouter" "lib/network/router.sh" exists_router
+    refresh_resource_state "cloudRouterNAT" "lib/network/router.sh" exists_router_nat "nat-config"
   else
     report_result "Fail"
     return 1
@@ -71,3 +72,10 @@ function delete_router () {
   fi
 }
 export -f delete_router
+
+function exists_router_nat() {
+  local nat_name="$1"
+  # gcloud compute routers nats describe returns non-zero if not found
+  _check_exists gcloud compute routers nats describe "${nat_name}" --router="${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}"
+}
+export -f exists_router_nat

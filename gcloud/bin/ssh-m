@@ -14,7 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
+
+source "${GCLOUD_DIR}/lib/env.sh"
 
 M_HOSTNAME="${CLUSTER_NAME}-m"
 # If the first argument is a number, treat it as the master index for HA

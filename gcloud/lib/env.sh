@@ -14,13 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Set RESOURCE_SUFFIX based on TIMESTAMP env var or generate new
+# --- Get lib's real directory ---
+LIB_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+GCLOUD_DIR="$(realpath "${LIB_DIR}/..")"
+export GCLOUD_DIR
 if [[ -n "${TIMESTAMP}" ]]; then
+  export TIMESTAMP
   export RESOURCE_SUFFIX="${TIMESTAMP}"
-  echo "Using provided TIMESTAMP for resources: ${RESOURCE_SUFFIX}" >&2
 else
-  export RESOURCE_SUFFIX="$(date +%s)"
-  echo "Generated new TIMESTAMP for resources: ${RESOURCE_SUFFIX}" >&2
+  export TIMESTAMP="$(date +%s)"
+  export RESOURCE_SUFFIX="${TIMESTAMP}"
 fi
 export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${RESOURCE_SUFFIX}}"
 mkdir -p "${REPRO_TMPDIR}"

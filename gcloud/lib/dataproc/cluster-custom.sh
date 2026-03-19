@@ -117,7 +117,7 @@ function create_dpgce_cluster() {
 #    --num-masters=1
 #    --num-workers=2
     --master-accelerator "type=${M_ACCELERATOR_TYPE}"
-  #  --worker-accelerator "type=${PRIMARY_ACCELERATOR_TYPE}"
+#    --worker-accelerator "type=${PRIMARY_ACCELERATOR_TYPE}"
   #  --secondary-worker-accelerator "type=${SECONDARY_ACCELERATOR_TYPE}"
     --master-machine-type "${M_MACHINE_TYPE}"
  #   --worker-machine-type "${PRIMARY_MACHINE_TYPE}"

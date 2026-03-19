@@ -7,13 +7,52 @@
 # Exit on failure
 set -e
 
-export TIMESTAMP=$(date +%s)
+# --- Argument Parsing ---
+ARG_TIMESTAMP=""
+while (( "$#" )); do
+  case "$1" in
+    --timestamp)
+      if [[ -n "$2" && "$2" != --* ]]; then
+        ARG_TIMESTAMP="$2"
+        shift 2
+      else
+        echo "Error: --timestamp requires an argument" >&2
+        exit 1
+      fi
+      ;;
+    -*)
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *)
+      # Ignore other params
+      shift
+      ;;
+  esac
+done
+
+export ARG_TIMESTAMP
 
 # --- Get script's real directory ---
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 export GCLOUD_DIR
+
+# --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
+
+# Override TIMESTAMP if provided as an argument
+if [[ -n "${ARG_TIMESTAMP}" ]]; then
+  export TIMESTAMP="${ARG_TIMESTAMP}"
+  # Re-set variables derived from TIMESTAMP
+  export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+  export LOG_DIR="${REPRO_TMPDIR}/logs"
+  export STATE_DB="${REPRO_TMPDIR}/state.db"
+  mkdir -p "${REPRO_TMPDIR}"
+  mkdir -p "${LOG_DIR}"
+  echo "Using provided TIMESTAMP for resources: ${TIMESTAMP}" >&2
+fi
+
 source "${GCLOUD_DIR}/lib/script-utils.sh"
 
 # Initialize the state database and table
@@ -33,7 +72,16 @@ run_check() {
   local cmd_out="${AUDIT_TEMP_DIR}/${key}.json"
 
   (
-    source "${GCLOUD_DIR}/${source_file}"
+    cd "${GCLOUD_DIR}"
+    source "./lib/env.sh" # Ensure env vars are set in subshell
+    if [[ -n "${ARG_TIMESTAMP}" ]]; then # Re-apply override if needed
+      export TIMESTAMP="${ARG_TIMESTAMP}"
+      export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+      export LOG_DIR="${REPRO_TMPDIR}/logs"
+      export STATE_DB="${REPRO_TMPDIR}/state.db"
+    fi
+    source "./lib/script-utils.sh"
+    source "./${source_file}" # Relative to GCLOUD_DIR
     "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
   ) &
   PIDS+=($!)
@@ -46,6 +94,15 @@ run_shared_check() {
   shift 2
   local cmd_out="${AUDIT_TEMP_DIR}/${key}.json"
   (
+    cd "${GCLOUD_DIR}"
+    source "./lib/env.sh" # Ensure env vars are set in subshell
+    if [[ -n "${ARG_TIMESTAMP}" ]]; then # Re-apply override if needed
+      export TIMESTAMP="${ARG_TIMESTAMP}"
+      export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+      export LOG_DIR="${REPRO_TMPDIR}/logs"
+      export STATE_DB="${REPRO_TMPDIR}/state.db"
+    fi
+    source "./lib/script-utils.sh"
     "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
   ) &
   PIDS+=($!)
@@ -61,8 +118,9 @@ run_check "standardSubnet" "lib/network/subnet.sh" exists_subnet "${SUBNET}"
 run_check "privateSubnet" "lib/network/subnet.sh" exists_subnet "${PRIVATE_SUBNET}"
 run_check "swpSubnet" "lib/network/subnet.sh" exists_subnet "${SWP_SUBNET}"
 run_check "cloudRouter" "lib/network/router.sh" exists_router
-run_check "firewallRule-ssh" "lib/swp/firewall.sh" exists_firewall_rule "${FIREWALL}-in-ssh"
-run_check "firewallRule-internal" "lib/swp/firewall.sh" exists_firewall_rule "${FIREWALL}-in-internal"
+run_check "cloudRouterNAT" "lib/network/router.sh" exists_router_nat "nat-config"
+run_check "firewallRule-ssh" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CLUSTER_NAME}-in-ssh"
+run_check "firewallRule-internal" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CLUSTER_NAME}-in-internal"
 run_shared_check "routes" _check_exists gcloud compute routes list --project="${PROJECT_ID}" --filter="network~/${NETWORK}$" --format="json(name,selfLink)"
 run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
 run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
@@ -101,8 +159,7 @@ for pid in "${PIDS[@]}"; do
   wait "${pid}" || true # Ignore errors from wait
 done
 
-echo "
-Populating SQLite Database..."
+echo "Populating SQLite Database..."
 # Populate STATE_DB from temp files
 for key_file in $(find "${AUDIT_TEMP_DIR}" -type f -name "*.json"); do
   key=$(basename "${key_file}" .json)
@@ -154,6 +211,7 @@ print_resource_status "Standard Subnet (${SUBNET})" "standardSubnet"
 print_resource_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
 print_resource_status "SWP Subnet (${SWP_SUBNET})" "swpSubnet"
 print_resource_status "Cloud Router (${ROUTER_NAME})" "cloudRouter"
+print_resource_status "Cloud NAT (nat-config)" "cloudRouterNAT"
 print_resource_status "Firewall Rule (SSH)" "firewallRule-ssh"
 print_resource_status "Firewall Rule (Internal)" "firewallRule-internal"
 print_resource_status "Service Account (${GSA})" "serviceAccount"
@@ -195,7 +253,10 @@ if [[ "${routes}" == "null" || "${routes}" == "[]" || -z "${routes}" ]]; then
   report_audit_status "Not Found"
 else
   # Check if the JSON array is not empty
-  routes_len=$(echo "${routes}" | /usr/bin/jq '. | length')
+  tmp_routes_file="${AUDIT_TEMP_DIR}/routes.json.tmp"
+  echo "${routes}" > "${tmp_routes_file}"
+  routes_len=$(/usr/bin/jq '. | length' "${tmp_routes_file}")
+  rm "${tmp_routes_file}"
   if [[ "${routes_len}" -gt 0 ]]; then
     report_audit_status "Exists"
   else
