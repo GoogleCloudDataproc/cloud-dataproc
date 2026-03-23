@@ -105,8 +105,17 @@ function create_service_account() {
     fi
   done
 
-  # Verify bindings
-  local bindings_ok=$(check_service_account_bindings)
+  # Verify bindings with retries
+  local bindings_ok="false"
+  local attempts=0
+  while [[ "${bindings_ok}" != "true" && ${attempts} -lt 5 ]]; do
+    attempts=$((attempts + 1))
+    bindings_ok=$(check_service_account_bindings)
+    if [[ "${bindings_ok}" != "true" ]]; then
+      echo "  DEBUG: Role bindings not ready, attempt ${attempts}/5. Waiting 10s..." >&2
+      sleep 10
+    fi
+  done
   update_state "serviceAccountBindings" "$(get_service_account_bindings)"
   update_state "serviceAccountRolesReady" "${bindings_ok}"
 

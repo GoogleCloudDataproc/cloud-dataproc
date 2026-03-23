@@ -66,6 +66,11 @@ source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
 source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh"
 
+# Source SWP functions
+for swp_script in $(ls "${GCLOUD_DIR}/lib/swp/"*.sh); do
+  source "${swp_script}"
+done
+
 # --- Main Logic ---
 configure_gcloud
 init_state_db
@@ -95,11 +100,8 @@ display_status "GCS Bucket (${BUCKET})" "gcsBucket"
 display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
 display_status "VPC Network (${NETWORK})" "vpcNetwork"
 display_status "Standard Subnet (${SUBNET})" "standardSubnet"
-if [[ "${IS_PRIVATE}" == "true" ]]; then
-  display_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
-fi
 display_status "Cloud Router" "cloudRouter"
-if [[ "${NAT_EGRESS}" == "true" ]]; then
+if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "null" ]]; then
   display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
 fi
 display_status "Firewall Rules" "firewallRule-ssh" # Assuming this key represents all base rules
@@ -107,8 +109,36 @@ display_status "Autoscaling Policy" "autoscalingPolicy"
 if [[ "${CREATE_CLUSTER}" == "true" ]]; then
   display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
 fi
-echo "----------------------------------------------"
 
+# SWP Resources
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "null" ]]; then
+  display_status "SWP Subnet" "swpSubnet"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCaPool") != "null" ]]; then
+  display_status "SWP CA Pool" "swpCaPool"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpRootCa") != "null" ]]; then
+  display_status "SWP Root CA" "swpRootCa"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCic") != "null" ]]; then
+  display_status "SWP CIC" "swpCic"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpManagedCertificate") != "null" ]]; then
+  display_status "SWP Managed Certificate" "swpManagedCertificate"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpPolicy") != "null" ]]; then
+  display_status "SWP Policy" "swpPolicy"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "null" ]]; then
+  display_status "SWP Gateway" "swpGateway"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallIngress") != "null" ]]; then
+  display_status "SWP Firewall Ingress" "swpFirewallIngress"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallInternal") != "null" ]]; then
+  display_status "SWP Firewall Internal" "swpFirewallInternal"
+fi
+echo "----------------------------------------------"
 # --- Determine Intended State & Generate Plan ---
 PLAN=()
 INTENDED=()
@@ -118,7 +148,9 @@ INTENDED+=("serviceAccount" "gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSu
 
 if [[ "${IS_PRIVATE}" == "true" ]]; then
   INTENDED+=("privateSubnet")
-  # TODO: Add SWP components to INTENDED
+fi
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  INTENDED+=("swpSubnet" "swpPolicy" "swpCaPool" "swpManagedCertificate" "swpGateway" "swpFirewallIngress" "swpFirewallInternal")
 fi
 if [[ "${CREATE_CLUSTER}" == "true" ]]; then
   INTENDED+=("dataprocCluster")
@@ -179,6 +211,12 @@ for action in "${PLAN[@]}"; do
 done
 echo "----------------------"
 
+# --- Set derived resource names for SWP ---
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  export SWP_CERT_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/certificates/swp-cert-${CLUSTER_NAME}-${TIMESTAMP}"
+  export SWP_POLICY_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/gatewaySecurityPolicies/${SWP_POLICY_NAME}"
+fi
+
 # --- Plan Execution ---
 echo "Executing plan..."
 
@@ -193,7 +231,16 @@ if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " || " ${PLAN[*]} " =~ " CREATE_gcsTe
 if [[ " ${PLAN[*]} " =~ " CREATE_vpcNetwork " ]]; then create_vpc_network; ensure_default_internet_route; fi
 if [[ " ${PLAN[*]} " =~ " ENSURE_DEFAULT_ROUTE " ]]; then ensure_default_internet_route; fi
 if [[ " ${PLAN[*]} " =~ " CREATE_standardSubnet " ]]; then create_subnet "${SUBNET}" "standardSubnet" "${RANGE}"; fi
-if [[ " ${PLAN[*]} " =~ " CREATE_privateSubnet " ]]; then source "${GCLOUD_DIR}/lib/swp/subnet.sh"; create_private_subnet; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_privateSubnet " ]]; then create_private_subnet; fi
+
+# SWP Resources
+if [[ " ${PLAN[*]} " =~ " CREATE_swpSubnet " ]]; then create_swp_subnet; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpPolicy " ]]; then create_gateway_security_policy; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpCaPool " ]]; then create_managed_certificate; fi # This creates CaPool, RootCa, and CIC
+if [[ " ${PLAN[*]} " =~ " CREATE_swpManagedCertificate " ]]; then create_managed_certificate; fi # This is likely redundant if CaPool is created
+if [[ " ${PLAN[*]} " =~ " CREATE_swpGateway " ]]; then create_swp_gateway; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpFirewallIngress " ]]; then create_allow_swp_ingress_rule; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpFirewallInternal " ]]; then create_allow_internal_subnets_rule; fi
 
 if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then
   create_router
@@ -215,11 +262,6 @@ if [[ " ${PLAN[*]} " =~ " CREATE_dataprocCluster " ]]; then
   fi
 else
   echo "INFO: Skipping cluster creation, already exists or not requested."
-fi
-
-# TODO: Implement SWP Egress setup if SWP_EGRESS is true
-if [[ "${SWP_EGRESS}" == "true" ]]; then
-  echo "WARNING: SWP Egress setup is not yet implemented." >&2
 fi
 
 echo "Plan execution finished."

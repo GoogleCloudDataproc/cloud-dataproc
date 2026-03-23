@@ -96,9 +96,6 @@ display_status "GCS Bucket (${BUCKET})" "gcsBucket"
 display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
 display_status "VPC Network (${NETWORK})" "vpcNetwork"
 display_status "Standard Subnet (${SUBNET})" "standardSubnet"
-if [[ "${IS_PRIVATE}" == "true" || $(get_state "privateSubnet") != "null" ]]; then
-  display_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
-fi
 if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "null" ]]; then
   display_status "SWP Subnet (${SWP_SUBNET})" "swpSubnet"
 fi
@@ -106,7 +103,11 @@ display_status "Cloud Router" "cloudRouter"
 if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "null" ]]; then
   display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "null" || $(get_state "swpCaPool") != "null" ]]; then
+    display_status "SWP CA Pool" "swpCaPool"
+    display_status "SWP Root CA" "swpRootCa"
+    display_status "SWP CIC" "swpCic"
+    display_status "SWP Managed Certificate" "swpManagedCertificate"
     display_status "SWP Gateway (${SWP_INSTANCE_NAME})" "swpGateway"
     display_status "SWP Policy (${SWP_POLICY_NAME})" "swpPolicy"
     display_status "SWP Firewall (Ingress)" "swpFirewallIngress"
@@ -130,9 +131,14 @@ exists() {
 # Order matters for dependencies
 if exists "dataprocCluster"; then PLAN+=("DELETE_dataprocCluster"); fi
 if exists "phsCluster"; then PLAN+=("DELETE_phsCluster"); fi
-if exists "dpgkeCluster"; then PLAN+=("DELETE_dpgkeCluster"); fi
-if exists "gkeCluster"; then PLAN+=("DELETE_gkeCluster"); fi
 if exists "autoscalingPolicy"; then PLAN+=("DELETE_autoscalingPolicy"); fi
+
+# Warning for GKE resources - DO NOT DELETE IN THIS SCRIPT
+GKE_RESOURCES_FOUND=false
+if exists "dpgkeCluster" || exists "gkeCluster"; then
+  GKE_RESOURCES_FOUND=true
+fi
+
 
 if exists "anyNetworkVms"; then
   PLAN+=("DELETE_all_network_vms")
@@ -155,8 +161,6 @@ if exists "debugVms"; then PLAN+=("DELETE_debugVms"); fi
 
 # SWP Components
 if exists "swpGateway"; then PLAN+=("DELETE_swpGateway"); fi
-if exists "swpPolicy"; then PLAN+=("DELETE_swpPolicy"); fi
-if exists "swpManagedCertificate"; then PLAN+=("DELETE_swpManagedCertificate"); fi
 if exists "swpFirewallIngress"; then PLAN+=("DELETE_swpFirewallIngress"); fi
 if exists "swpFirewallInternal"; then PLAN+=("DELETE_swpFirewallInternal"); fi
 
@@ -173,12 +177,20 @@ if exists "vpcNetwork"; then PLAN+=("DELETE_vpcNetwork"); fi
 # Other Resources
 if exists "serviceAccount"; then PLAN+=("DELETE_serviceAccount"); fi
 
+# Persistent resources requiring --force to delete
+PROTECTED_RESOURCES_EXIST=false
+if exists "gcsBucket" || exists "gcsTempBucket" || exists "swpCaPool" || exists "swpRootCa" || exists "swpCic" || exists "swpManagedCertificate" || exists "swpPolicy"; then
+  PROTECTED_RESOURCES_EXIST=true
+fi
+
 if [[ "${FORCE_DELETE}" = true ]]; then
   if exists "gcsBucket"; then PLAN+=("DELETE_gcsBucket"); fi
   if exists "gcsTempBucket"; then PLAN+=("DELETE_gcsTempBucket"); fi
+  if exists "swpManagedCertificate"; then PLAN+=("DELETE_swpManagedCertificate"); fi
+  if exists "swpPolicy"; then PLAN+=("DELETE_swpPolicy"); fi
 else
-  if exists "gcsBucket" || exists "gcsTempBucket"; then
-    echo "INFO: Buckets exist but --force not specified, skipping bucket deletion."
+  if [[ "${PROTECTED_RESOURCES_EXIST}" = true ]]; then
+    echo "INFO: Persistent resources (Buckets, SWP Certs/Policy) exist but --force not specified, skipping their deletion."
   fi
 fi
 
@@ -200,8 +212,6 @@ for action in "${PLAN[@]}"; do
   case ${action} in
     DELETE_dataprocCluster) delete_dpgce_cluster ;;
     DELETE_phsCluster) delete_phs_cluster ;;
-    DELETE_dpgkeCluster) delete_dpgke_cluster ;;
-    DELETE_gkeCluster) delete_gke_cluster ;;
     DELETE_autoscalingPolicy) delete_autoscaling_policy ;;
     DELETE_all_network_vms) delete_all_network_vms ;;
     DELETE_kdcServer) delete_kdc_server ;;
@@ -251,3 +261,8 @@ done
 echo "========================================"
 echo "DPGCE Environment teardown complete"
 echo "========================================"
+
+if [[ "${GKE_RESOURCES_FOUND}" == "true" ]]; then
+  echo -e "\n${YELLOW}WARNING:${NC} GKE-specific resources were detected but NOT deleted."
+  echo -e "Please run ${BLUE}bash bin/destroy-dpgke${NC} to clean up GKE components."
+fi

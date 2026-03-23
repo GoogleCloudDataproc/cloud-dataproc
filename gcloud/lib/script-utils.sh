@@ -34,6 +34,50 @@ function report_audit_status() {
 }
 export -f report_audit_status
 
+function configure_gcloud() {
+  local cache_file="${HOME}/.config/gcloud/dpgce_config_cache_ts.txt"
+  local cache_ttl=300 # 5 minutes
+
+  if [[ -f "${cache_file}" ]]; then
+    local last_run=$(cat "${cache_file}")
+    local now=$(date +%s)
+    if (( now - last_run < cache_ttl )); then
+      # echo "DEBUG: gcloud config cache hit" >&2
+      return 0
+    fi
+  fi
+  # echo "DEBUG: gcloud config cache miss" >&2
+
+  print_status "Checking gcloud config..."
+  local account=$(gcloud config get-value account 2> /dev/null)
+  local project=$(gcloud config get-value project 2> /dev/null)
+  local region=$(gcloud config get-value compute/region 2> /dev/null)
+  local zone=$(gcloud config get-value compute/zone 2> /dev/null)
+
+  if [[ -z "${account}" || -z "${project}" || -z "${region}" || -z "${zone}" ]]; then
+    echo -e "${RED}GCLOUD NOT CONFIGURED:${NC}" >&2
+    echo "Please run the following commands:" >&2
+    echo "  gcloud config set account <YOUR_ACCOUNT>" >&2
+    echo "  gcloud config set project <YOUR_PROJECT>" >&2
+    echo "  gcloud config set compute/region <YOUR_REGION>" >&2
+    echo "  gcloud config set compute/zone <YOUR_ZONE>" >&2
+    exit 1
+  fi
+
+  # Check for reauthentication error
+  if ! gcloud projects describe "${project}" > /dev/null 2>&1; then
+      echo -e "
+  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}" >&2
+      echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
+      exit 1
+  fi
+
+  # Update cache timestamp
+  date +%s > "${cache_file}"
+  report_result "Pass"
+}
+export -f configure_gcloud
+
 # Usage: run_gcloud <log_file_name> <gcloud command ...>
 function run_gcloud() {
   local log_file_name=$1
@@ -50,7 +94,7 @@ function run_gcloud() {
   if [[ ${exit_code} -ne 0 ]]; then
     if grep -q -e "Reauthentication failed" -e "gcloud auth login" -e "gcloud config set account" "${log_file}"; then
       echo -e "
-  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}"
+  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}" >&2
       echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
       exit 1
     fi
@@ -114,12 +158,7 @@ export -f parse_args
 # --- State Management Functions ---
 function init_state_db() {
     local db_file="${STATE_DB}"
-    # local db_file="${STATE_DB}"
-    if [[ ! -f "${db_file}" ]]; then
-        sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);"
-        # Old schema, for reference:
-        # sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS resource_state (key TEXT PRIMARY KEY, json_data TEXT);"
-    fi
+    sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);"
 }
 export -f init_state_db
 
@@ -191,24 +230,37 @@ export -f refresh_resource_state
 # They return a JSON object with details if a resource is found, or the string "null".
 # Call this with command and arguments as separate words, not a single string.
 function _check_exists() {
-    # echo "DEBUG _check_exists called with: $@" >&2
     local json_output
-    # Execute the command, capturing stdout. Stderr is suppressed.
-    json_output=$("$@" 2> /dev/null)
-    local exit_code=$?
-    # echo "DEBUG INSIDE _check_exists:" >&2
-    # echo "DEBUG CMD: $@" >&2
-    # echo "DEBUG EXIT CODE: ${exit_code}" >&2
-    # echo "DEBUG JSON OUTPUT: ${json_output}" >&2
+    local exit_code=1
+    local attempts=0
+    local max_attempts=3
+    local delay=2
 
-    if [[ ${exit_code} -eq 0 && -n "${json_output}" && "${json_output}" != "[]" ]]; then
-        # If the command was successful and output is not empty or an empty JSON array, resource exists.
-        # echo "DEBUG _check_exists: Returning JSON" >&2
-        echo "${json_output}"
-    else
-        # Otherwise, resource does not exist or an error occurred.
-        # echo "DEBUG _check_exists: Returning null" >&2
-        echo "null"
-    fi
+    # echo "DEBUG _check_exists called with: $@" >&2
+
+    while [[ ${attempts} -lt ${max_attempts} ]]; do
+        attempts=$((attempts + 1))
+        json_output=$("$@" 2> /dev/null)
+        exit_code=$?
+        # echo "DEBUG INSIDE _check_exists (Attempt ${attempts}):" >&2
+        # echo "DEBUG CMD: $@" >&2
+        # echo "DEBUG EXIT CODE: ${exit_code}" >&2
+        # echo "DEBUG JSON OUTPUT: ${json_output}" >&2
+
+        if [[ ${exit_code} -eq 0 && -n "${json_output}" && "${json_output}" != "[]" ]]; then
+            # echo "DEBUG _check_exists: Returning JSON" >&2
+            echo "${json_output}"
+            return 0
+        fi
+
+        if [[ ${attempts} -lt ${max_attempts} ]]; then
+            # echo "DEBUG _check_exists: Attempt ${attempts} failed, retrying in ${delay}s..." >&2
+            sleep ${delay}
+        fi
+    done
+
+    # echo "DEBUG _check_exists: Returning null after ${max_attempts} attempts" >&2
+    echo "null"
+    return 1 # Technically the last exit_code, but we return 1 to indicate not found
 }
 export -f _check_exists

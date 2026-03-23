@@ -31,10 +31,20 @@ function create_dpgce_cluster() {
     "rapids-runtime=SPARK"
     "bigtable-instance=${BIGTABLE_INSTANCE}"
     "include-gpus=1"
-#    "http-proxy=${SWP_IP}:${SWP_PORT}"
-#    "https-proxy=${SWP_IP}:${SWP_PORT}"
-#    "proxy-uri=${SWP_IP}:${SWP_PORT}"
   )
+
+  local init_actions=()
+  if [[ "${SWP_EGRESS}" == "true" ]]; then
+    metadata_array+=(
+      "http-proxy=${SWP_IP}:${SWP_PORT}"
+      "https-proxy=${SWP_IP}:${SWP_PORT}"
+      "proxy-uri=${SWP_IP}:${SWP_PORT}"
+      "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
+    )
+    if [[ -n "${GCE_PROXY_SETUP_URI}" ]]; then
+      init_actions+=("${GCE_PROXY_SETUP_URI}")
+    fi
+  fi
 
   local all_metadata
   all_metadata="$(IFS='|'; echo "${metadata_array[*]}")"
@@ -60,12 +70,28 @@ function create_dpgce_cluster() {
     --enable-component-gateway
     --metadata "${all_metadata}"
     --no-shielded-secure-boot
-    --image-version "${IMAGE_VERSION}"
+    # NO --image or --image-version here
     --initialization-action-timeout 90m
     --optional-components "DOCKER,JUPYTER"
     --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog"
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   )
+
+  if [[ ${#init_actions[@]} -gt 0 ]]; then
+    gcloud_cmd+=(--initialization-actions "$(IFS=,; echo "${init_actions[*]}")")
+  fi
+
+  if [[ "${IS_CUSTOM}" == "true" ]]; then
+    if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+      echo "ERROR: --custom flag is set but CUSTOM_IMAGE_URI is not defined in env.json" >&2
+      exit 1
+    fi
+    gcloud_cmd+=(--image "${CUSTOM_IMAGE_URI}")
+    echo "INFO: Using Custom Image URI: ${CUSTOM_IMAGE_URI}"
+  else
+    gcloud_cmd+=(--image-version "${IMAGE_VERSION}")
+     echo "INFO: Using Image Version: ${IMAGE_VERSION}"
+  fi
 
   if [[ "${GCLOUD_QUIET}" != "true" ]]; then
     echo

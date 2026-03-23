@@ -14,10 +14,13 @@ name: ${policy_full_name}
 description: "Allow all policy for SWP"
 EOF
 )
-  if echo "${policy_yaml}" | run_gcloud "${log_file}" gcloud network-security gateway-security-policies import "${policy_name}" \
-    --location="${region}" \
-    --project="${project_id}" \
-    --source=-; then
+  local policy_cmd=(
+    gcloud network-security gateway-security-policies import "${policy_name}"
+    --location="${region}"
+    --project="${project_id}"
+    --source=-
+  )
+  if echo "${policy_yaml}" | run_gcloud "${log_file}" "${policy_cmd[@]}"; then
     report_result "Created"
   else
     report_result "Fail"
@@ -35,17 +38,21 @@ basicProfile: ALLOW
 sessionMatcher: "host() != 'none'"
 EOF
 )
-  if echo "${rule_yaml}" | run_gcloud "${rule_log_file}" gcloud network-security gateway-security-policies rules import "${rule_name}" \
-    --gateway-security-policy="${policy_name}" \
-    --location="${region}" \
-    --project="${project_id}" \
-    --source=-; then
+  local rule_cmd=(
+    gcloud network-security gateway-security-policies rules import "${rule_name}"
+    --gateway-security-policy="${policy_name}"
+    --location="${region}"
+    --project="${project_id}"
+    --source=-
+  )
+  if echo "${rule_yaml}" | run_gcloud "${rule_log_file}" "${rule_cmd[@]}"; then
     report_result "Created"
   else
     report_result "Fail"
     return 1
   fi
   export SWP_POLICY_URI_PARTIAL="${policy_full_name}"
+  refresh_resource_state "swpPolicy" "lib/swp/policy.sh" exists_gateway_security_policy "${policy_name}" "${region}" "${project_id}"
 }
 export -f create_gateway_security_policy
 
@@ -53,7 +60,7 @@ function exists_gateway_security_policy() {
   local policy_name="${1:-${SWP_POLICY_NAME}}"
   local region="${2:-${REGION}}"
   local project_id="${3:-${PROJECT_ID}}"
-  _check_exists gcloud network-security gateway-security-policies describe "${policy_name}" --location="${region}" --project="${project_id}" --format="json(name)"
+  _check_exists gcloud network-security gateway-security-policies export "${policy_name}" --location="${region}" --project="${project_id}"
 }
 export -f exists_gateway_security_policy
 
@@ -67,17 +74,23 @@ function delete_gateway_security_policy() {
   local policy_log="delete_swp_policy_${policy_name}.log"
   
   print_status "  Deleting rule ${rule_name}..."
-  run_gcloud "${rule_log}" gcloud network-security gateway-security-policies rules delete "${rule_name}" \
-    --gateway-security-policy="${policy_name}" \
-    --location="${region}" \
-    --project="${project_id}" \
+  local del_rule_cmd=(
+    gcloud network-security gateway-security-policies rules delete "${rule_name}"
+    --gateway-security-policy="${policy_name}"
+    --location="${region}"
+    --project="${project_id}"
     --quiet
+  )
+  run_gcloud "${rule_log}" "${del_rule_cmd[@]}"
 
   print_status "  Deleting policy ${policy_name}..."
-  if run_gcloud "${policy_log}" gcloud network-security gateway-security-policies delete "${policy_name}" \
-    --location="${region}" \
-    --project="${project_id}" \
-    --quiet; then
+  local del_policy_cmd=(
+    gcloud network-security gateway-security-policies delete "${policy_name}"
+    --location="${region}"
+    --project="${project_id}"
+    --quiet
+  )
+  if run_gcloud "${policy_log}" "${del_policy_cmd[@]}"; then
     report_result "Deleted"
   else
     report_result "Fail"

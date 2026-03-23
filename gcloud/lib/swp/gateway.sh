@@ -4,16 +4,20 @@ function create_swp_gateway() {
   local swp_instance_name="${1:-${SWP_INSTANCE_NAME}}"
   local region="${2:-${REGION}}"
   local network_name="${3:-${NETWORK}}"
-  local client_subnet_name="${4:-${PRIVATE_SUBNET}}"
+  # client_subnet_name is not used for the gateway resource itself
   local certificate_url="${5:-${SWP_CERT_URI_PARTIAL}}"
   local gateway_security_policy_url="${6:-${SWP_POLICY_URI_PARTIAL}}"
   local project_id="${7:-${PROJECT_ID}}"
+  local swp_full_name="projects/${project_id}/locations/${region}/gateways/${swp_instance_name}"
+
+  echo "DEBUG: certificate_url: ${certificate_url}" >&2
+  echo "DEBUG: gateway_security_policy_url: ${gateway_security_policy_url}" >&2
+
   print_status "Creating SWP Gateway ${swp_instance_name}..."
   local log_file="create_swp_gateway_${swp_instance_name}.log"
   local swp_address="${SWP_IP}"
   local full_network_name="projects/${project_id}/global/networks/${network_name}"
-  local full_client_subnet_name="projects/${project_id}/regions/${region}/subnetworks/${client_subnet_name}"
-  local swp_full_name="projects/${project_id}/locations/${region}/gateways/${swp_instance_name}"
+  local full_client_subnet_name="projects/${project_id}/regions/${region}/subnetworks/${SUBNET}" # Client subnet
 
   gateway_yaml=$(cat << EOF
 name: ${swp_full_name}
@@ -31,10 +35,17 @@ scope: ${swp_instance_name}-scope
 routingMode: EXPLICIT_ROUTING_MODE
 EOF
 )
-  if echo "${gateway_yaml}" | run_gcloud "${log_file}" gcloud network-services gateways import "${swp_instance_name}" \
-    --source=- \
-    --location="${region}" --project="${project_id}"; then
+
+  local cmd=(
+    gcloud network-services gateways import "${swp_instance_name}"
+    --source=-
+    --location="${region}"
+    --project="${project_id}"
+  )
+
+  if echo "${gateway_yaml}" | run_gcloud "${log_file}" "${cmd[@]}"; then
     report_result "Created"
+    refresh_resource_state "swpGateway" "lib/swp/gateway.sh" exists_swp_gateway "${swp_instance_name}" "${region}" "${project_id}"
   else
     report_result "Fail"
     return 1

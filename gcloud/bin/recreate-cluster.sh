@@ -9,53 +9,62 @@ GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
+
+# SET TIMESTAMP for THIS run
+export TIMESTAMP=$(date +%s)
+export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+export LOG_DIR="${REPRO_TMPDIR}/logs"
+export STATE_DB="${REPRO_TMPDIR}/state.db"
+mkdir -p "${REPRO_TMPDIR}"
+mkdir -p "${LOG_DIR}"
+echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
+
 source "${GCLOUD_DIR}/lib/script-utils.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
-source "${GCLOUD_DIR}/lib/dataproc/cluster-custom.sh"
-source "${GCLOUD_DIR}/lib/dataproc/private-cluster.sh"
 source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 
-# --- Argument Parsing ---
-IS_CUSTOM=false
-IS_PRIVATE=false
+# --- Main Logic ---
+configure_gcloud
+init_state_db # Initialize the database for this run
 
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --custom) IS_CUSTOM=true ;;
-        --private) IS_PRIVATE=true ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
-    esac
-    shift
-done
+# --- Run an audit to load the current state of other resources ---
+print_status "Auditing environment to load state..."
+"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
+report_result "Done"
+
+# --- Load Stored Configuration from last create-dpgce run ---
+export IS_CUSTOM=$(get_state "config.isCustom")
+export NAT_EGRESS=$(get_state "config.natEgress")
+export SWP_EGRESS=$(get_state "config.swpEgress")
+
+# Default to false if not found in DB
+IS_CUSTOM=${IS_CUSTOM:-false}
+NAT_EGRESS=${NAT_EGRESS:-false}
+SWP_EGRESS=${SWP_EGRESS:-false}
+
+echo "INFO: Loaded configuration - IS_CUSTOM=${IS_CUSTOM}, NAT_EGRESS=${NAT_EGRESS}, SWP_EGRESS=${SWP_EGRESS}" >&2
 
 if (( DEBUG != 0 )); then
   set -x
 fi
 
-# --- Main Logic ---
-configure_gcloud
-
 echo "========================================"
 echo "Starting DPGCE Cluster Recreation"
 echo "========================================"
 
-# Attempt to delete the cluster, any errors will be logged by delete_dpgce_cluster
 print_status "Attempting to ensure any pre-existing cluster named '${CLUSTER_NAME}' is deleted..."
 delete_dpgce_cluster
 report_result "Done"
 
-# Re-create the cluster based on the flags provided
-if [[ "$IS_PRIVATE" == "true" ]]; then
-  create_dpgce_private_cluster "$@"
-else
-  create_dpgce_cluster "$@"
-fi
+# Re-create the cluster based on the loaded config
+print_status "Creating cluster ${CLUSTER_NAME}..."
+create_dpgce_cluster
 
 # After creation, run audit again to update state file with new resource details
-"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+print_status "Running final audit to update cache..."
+"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
+report_result "Done"
 
 echo "========================================"
 echo "DPGCE Cluster re-created"
 echo "========================================"
-# Display cluster details
-gcloud dataproc clusters describe "${CLUSTER_NAME}" --region="${REGION}" --format=json
