@@ -88,7 +88,7 @@ display_status() {
   local key="$2"
   local value=$(get_state "${key}")
   echo -n "- ${display_name}: "
-  if [[ "${value}" == "null" || "${value}" == "" ]]; then
+  if [[ "${value}" == "" ]]; then
     report_audit_status "Not Found"
   else
     report_audit_status "Exists"
@@ -97,7 +97,7 @@ display_status() {
 
 # Display status for all potentially relevant resources
 display_status "Service Account" "serviceAccount"
-if [[ $(get_state "serviceAccount") != "null" ]]; then
+if [[ $(get_state "serviceAccount") != "" ]]; then
   display_status "  Roles Ready" "serviceAccountRolesReady"
 fi
 display_status "GCS Bucket (${BUCKET})" "gcsBucket"
@@ -105,7 +105,7 @@ display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
 display_status "VPC Network (${NETWORK})" "vpcNetwork"
 display_status "Standard Subnet (${SUBNET})" "standardSubnet"
 display_status "Cloud Router" "cloudRouter"
-if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "null" ]]; then
+if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "" ]]; then
   display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
 fi
 display_status "Firewall Rules" "firewallRule-ssh" # Assuming this key represents all base rules
@@ -115,31 +115,31 @@ if [[ "${CREATE_CLUSTER}" == "true" ]]; then
 fi
 
 # SWP Resources
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "" ]]; then
   display_status "SWP Subnet" "swpSubnet"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCaPool") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCaPool") != "" ]]; then
   display_status "SWP CA Pool" "swpCaPool"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpRootCa") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpRootCa") != "" ]]; then
   display_status "SWP Root CA" "swpRootCa"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCic") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCic") != "" ]]; then
   display_status "SWP CIC" "swpCic"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpManagedCertificate") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpManagedCertificate") != "" ]]; then
   display_status "SWP Managed Certificate" "swpManagedCertificate"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpPolicy") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpPolicy") != "" ]]; then
   display_status "SWP Policy" "swpPolicy"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "" ]]; then
   display_status "SWP Gateway" "swpGateway"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallIngress") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallIngress") != "" ]]; then
   display_status "SWP Firewall Ingress" "swpFirewallIngress"
 fi
-if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallInternal") != "null" ]]; then
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallInternal") != "" ]]; then
   display_status "SWP Firewall Internal" "swpFirewallInternal"
 fi
 echo "----------------------------------------------"
@@ -151,7 +151,7 @@ INTENDED=()
 INTENDED+=("gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "cloudRouter" "firewallRule-ssh" "autoscalingPolicy" "defaultRoute")
 
 # Service Account and Roles are handled separately
-if [[ $(get_state "serviceAccount") == "null" ]]; then
+if [[ $(get_state "serviceAccount") == "" ]]; then
   PLAN+=("CREATE_serviceAccount")
   PLAN+=("ENSURE_serviceAccountRoles") # If we create it, we need to ensure roles
 elif [[ $(get_state "serviceAccountRolesReady") != "true" ]]; then
@@ -168,7 +168,7 @@ fi
 # Helper to check if a resource needs creation
 needs_create() {
   local key="$1"
-  [[ $(get_state "${key}") == "null" ]]
+  [[ $(get_state "${key}") == "" ]]
 }
 
 # Add to plan if resource is missing
@@ -181,19 +181,6 @@ for resource in "${INTENDED[@]}"; do
     continue
   fi
 
-  # SWP Certificate components are ALWAYS (re)created due to the TIMESTAMP in their name
-  if [[ "${SWP_EGRESS}" == "true" ]] && [[ "${resource}" == "swpCaPool" ]]; then
-    # Only need to trigger the creation function once for all cert-related resources
-    if ! [[ " ${PLAN[*]} " =~ " CREATE_swpCaPool " ]]; then
-      PLAN+=("CREATE_swpCaPool")
-    fi
-    continue
-  fi
-  # Skip adding other individual cert components to the plan as they are created by create_managed_certificate
-  if [[ "${SWP_EGRESS}" == "true" ]] && [[ "${resource}" == "swpRootCa" || "${resource}" == "swpCic" || "${resource}" == "swpManagedCertificate" ]]; then
-      continue
-  fi
-
   # For other resources, check if they need creation based on audit
   if needs_create "${resource}"; then
     PLAN+=("CREATE_${resource}")
@@ -203,9 +190,9 @@ done
 
 # NAT Egress logic
 if [[ "${NAT_EGRESS}" == "true" ]]; then
-  if [[ $(get_state "cloudRouter") != "null" ]]; then
+  if [[ $(get_state "cloudRouter") != "" ]]; then
     NAT_STATE=$(get_state "cloudRouterNAT")
-    if [[ "${NAT_STATE}" == "null" ]]; then
+    if [[ "${NAT_STATE}" == "" ]]; then
       PLAN+=("ADD_NAT_TO_ROUTER")
     fi
   fi
