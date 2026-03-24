@@ -29,6 +29,9 @@ function report_audit_status() {
   case "${status}" in
     Exists) echo -e " [${GREEN}Exists${NC}]" ;;
     "Not Found") echo -e " [${YELLOW}Not Found${NC}]" ;;
+    True) echo -e " [${GREEN}True${NC}]" ;;
+    False) echo -e " [${RED}False${NC}]" ;;
+    Done) echo -e " [${GREEN}Done${NC}]" ;;
     *) echo -e " [${YELLOW}${status}${NC}]" ;;
   esac
 }

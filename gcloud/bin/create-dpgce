@@ -88,7 +88,15 @@ display_status() {
   local key="$2"
   local value=$(get_state "${key}")
   echo -n "- ${display_name}: "
-  if [[ "${value}" == "" ]]; then
+  if [[ "${key}" == *RolesReady ]]; then
+    if [[ "${value}" == "true" ]]; then
+      report_audit_status "True"
+    elif [[ "${value}" == "false" ]]; then
+      report_audit_status "False"
+    else
+      report_audit_status "Unknown"
+    fi
+  elif [[ "${value}" == "" ]]; then
     report_audit_status "Not Found"
   else
     report_audit_status "Exists"
