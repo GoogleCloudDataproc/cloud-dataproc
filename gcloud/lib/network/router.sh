@@ -52,13 +52,16 @@ function add_nat_to_router () {
 export -f add_nat_to_router
 
 function delete_router () {
-  print_status "Deleting NAT from Router ${ROUTER_NAME}..."
-  local log_file="delete_nat_${ROUTER_NAME}.log"
-  # Don't fail if the NAT doesn't exist
-  run_gcloud "${log_file}" gcloud compute routers nats delete "nat-config" \
-    --router-region "${REGION}" \
-    --router "${ROUTER_NAME}" \
-    --project="${PROJECT_ID}" --quiet || true
+  if [[ $(get_state "cloudRouterNAT") != "null" ]]; then
+    print_status "Deleting NAT from Router ${ROUTER_NAME}..."
+    local log_file="delete_nat_${ROUTER_NAME}.log"
+    # Don't fail if the NAT doesn't exist in GCP, as state might be slightly stale
+    run_gcloud "${log_file}" gcloud compute routers nats delete "nat-config" \
+      --router-region "${REGION}" \
+      --router "${ROUTER_NAME}" \
+      --project="${PROJECT_ID}" --quiet || true
+    update_state "cloudRouterNAT" "null"
+  fi
 
   print_status "Deleting Router ${ROUTER_NAME}..."
   log_file="delete_router_${ROUTER_NAME}.log"

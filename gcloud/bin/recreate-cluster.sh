@@ -10,39 +10,38 @@ GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
 
-# SET TIMESTAMP for THIS run
-export TIMESTAMP=$(date +%s)
-export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
-export LOG_DIR="${REPRO_TMPDIR}/logs"
-export STATE_DB="${REPRO_TMPDIR}/state.db"
-mkdir -p "${REPRO_TMPDIR}"
-mkdir -p "${LOG_DIR}"
-echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
-
 source "${GCLOUD_DIR}/lib/script-utils.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
 source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 
 # --- Main Logic ---
 configure_gcloud
-init_state_db # Initialize the database for this run
+init_state_db # Initialize the database if it doesn't exist
 
-# --- Run an audit to load the current state of other resources ---
-print_status "Auditing environment to load state..."
-"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
-report_result "Done"
+# Load Stored Configuration from the state DB ---
+echo "INFO: Loading configuration from ${STATE_DB}" >&2
 
-# --- Load Stored Configuration from last create-dpgce run ---
 export IS_CUSTOM=$(get_state "config.isCustom")
 export NAT_EGRESS=$(get_state "config.natEgress")
 export SWP_EGRESS=$(get_state "config.swpEgress")
 
-# Default to false if not found in DB
+# Apply defaults if not set in state.db
 IS_CUSTOM=${IS_CUSTOM:-false}
-NAT_EGRESS=${NAT_EGRESS:-false}
+NAT_EGRESS=${NAT_EGRESS:-true}
 SWP_EGRESS=${SWP_EGRESS:-false}
 
+# Export the potentially modified values
+export IS_CUSTOM
+export NAT_EGRESS
+export SWP_EGRESS
+
 echo "INFO: Loaded configuration - IS_CUSTOM=${IS_CUSTOM}, NAT_EGRESS=${NAT_EGRESS}, SWP_EGRESS=${SWP_EGRESS}" >&2
+
+# --- Run an audit to refresh the current state of resources ---
+# The audit will use the same TIMESTAMP as defined in env.sh for its own logs
+print_status "Auditing environment to refresh state..."
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+report_result "Done"
 
 if (( DEBUG != 0 )); then
   set -x
@@ -62,7 +61,7 @@ create_dpgce_cluster
 
 # After creation, run audit again to update state file with new resource details
 print_status "Running final audit to update cache..."
-"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
 report_result "Done"
 
 echo "========================================"

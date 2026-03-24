@@ -23,7 +23,9 @@ export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/$(date +%s)}"
 mkdir -p "${REPRO_TMPDIR}"
 export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
 mkdir -p "${LOG_DIR}"
-export STATE_DB="${REPRO_TMPDIR}/state.db"
+export STATE_DIR="${GCLOUD_DIR}/.state"
+mkdir -p "${STATE_DIR}"
+export STATE_DB="${STATE_DIR}/state.db"
 
 
 source "${GCLOUD_DIR}/lib/script-utils.sh"
@@ -43,8 +45,6 @@ export CLUSTER_NAME="$(jq -r .CLUSTER_NAME "${GCLOUD_DIR}/env.json")"
 export BUCKET="$(jq -r .BUCKET "${GCLOUD_DIR}/env.json")"
 export TEMP_BUCKET="$(jq -r .TEMP_BUCKET "${GCLOUD_DIR}/env.json")"
 export RANGE="$(jq -r .RANGE "${GCLOUD_DIR}/env.json")"
-export PRIVATE_RANGE="$(jq -r .PRIVATE_RANGE "${GCLOUD_DIR}/env.json")"
-export PRIVATE_SUBNET="private-subnet-${CLUSTER_NAME}"
 export SWP_RANGE="$(jq -r .SWP_RANGE "${GCLOUD_DIR}/env.json")"
 export SWP_SUBNET="swp-subnet-${CLUSTER_NAME}"
 export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT "${GCLOUD_DIR}/env.json")"
@@ -94,6 +94,7 @@ else
 fi
 
 export INIT_ACTIONS_ROOT="gs://${BUCKET}/dataproc-initialization-actions"
+export GCE_PROXY_SETUP_URI="${INIT_ACTIONS_ROOT}/gce-proxy-setup.sh"
 export YARN_DOCKER_IMAGE="gcr.io/${PROJECT_ID}/${USER}/cudatest-ubuntu18:latest"
 export SPARK_PROPERTIES="spark:spark.yarn.unmanagedAM.enabled=false,spark:spark.task.resource.gpu.amount=1,spark:spark.executor.cores=1,spark:spark.task.cpus=1,spark:spark.executor.memory=4G"
 export DOCKER_PROPERTIES="dataproc:docker.yarn.enable=true"

@@ -26,7 +26,7 @@ function get_service_account_bindings() {
     gcloud projects get-iam-policy "${PROJECT_ID}"
     --format=json
   )
-  
+
   if ! "${cmd[@]}" > "${tmp_policy_file}" 2>/dev/null; then
     echo "null"
     rm -f "${tmp_policy_file}"
@@ -45,6 +45,7 @@ function get_service_account_bindings() {
 }
 export -f get_service_account_bindings
 
+# Returns "true" or "false"
 function check_service_account_bindings() {
   local bindings_json=$(get_service_account_bindings)
   if [[ "${bindings_json}" == "null" ]]; then
@@ -64,32 +65,35 @@ function check_service_account_bindings() {
 }
 export -f check_service_account_bindings
 
+# This function is called by the audit script
+function audit_service_account_roles() {
+  check_service_account_bindings
+}
+export -f audit_service_account_roles
+
 function create_service_account() {
-  print_status "Creating/Verifying Service Account ${GSA}..."
+  print_status "Creating Service Account ${GSA}..."
   local log_file="create_service_account_${SA_NAME}.log"
-  local sa_exists=false
 
-  if [[ $(exists_service_account) != "null" ]]; then
-    sa_exists=true
-    report_result "Exists"
-  else
-    local cmd=(
-      gcloud iam service-accounts create "${SA_NAME}"
-      --project="${PROJECT_ID}"
-      --description="Service account for use with cluster ${CLUSTER_NAME}"
-      --display-name="${SA_NAME}"
-    )
-    if ! run_gcloud "${log_file}" "${cmd[@]}"; then
-      report_result "Fail"
-      return 1
-    fi
+  local cmd=(
+    gcloud iam service-accounts create "${SA_NAME}"
+    --project="${PROJECT_ID}"
+    --description="Service account for use with cluster ${CLUSTER_NAME}"
+    --display-name="${SA_NAME}"
+  )
+  if run_gcloud "${log_file}" "${cmd[@]}"; then
     report_result "Created"
-    update_state "serviceAccount" "{"name": "${SA_NAME}"}" # Basic update
+    refresh_resource_state "serviceAccount" "lib/gcp/iam.sh" exists_service_account
     sleep 10 # Allow propagation
+  else
+    report_result "Fail"
+    return 1
   fi
+}
+export -f create_service_account
 
-  # Bind roles
-  print_status "  Ensuring roles for ${GSA}... "
+function ensure_service_account_roles() {
+  print_status "Ensuring roles for ${GSA}... "
   local all_roles_bound=true
   for role in "${ROLES[@]}"; do
     local role_log="bind_roles/bind_${role//\//_}_${SA_NAME}.log"
@@ -100,9 +104,8 @@ function create_service_account() {
       --condition=None
       --quiet
     )
-    if ! run_gcloud "${role_log}" "${cmd[@]}"; then
-      all_roles_bound=false
-    fi
+    # We don't care if the run_gcloud fails here, as the binding might already exist.
+    run_gcloud "${role_log}" "${cmd[@]}" > /dev/null 2>&1 || true
   done
 
   # Verify bindings with retries
@@ -112,8 +115,10 @@ function create_service_account() {
     attempts=$((attempts + 1))
     bindings_ok=$(check_service_account_bindings)
     if [[ "${bindings_ok}" != "true" ]]; then
-      echo "  DEBUG: Role bindings not ready, attempt ${attempts}/5. Waiting 10s..." >&2
-      sleep 10
+      if (( attempts > 1 )); then
+          echo "  DEBUG: Role bindings not fully ready, attempt ${attempts}/5. Waiting 10s..." >&2
+          sleep 10
+      fi
     fi
   done
   update_state "serviceAccountBindings" "$(get_service_account_bindings)"
@@ -127,7 +132,7 @@ function create_service_account() {
      return 1
   fi
 }
-export -f create_service_account
+export -f ensure_service_account_roles
 
 function delete_service_account() {
   print_status "Deleting Service Account ${GSA}... Element: serviceAccount"
@@ -158,14 +163,14 @@ function delete_service_account() {
   else
     report_result "No Bindings Found"
   fi
+  update_state "serviceAccountBindings" "null"
+  update_state "serviceAccountRolesReady" "null"
 
   print_status "Deleting service account ${GSA}..."
   local delete_cmd=(gcloud iam service-accounts delete --quiet "${GSA}")
   if run_gcloud "${log_file}" "${delete_cmd[@]}"; then
     report_result "Deleted"
     update_state "serviceAccount" "null"
-    update_state "serviceAccountBindings" "null"
-    update_state "serviceAccountRolesReady" "null"
   else
     report_result "Fail" # Fail the script if SA deletion fails and it wasn't a NOT_FOUND
     return 1

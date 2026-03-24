@@ -182,7 +182,7 @@ function get_state() {
     local resource_key=$1
     local db_file="${STATE_DB}"
     if [[ ! -f "${db_file}" ]]; then
-        echo "null"
+        echo ""
         return
     fi
     local result=$(sqlite3 "${db_file}" "SELECT value FROM state WHERE key = '${resource_key}';")

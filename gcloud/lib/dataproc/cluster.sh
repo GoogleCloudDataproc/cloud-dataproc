@@ -32,22 +32,17 @@ function create_dpgce_cluster() {
     "bigtable-instance=${BIGTABLE_INSTANCE}"
     "include-gpus=1"
   )
-
-  local init_actions=()
-  if [[ "${SWP_EGRESS}" == "true" ]]; then
-    metadata_array+=(
-      "http-proxy=${SWP_IP}:${SWP_PORT}"
-      "https-proxy=${SWP_IP}:${SWP_PORT}"
-      "proxy-uri=${SWP_IP}:${SWP_PORT}"
-      "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
-    )
-    if [[ -n "${GCE_PROXY_SETUP_URI}" ]]; then
-      init_actions+=("${GCE_PROXY_SETUP_URI}")
-    fi
-  fi
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  metadata_array+=(
+    "http-proxy=${SWP_IP}:${SWP_PORT}"
+    "https-proxy=${SWP_IP}:${SWP_PORT}"
+    "proxy-uri=${SWP_IP}:${SWP_PORT}"
+    "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
+  )
+fi
 
   local all_metadata
-  all_metadata="$(IFS='|'; echo "${metadata_array[*]}")"
+  all_metadata="$(IFS='^|^'; echo "${metadata_array[*]}")"
   all_metadata="^|^${all_metadata}"
 
   local gcloud_cmd=(
@@ -77,8 +72,8 @@ function create_dpgce_cluster() {
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   )
 
-  if [[ ${#init_actions[@]} -gt 0 ]]; then
-    gcloud_cmd+=(--initialization-actions "$(IFS=,; echo "${init_actions[*]}")")
+  if [[ "${SWP_EGRESS}" == "true" ]]; then
+    gcloud_cmd+=(--metadata-from-file "startup-script=${GCLOUD_DIR}/init/gce-proxy-setup.sh")
   fi
 
   if [[ "${IS_CUSTOM}" == "true" ]]; then
@@ -123,6 +118,6 @@ function delete_dpgce_cluster() {
 export -f delete_dpgce_cluster
 
 function exists_dataproc_cluster_vms() {
-  _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter="labels.goog-dataproc-cluster-name=${CLUSTER_NAME}" --format="json(name,zone,status)" | jq 'if . == [] then null else . end'
+  _check_exists gcloud compute instances list --project="${PROJECT_ID}" --filter="labels.goog-dataproc-cluster-name=${CLUSTER_NAME}" --format="json(name,zone,status)"
 }
 export -f exists_dataproc_cluster_vms

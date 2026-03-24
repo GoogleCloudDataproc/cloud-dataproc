@@ -22,9 +22,9 @@ This collection of bash scripts helps create and manage Google Cloud environment
 
 **Core Principles:**
 
-*   **Declarative & Idempotent:** The `create-dpgce` script is designed to be declarative. It audits the current state of the cloud environment and only creates missing resources to reach the desired state defined by the flags and `env.json`. It does not modify or delete existing resources, making it safe to re-run.
+*   **Declarative & Idempotent:** The `create-dpgce` script is designed to be declarative. It audits the current state of the cloud environment and only creates missing resources to reach the desired state defined by the flags and `env.json`.
 *   **Audit-Driven:** The `audit-dpgce` script is the foundation, performing a comprehensive, concurrent scan of the GCP environment to populate a local SQLite database (`state.db`).
-*   **Stateful Cache:** A local SQLite database (`/tmp/dataproc-repro/${TIMESTAMP}/state.db`) is used to cache the audit results, providing a consistent view for the other scripts.
+*   **Stateful Cache:** A local SQLite database (`${GCLOUD_DIR}/.state/state.db`) is used to cache the audit results and persist configuration flags between runs.
 *   **Modular:** Core logic is organized into functions within the `lib/` directory.
 
 ## Supported Scenarios
@@ -61,16 +61,13 @@ These scripts are designed to deploy and manage Dataproc clusters in various con
 
 The workflow centers around these main scripts:
 
-*   **`bin/audit-dpgce`**: Queries the live cloud environment to discover deployed resources and updates the local SQLite state cache. Typically called automatically by other scripts, but can be run manually to inspect the current state.
+*   **`bin/audit-dpgce`**: Queries the live cloud environment to discover deployed resources and updates the local SQLite state cache (`${GCLOUD_DIR}/.state/state.db`). Typically called automatically by other scripts, but can be run manually to inspect the current state.
 
-*   **`bin/create-dpgce`**: The idempotent creation script. It runs an audit, then creates only the resources that are defined in `env.json` and the passed flags but are missing in the cloud. 
-    *   It **does not** delete or modify existing resources.
-    *   If a cluster exists but doesn't match the image type (e.g., `--custom` is passed but a standard image is found), it will **not** modify the cluster.
-    *   Flags like `--nat-egress` or `--private` control the desired network architecture.
+*   **`bin/create-dpgce`**: The idempotent creation script. It runs an audit, stores the provided flags (e.g., `--custom`, `--nat-egress`) in the state cache, then generates and executes a plan to create any resources that are missing to achieve the desired state. It does not delete or modify existing resources if they are already present.
 
-*   **`bin/destroy-dpgce`**: The teardown script. It audits the environment and then de-provisions all discovered resources in a safe dependency order. Uses the state cache to know what to delete.
+*   **`bin/destroy-dpgce`**: The teardown script. It audits the environment and then de-provisions all discovered resources in a safe dependency order. Uses the state cache to know what to delete. Add `--force` to also delete GCS buckets and SWP policies/certificate authorities.
 
-*   **`bin/recreate-cluster.sh`**: Utility script to quickly delete and recreate just the Dataproc cluster VMs within an *already existing* environment. Useful for testing changes to init actions or cluster properties without tearing down the whole network.
+*   **`bin/recreate-cluster.sh`**: Utility script to quickly delete and recreate just the Dataproc cluster VMs. It loads the *last used* flags (`--custom`, `--nat-egress`, etc.) from the `${GCLOUD_DIR}/.state/state.db` to ensure the cluster is recreated with the same configuration. Useful for testing changes to init actions or cluster properties without tearing down the whole network.
 
 *   **`bin/ssh-m [node-index] [command...]`**: SSHes into the master node. Without arguments, it opens a shell. With arguments, it runs the command on the master node. Defaults to the first master (`-m`). If a number is provided as the first argument, it targets that index in an HA cluster (e.g., `bash bin/ssh-m 1` for `-m-1`).
 
@@ -78,22 +75,27 @@ The workflow centers around these main scripts:
 
 ### Example Usage
 
-*   **Create/Ensure Standard Environment & Cluster:**
+*   **Create Environment & Cluster with NAT:**
     ```bash
     bash bin/create-dpgce --nat-egress
     ```
 
-*   **Ensure Infrastructure for a Custom Image Cluster:**
+*   **Create Environment & Cluster with Custom Image and NAT:**
     ```bash
     bash bin/create-dpgce --nat-egress --custom
     ```
 
-*   **Tear Down All Environment Infrastructure:**
+*   **Recreate the Cluster (using last saved flags):**
     ```bash
-    bash bin/destroy-dpgce --nat-egress --custom
+    bash bin/recreate-cluster.sh
     ```
 
-*   **Tear Down Everything, Including GCS Buckets (DANGEROUS):**
+*   **Tear Down All Environment Infrastructure:**
+    ```bash
+    bash bin/destroy-dpgce
+    ```
+
+*   **Tear Down Everything, Including Persistent Resources (DANGEROUS):**
     ```bash
     bash bin/destroy-dpgce --force
     ```
@@ -110,17 +112,27 @@ The workflow centers around these main scripts:
 
 *   **Copy a file to the master node's /tmp:**
     ```bash
-    bash bin/scp-m my_script.sh /tmp/install_gpu_driver.sh
+    bash bin/scp-m my_script.sh
     ```
+
+### Default Behavior
+
+If `bin/create-dpgce` is run without any flags, it defaults to the following settings:
+
+*   `--no-custom`: Uses the standard image version.
+*   `--nat-egress`: Enables Cloud NAT for internet access.
+*   `--no-swp-egress`: Secure Web Proxy is disabled.
+*   A Dataproc cluster *will* be created.
 
 ### Common Flags for `create-dpgce`
 
-*   `--custom`: Expects the cluster to use the `CUSTOM_IMAGE_URI` from `env.json`.
-*   `--no-custom`: Expects the cluster to use the standard `IMAGE_VERSION` from `env.json`.
-*   `--private`: Sets up a private network (currently placeholder for SWP).
-*   `--nat-egress`: Ensures Cloud NAT is configured for internet egress.
-*   `--swp-egress`: (Work In Progress) Ensures SWP is configured for internet egress.
-*   `--no-create-cluster`: Sets up all networking and dependencies but skips the `gcloud dataproc clusters create` command.
+*   `--custom`: Use the `CUSTOM_IMAGE_URI` from `env.json` for the cluster.
+*   `--no-custom`: Use the standard `IMAGE_VERSION` from `env.json`.
+*   `--nat-egress`: Ensure Cloud NAT is configured for internet egress from the standard subnet.
+*   `--no-nat-egress`: Do not configure Cloud NAT.
+*   `--swp-egress`: (Work In Progress) Ensure Secure Web Proxy is configured for internet egress.
+*   `--no-swp-egress`: Do not configure Secure Web Proxy.
+*   `--no-create-cluster`: Set up all networking and dependencies but skip the `gcloud dataproc clusters create` command.
 
 ### Debugging
 
@@ -128,11 +140,4 @@ The workflow centers around these main scripts:
     ```bash
     DEBUG=1 bash bin/create-dpgce --nat-egress
     ```
-ud dataproc clusters create` command.
-
-### Debugging
-
-*   `DEBUG=1`: Set this environment variable before running any script to enable verbose debug output (`set -x`).
-    ```bash
-    DEBUG=1 bash bin/create-dpgce --nat-egress
-    ```
+*   Logs for each script run are stored in timestamped directories under `/tmp/dataproc-repro/`.

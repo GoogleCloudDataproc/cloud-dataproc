@@ -78,6 +78,7 @@ function grant_gcs_bucket_perms() {
   fi
 }
 
+
 function upload_init_actions() {
   if [[ -d init ]] ; then
     print_status "Copying init scripts to ${INIT_ACTIONS_ROOT}..."
