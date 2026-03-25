@@ -179,6 +179,16 @@ function exists_swp_managed_certificate() {
   local cert_prefix="swp-cert-${CLUSTER_NAME}-"
   # List certificates and filter
   gcloud certificate-manager certificates list --location="${region}" --project="${project_id}" --format="json(name,managed.state)" \
-    | jq --arg prefix "${cert_prefix}" 'if type == "array" then map(select(.name | split("/") | last | startswith($prefix))) | if length > 0 then .[0] else null end else null end'
+    | jq --arg prefix "${cert_prefix}" -c 'if type == "array" then map(select(.name | split("/") | last | startswith($prefix))) | if length > 0 then .[0] else null end else null end'
 }
 export -f exists_swp_managed_certificate
+
+function get_or_construct_swp_cert_uri() {
+  local cert_json=$(get_state "swpManagedCertificate")
+  if [[ -n "${cert_json}" && "${cert_json}" != "null" ]]; then
+    export SWP_CERT_URI_PARTIAL=$(echo "${cert_json}" | /usr/bin/jq -r '.name')
+  else
+    export SWP_CERT_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/certificates/swp-cert-${CLUSTER_NAME}-${TIMESTAMP}"
+  fi
+}
+export -f get_or_construct_swp_cert_uri

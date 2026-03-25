@@ -47,7 +47,6 @@ if [[ -n "${ARG_TIMESTAMP}" ]]; then
   # Re-set variables derived from TIMESTAMP
   export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
   export LOG_DIR="${REPRO_TMPDIR}/logs"
-  export STATE_DB="${REPRO_TMPDIR}/state.db"
   mkdir -p "${REPRO_TMPDIR}"
   mkdir -p "${LOG_DIR}"
   echo "Using provided TIMESTAMP for resources: ${TIMESTAMP}" >&2
@@ -78,7 +77,6 @@ run_check() {
       export TIMESTAMP="${ARG_TIMESTAMP}"
       export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
       export LOG_DIR="${REPRO_TMPDIR}/logs"
-      export STATE_DB="${REPRO_TMPDIR}/state.db"
     fi
     source "./lib/script-utils.sh"
     source "./${source_file}" # Relative to GCLOUD_DIR
@@ -100,7 +98,6 @@ run_shared_check() {
       export TIMESTAMP="${ARG_TIMESTAMP}"
       export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
       export LOG_DIR="${REPRO_TMPDIR}/logs"
-      export STATE_DB="${REPRO_TMPDIR}/state.db"
     fi
     source "./lib/script-utils.sh"
     "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"

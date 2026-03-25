@@ -190,7 +190,7 @@ function get_state() {
     fi
     local result=$(sqlite3 "${db_file}" "SELECT value FROM state WHERE key = '${resource_key}';")
     if [[ -z "${result}" ]]; then
-        echo "null"
+        echo ""
     else
         echo "${result}"
     fi

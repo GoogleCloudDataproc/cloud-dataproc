@@ -60,9 +60,19 @@ function exists_gateway_security_policy() {
   local policy_name="${1:-${SWP_POLICY_NAME}}"
   local region="${2:-${REGION}}"
   local project_id="${3:-${PROJECT_ID}}"
-  _check_exists gcloud network-security gateway-security-policies export "${policy_name}" --location="${region}" --project="${project_id}"
+  _check_exists gcloud network-security gateway-security-policies describe "${policy_name}" --location="${region}" --project="${project_id}" --format=json
 }
 export -f exists_gateway_security_policy
+
+function get_or_construct_swp_policy_uri() {
+  local policy_json=$(get_state "swpPolicy")
+  if [[ -n "${policy_json}" && "${policy_json}" != "null" ]]; then
+    export SWP_POLICY_URI_PARTIAL=$(echo "${policy_json}" | /usr/bin/jq -r '.name')
+  else
+    export SWP_POLICY_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/gatewaySecurityPolicies/${SWP_POLICY_NAME}"
+  fi
+}
+export -f get_or_construct_swp_policy_uri
 
 function delete_gateway_security_policy() {
   local policy_name="${1:-${SWP_POLICY_NAME}}"

@@ -90,8 +90,9 @@ function set_proxy(){
 
   # Persist for system
   local env_file="/etc/environment"
-  sed -i -e '/^http_proxy=/d' -e '/^https_proxy=/d' -e '/^no_proxy=/d' 
-    -e '/^HTTP_PROXY=/d' -e '/^HTTPS_PROXY=/d' -e '/^NO_PROXY=/d' "${env_file}"
+  sed -i -e '/^http_proxy=/d' -e '/^https_proxy=/d' -e '/^no_proxy=/d' \
+         -e '/^HTTP_PROXY=/d' -e '/^HTTPS_PROXY=/d' -e '/^NO_PROXY=/d' \
+         -e '/^BOTO_CONFIG=/d' "${env_file}"
 
   if [[ -n "${HTTP_PROXY:-}" ]]; then echo "HTTP_PROXY=${HTTP_PROXY}" >> "${env_file}"; fi
   if [[ -n "${http_proxy:-}" ]]; then echo "http_proxy=${http_proxy}" >> "${env_file}"; fi
@@ -122,8 +123,8 @@ function set_proxy(){
       echo "DEBUG: set_proxy: No HTTP or HTTPS proxy set for package managers." >&2
   elif is_debuntu ; then
     local apt_proxy_conf="/etc/apt/apt.conf.d/99proxy"
-    echo "Acquire::http::Proxy "http://${effective_proxy}";" > "${apt_proxy_conf}"
-    echo "Acquire::https::Proxy "http://${effective_proxy}";" >> "${apt_proxy_conf}"
+    echo "Acquire::http::Proxy \"http://${effective_proxy}\";" > "${apt_proxy_conf}"
+    echo "Acquire::https::Proxy \"http://${effective_proxy}\";" >> "${apt_proxy_conf}"
     echo "DEBUG: set_proxy: Configured apt proxy: ${apt_proxy_conf}" >&2
   elif is_rocky ; then
     local dnf_proxy_conf="/etc/dnf/dnf.conf"
@@ -132,10 +133,31 @@ function set_proxy(){
     if grep -q "^\[main\]" "${dnf_proxy_conf}"; then
       sed -i.bak "/^\[main\]/a proxy=http://${effective_proxy}" "${dnf_proxy_conf}"
     else
-      echo -e "[main]
-proxy=http://${effective_proxy}" >> "${dnf_proxy_conf}"
+      echo -e "[main]\nproxy=http://${effective_proxy}" >> "${dnf_proxy_conf}"
     fi
     echo "DEBUG: set_proxy: Configured dnf proxy: ${dnf_proxy_conf}" >&2
+  fi
+
+  # Configure boto (gsutil)
+  local boto_file="/etc/boto.cfg"
+  if [[ -f "${boto_file}" ]]; then
+    echo "DEBUG: set_proxy: Repairing and configuring ${boto_file}" >&2
+    
+    # Deduplicate sections (fix for DuplicateSectionError)
+    perl -i -ne 'if (/^\[(.*)\]/) { $skip = $seen{$1}++; } print unless $skip;' "${boto_file}"
+    
+    if [[ -n "${effective_proxy}" ]]; then
+      local proxy_host="${effective_proxy%:*}"
+      local proxy_port="${effective_proxy##*:}"
+      
+      sed -i -e '/^proxy =/d' -e '/^proxy_port =/d' "${boto_file}"
+      if grep -q "^\[Boto\]" "${boto_file}"; then
+        sed -i "/^\[Boto\]/a proxy = ${proxy_host}\nproxy_port = ${proxy_port}" "${boto_file}"
+      else
+        echo -e "\n[Boto]\nproxy = ${proxy_host}\nproxy_port = ${proxy_port}" >> "${boto_file}"
+      fi
+    fi
+    echo "DEBUG: set_proxy: Updated ${boto_file}" >&2
   fi
 
   # TODO: Add gcloud proxy config if needed

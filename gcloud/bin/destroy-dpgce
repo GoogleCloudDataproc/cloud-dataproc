@@ -83,7 +83,7 @@ display_status() {
   local key="$2"
   local value=$(get_state "${key}")
   echo -n "- ${display_name}: "
-  if [[ "${value}" == "null" || "${value}" == "" ]]; then
+  if [[ -z "${value}" || "${value}" == "null" ]]; then
     report_audit_status "Not Found"
   else
     report_audit_status "Exists"
@@ -125,7 +125,8 @@ PLAN=()
 # Helper to check if a resource exists
 exists() {
   local key="$1"
-  [[ $(get_state "${key}") != "null" ]]
+  local val=$(get_state "${key}")
+  [[ -n "${val}" && "${val}" != "null" ]]
 }
 
 # Order matters for dependencies

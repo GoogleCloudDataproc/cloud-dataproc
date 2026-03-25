@@ -11,6 +11,7 @@ GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 source "${GCLOUD_DIR}/lib/env.sh"
 
 source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
 source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
 source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 
@@ -54,6 +55,9 @@ echo "========================================"
 print_status "Attempting to ensure any pre-existing cluster named '${CLUSTER_NAME}' is deleted..."
 delete_dpgce_cluster
 report_result "Done"
+
+# Upload init actions before recreation to ensure latest scripts are used
+upload_init_actions
 
 # Re-create the cluster based on the loaded config
 print_status "Creating cluster ${CLUSTER_NAME}..."

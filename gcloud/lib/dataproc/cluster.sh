@@ -31,18 +31,20 @@ function create_dpgce_cluster() {
     "rapids-runtime=SPARK"
     "bigtable-instance=${BIGTABLE_INSTANCE}"
     "include-gpus=1"
+    "startup-script=gcloud config set core/universe_domain '${UNIVERSE_DOMAIN}'"
   )
-if [[ "${SWP_EGRESS}" == "true" ]]; then
-  metadata_array+=(
-    "http-proxy=${SWP_IP}:${SWP_PORT}"
-    "https-proxy=${SWP_IP}:${SWP_PORT}"
-    "proxy-uri=${SWP_IP}:${SWP_PORT}"
-    "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
-  )
-fi
+  if [[ "${SWP_EGRESS}" == "true" ]]; then
+    metadata_array+=(
+      "http-proxy=${SWP_IP}:${SWP_PORT}"
+      "https-proxy=${SWP_IP}:${SWP_PORT}"
+      "proxy-uri=${SWP_IP}:${SWP_PORT}"
+      "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
+      "startup-script-url=${INIT_ACTIONS_ROOT}/gce-proxy-setup.sh"
+    )
+  fi
 
   local all_metadata
-  all_metadata="$(IFS='^|^'; echo "${metadata_array[*]}")"
+  all_metadata="$(IFS='|'; echo "${metadata_array[*]}")"
   all_metadata="^|^${all_metadata}"
 
   local gcloud_cmd=(
@@ -71,10 +73,6 @@ fi
     --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog"
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   )
-
-  if [[ "${SWP_EGRESS}" == "true" ]]; then
-    gcloud_cmd+=(--metadata-from-file "startup-script=${GCLOUD_DIR}/init/gce-proxy-setup.sh")
-  fi
 
   if [[ "${IS_CUSTOM}" == "true" ]]; then
     if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then

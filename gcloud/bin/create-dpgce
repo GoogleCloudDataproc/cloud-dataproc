@@ -80,6 +80,12 @@ print_status "Auditing environment to ensure cache is fresh..."
 "${GCLOUD_DIR}/bin/audit-dpgce" &> /dev/null
 report_result "Done"
 
+# --- Set derived resource names for SWP ---
+# This must happen after audit to reuse existing versioned resources (certs/policies)
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  get_or_construct_swp_cert_uri
+  get_or_construct_swp_policy_uri
+fi
 
 echo "--- Current Environment State (from Audit) --- "
 # Function to display resource status from DB
@@ -227,12 +233,6 @@ for action in "${PLAN[@]}"; do
 done
 echo "----------------------"
 
-# --- Set derived resource names for SWP ---
-if [[ "${SWP_EGRESS}" == "true" ]]; then
-  export SWP_CERT_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/certificates/swp-cert-${CLUSTER_NAME}-${TIMESTAMP}"
-  export SWP_POLICY_URI_PARTIAL="projects/${PROJECT_ID}/locations/${REGION}/gatewaySecurityPolicies/${SWP_POLICY_NAME}"
-fi
-
 # --- Plan Execution ---
 echo "Executing plan..."
 
@@ -243,7 +243,7 @@ if [[ " ${PLAN[*]} " =~ " ENSURE_serviceAccountRoles " ]]; then ensure_service_a
 # GCS Buckets - No strong dependencies between them
 if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " ]]; then create_gcs_bucket "${BUCKET}" "Standard"; grant_gcs_bucket_perms "${BUCKET}"; fi
 if [[ " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then create_gcs_bucket "${TEMP_BUCKET}" "Standard"; grant_gcs_bucket_perms "${TEMP_BUCKET}"; fi
-if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " || " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then upload_init_actions; fi
+upload_init_actions
 
 if [[ " ${PLAN[*]} " =~ " CREATE_vpcNetwork " ]]; then create_vpc_network; fi
 if [[ " ${PLAN[*]} " =~ " ENSURE_DEFAULT_ROUTE " ]]; then ensure_default_internet_route; fi
