@@ -32,7 +32,7 @@ This collection of bash scripts helps create and manage Google Cloud environment
 These scripts are designed to deploy and manage Dataproc clusters in various configurations:
 
 *   **Standard Dataproc on GCE:** A cluster with default network settings.
-*   **Egress Control:** Options for `--nat-egress` (Cloud NAT) or `--swp-egress` (Secure Web Proxy - *WIP*).
+*   **Egress Control:** Options for `--nat-egress` (Cloud NAT) or `--swp-egress` (Secure Web Proxy).
 *   **Custom Images:** Support for deploying clusters using pre-built custom images via the `--custom` flag.
 *   **GPU-Enabled Clusters:** Facilitates testing GPU-enabled clusters, often used with custom images containing pre-installed drivers.
 *   **Secure Boot Clusters:** Deployment of clusters using custom images built with Secure Boot enabled.
@@ -130,7 +130,7 @@ If `bin/create-dpgce` is run without any flags, it defaults to the following set
 *   `--no-custom`: Use the standard `IMAGE_VERSION` from `env.json`.
 *   `--nat-egress`: Ensure Cloud NAT is configured for internet egress from the standard subnet.
 *   `--no-nat-egress`: Do not configure Cloud NAT.
-*   `--swp-egress`: (Work In Progress) Ensure Secure Web Proxy is configured for internet egress.
+*   `--swp-egress`: Ensure Secure Web Proxy (SWP) is configured for internet egress.
 *   `--no-swp-egress`: Do not configure Secure Web Proxy.
 *   `--no-create-cluster`: Set up all networking and dependencies but skip the `gcloud dataproc clusters create` command.
 

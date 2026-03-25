@@ -21,40 +21,37 @@ function exists_service_account() {
 export -f exists_service_account
 
 function get_service_account_bindings() {
-  local tmp_policy_file="${REPRO_TMPDIR}/iam_policy.json"
   local cmd=(
     gcloud projects get-iam-policy "${PROJECT_ID}"
     --format=json
   )
 
-  if ! "${cmd[@]}" > "${tmp_policy_file}" 2>/dev/null; then
+  local policy
+  if ! policy=$("${cmd[@]}" 2>/dev/null); then
     echo "null"
-    rm -f "${tmp_policy_file}"
     return
   fi
-
-  local policy=$(cat "${tmp_policy_file}")
-  rm -f "${tmp_policy_file}"
 
   if [[ -z "${policy}" ]]; then
     echo "null"
     return
   fi
 
-  echo "${policy}" | jq -r --arg GSA "serviceAccount:${GSA}" '[.bindings[] | select(.members[] == $GSA)]' | jq 'if length == 0 then null else . end'
+  # Extract unique roles bound to the service account
+  echo "${policy}" | jq -r --arg GSA "serviceAccount:${GSA}" '[.bindings[] | select(.members // [] | any(. == $GSA)) | .role] | unique' | jq -c 'if length == 0 then null else . end'
 }
 export -f get_service_account_bindings
 
 # Returns "true" or "false"
 function check_service_account_bindings() {
-  local bindings_json=$(get_service_account_bindings)
-  if [[ "${bindings_json}" == "null" ]]; then
+  local roles_json=$(get_service_account_bindings)
+  if [[ "${roles_json}" == "null" || -z "${roles_json}" ]]; then
     echo "false"
     return
   fi
 
   for role in "${ROLES[@]}"; do
-    local role_found=$(echo "${bindings_json}" | jq --arg ROLE "${role}" --arg GSA "serviceAccount:${GSA}" 'map(select(.role == $ROLE and .members[] == $GSA)) | length > 0')
+    local role_found=$(echo "${roles_json}" | jq --arg ROLE "${role}" 'index($ROLE) != null')
     if [[ "${role_found}" != "true" ]]; then
       # echo "DEBUG: Role ${role} not found for ${GSA}" >&2
       echo "false"

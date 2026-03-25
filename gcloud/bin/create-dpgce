@@ -162,7 +162,11 @@ PLAN=()
 INTENDED=()
 
 # Basic resources for all types
-INTENDED+=("gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "cloudRouter" "firewallRule-ssh" "autoscalingPolicy" "defaultRoute")
+INTENDED+=("gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "firewallRule-ssh" "autoscalingPolicy" "defaultRoute")
+
+if [[ "${NAT_EGRESS}" == "true" ]]; then
+  INTENDED+=("cloudRouter")
+fi
 
 # Service Account and Roles are handled separately
 if [[ $(get_state "serviceAccount") == "" ]]; then
@@ -210,7 +214,14 @@ if [[ "${NAT_EGRESS}" == "true" ]]; then
       PLAN+=("ADD_NAT_TO_ROUTER")
     fi
   fi
-  # If cloudRouter needs creation, NAT is added within that function's flow.
+else
+  # --no-nat-egress passed, remove NAT and Router if they exist
+  if [[ $(get_state "cloudRouterNAT") != "" ]]; then
+    PLAN+=("REMOVE_NAT_FROM_ROUTER")
+  fi
+  if [[ $(get_state "cloudRouter") != "" ]]; then
+    PLAN+=("DELETE_ROUTER")
+  fi
 fi
 
 # Special handling for dataprocCluster
@@ -263,6 +274,12 @@ if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then
 elif [[ " ${PLAN[*]} " =~ " ADD_NAT_TO_ROUTER " ]]; then
   echo "INFO: NAT Egress enabled, ensuring NAT on existing router..."
   add_nat_to_router
+fi
+if [[ " ${PLAN[*]} " =~ " REMOVE_NAT_FROM_ROUTER " ]]; then
+  remove_nat_from_router
+fi
+if [[ " ${PLAN[*]} " =~ " DELETE_ROUTER " ]]; then
+  delete_router
 fi
 
 if [[ " ${PLAN[*]} " =~ " CREATE_firewallRule-ssh " ]]; then create_firewall_rules; fi

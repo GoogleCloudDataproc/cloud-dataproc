@@ -60,7 +60,9 @@ function exists_gateway_security_policy() {
   local policy_name="${1:-${SWP_POLICY_NAME}}"
   local region="${2:-${REGION}}"
   local project_id="${3:-${PROJECT_ID}}"
-  _check_exists gcloud network-security gateway-security-policies describe "${policy_name}" --location="${region}" --project="${project_id}" --format=json
+  # List policies and filter for the exact name
+  gcloud network-security gateway-security-policies list --location="${region}" --project="${project_id}" --format=json \
+    | /usr/bin/jq -c --arg name "${policy_name}" 'if type == "array" then map(select(.name | split("/") | last == $name)) | if length > 0 then .[0] else null end else null end'
 }
 export -f exists_gateway_security_policy
 
