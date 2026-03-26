@@ -31,6 +31,7 @@ function create_dpgce_cluster() {
     "rapids-runtime=SPARK"
     "bigtable-instance=${BIGTABLE_INSTANCE}"
     "include-gpus=1"
+    "universe-domain=${UNIVERSE_DOMAIN}"
     "startup-script=gcloud config set core/universe_domain '${UNIVERSE_DOMAIN}'"
   )
   if [[ "${SWP_EGRESS}" == "true" ]]; then
