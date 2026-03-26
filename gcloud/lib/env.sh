@@ -49,6 +49,9 @@ export SWP_RANGE="$(jq -r .SWP_RANGE "${GCLOUD_DIR}/env.json")"
 export SWP_SUBNET="swp-subnet-${CLUSTER_NAME}"
 export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT "${GCLOUD_DIR}/env.json")"
 export ASN_NUMBER="$(jq -r .ASN_NUMBER "${GCLOUD_DIR}/env.json")"
+if [[ "${ASN_NUMBER}" == "null" ]]; then
+  export ASN_NUMBER="65531"
+fi
 export IMAGE_VERSION="$(jq -r .IMAGE_VERSION "${GCLOUD_DIR}/env.json")"
 export REGION="$(jq -r .REGION "${GCLOUD_DIR}/env.json")"
 export ZONE="$(jq -r .ZONE "${GCLOUD_DIR}/env.json")"
