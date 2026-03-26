@@ -33,6 +33,7 @@ function create_dpgce_cluster() {
     "include-gpus=1"
     "universe-domain=${UNIVERSE_DOMAIN}"
     "startup-script=gcloud config set core/universe_domain '${UNIVERSE_DOMAIN}'"
+    "startup-script-url=${GCE_PROXY_SETUP_URI}"
   )
   if [[ "${SWP_EGRESS}" == "true" ]]; then
     metadata_array+=(
@@ -40,7 +41,6 @@ function create_dpgce_cluster() {
       "https-proxy=${SWP_IP}:${SWP_PORT}"
       "proxy-uri=${SWP_IP}:${SWP_PORT}"
       "no-proxy=metadata.google.internal,${PROJECT_ID}.svc.id.goog"
-      "startup-script-url=${INIT_ACTIONS_ROOT}/gce-proxy-setup.sh"
     )
   fi
 
