@@ -153,8 +153,24 @@ function set_proxy(){
   if [[ -n "${http_proxy:-}" ]]; then echo "http_proxy=${http_proxy}" >> /etc/environment; fi
   if [[ -n "${HTTPS_PROXY:-}" ]]; then echo "HTTPS_PROXY=${HTTPS_PROXY}" >> /etc/environment; fi
   if [[ -n "${https_proxy:-}" ]]; then echo "https_proxy=${https_proxy}" >> /etc/environment; fi
-  
+  if [[ -n "${NO_PROXY:-}" ]]; then echo "NO_PROXY=${NO_PROXY}" >> /etc/environment; fi
+  if [[ -n "${NO_PROXY:-}" ]]; then echo "no_proxy=${no_proxy}" >> /etc/environment; fi
+
+  # Persist for all shell sessions
+  local profile_script="/etc/profile.d/proxy.sh"
+  echo "# Proxy settings from Dataproc init action" > "${profile_script}"
+  if [[ -n "${HTTP_PROXY:-}" ]]; then echo "export HTTP_PROXY='${HTTP_PROXY}'" >> "${profile_script}"; fi
+  if [[ -n "${http_proxy:-}" ]]; then echo "export http_proxy='${http_proxy}'" >> "${profile_script}"; fi
+  if [[ -n "${HTTPS_PROXY:-}" ]]; then echo "export HTTPS_PROXY='${HTTPS_PROXY}'" >> "${profile_script}"; fi
+  if [[ -n "${https_proxy:-}" ]]; then echo "export https_proxy='${https_proxy}'" >> "${profile_script}"; fi
+  if [[ -n "${NO_PROXY:-}" ]]; then echo "export NO_PROXY='${NO_PROXY}'" >> "${profile_script}"; fi
+  if [[ -n "${no_proxy:-}" ]]; then echo "export no_proxy='${no_proxy}'" >> "${profile_script}"; fi
+
+  # Source the script to apply settings to the current shell
+  source "${profile_script}"
+
   if [[ -n "${http_proxy_val}" ]]; then
+
     local proxy_host=$(echo "${http_proxy_val}" | cut -d: -f1)
     local proxy_port=$(echo "${http_proxy_val}" | cut -d: -f2)
 
@@ -210,12 +226,23 @@ function repair_boto() {
     echo "DEBUG: repair_boto: Repairing and deduplicating ${boto_file}" >&2
     
     # 1. Deduplicate sections (fix for DuplicateSectionError)
-    perl -i -ne 'if (/^\[(.*)\]/) { $skip = $seen{$1}++; } print unless $skip;' "${boto_file}"
+    # Use a more robust perl one-liner that also handles the content within duplicate sections
+    # by only keeping the first occurrence of each section and its variables.
+    perl -i -ne '
+      if (/^\[(.*)\]/) {
+        $section = $1;
+        $skip = $seen{$section}++;
+      }
+      print unless $skip;
+    ' "${boto_file}"
     
     # 2. Fix universe_domain if it is still a variable
     local universe_domain
     universe_domain=$(get_metadata_attribute 'universe-domain' 'googleapis.com')
-    perl -pi -e "s/\\\$\{universe_domain\}/${universe_domain}/g" "${boto_file}"
+    # Use a more robust replacement that handles potential escaping issues
+    UNIVERSE_DOMAIN="${universe_domain}" perl -i -pe 's/\$\{universe_domain\}/$ENV{UNIVERSE_DOMAIN}/g' "${boto_file}"
+    # Also fix cases where it might have been partially expanded to storage.$
+    UNIVERSE_DOMAIN="${universe_domain}" perl -i -pe 's/storage\.\$/storage.$ENV{UNIVERSE_DOMAIN}/g' "${boto_file}"
 
     # 3. Apply proxy if set
     local meta_http_proxy=$(get_metadata_attribute 'http-proxy' '')

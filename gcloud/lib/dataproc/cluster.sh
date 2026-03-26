@@ -67,7 +67,6 @@ function create_dpgce_cluster() {
     --temp-bucket "${TEMP_BUCKET}"
     --enable-component-gateway
     --metadata "${all_metadata}"
-    --no-shielded-secure-boot
     # NO --image or --image-version here
     --initialization-action-timeout 90m
     --optional-components "DOCKER,JUPYTER"
@@ -81,10 +80,12 @@ function create_dpgce_cluster() {
       exit 1
     fi
     gcloud_cmd+=(--image "${CUSTOM_IMAGE_URI}")
-    echo "INFO: Using Custom Image URI: ${CUSTOM_IMAGE_URI}"
+    gcloud_cmd+=(--shielded-secure-boot)
+    echo "INFO: Using Custom Image URI: ${CUSTOM_IMAGE_URI} with Secure Boot enabled."
   else
     gcloud_cmd+=(--image-version "${IMAGE_VERSION}")
-     echo "INFO: Using Image Version: ${IMAGE_VERSION}"
+    gcloud_cmd+=(--initialization-actions "${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh")
+     echo "INFO: Using Image Version: ${IMAGE_VERSION}. Init actions enabled."
   fi
 
   if [[ "${GCLOUD_QUIET}" != "true" ]]; then
