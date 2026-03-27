@@ -1,1 +1,35 @@
-#!/bin/bashsource lib/env.shgcloud network-services gateways describe ${SWP_INSTANCE_NAME} --location ${REGION}gcloud network-security gateway-security-policies rules export allow-all-rule \  --gateway-security-policy=${SWP_POLICY_NAME} \  --location ${REGION}#gcloud logging read \#  "resource.type=\"networkservices.googleapis.com/Gateway\" \#  resource.labels.location=\"${REGION}\" \#  resource.labels.gateway_id=\"${SWP_INSTANCE_NAME}\"" \#  --project="${PROJECT_ID}" \#  --limit=100 \#  --format=json # Or text, defaultgcloud logging read \  "resource.type=\"networkservices.googleapis.com/Gateway\" \  resource.labels.location=\"${REGION}\" \  resource.labels.gateway_id=\"${SWP_INSTANCE_NAME}\"" \  --project="${PROJECT_ID}" \  --limit=500 \  --freshness=1d # Look back over the last day# Delete the old test if it existsgcloud network-management connectivity-tests delete swp-test --quiet# Create a new onegcloud network-management connectivity-tests create swp-test \  --source-instance=projects/${PROJECT_ID}/zones/${ZONE}/instances/${CLUSTER_NAME}-m \  --destination-ip-address=10.43.79.245 \  --destination-port=3128 \  --protocol=TCP \  --source-network=projects/${PROJECT_ID}/global/networks/${NETWORK}# Wait and describesleep 5# After a moment, get the results:gcloud network-management connectivity-tests describe swp-test
+#!/bin/bash
+
+source lib/env.sh
+
+gcloud network-services gateways describe ${SWP_INSTANCE_NAME} --location ${REGION}
+
+gcloud network-security gateway-security-policies rules export allow-all-rule \
+  --gateway-security-policy=${SWP_POLICY_NAME} \
+  --location ${REGION}
+
+# Look back over the last day for Gateway logs
+gcloud logging read \
+  "resource.type=\"networkservices.googleapis.com/Gateway\" \
+  resource.labels.location=\"${REGION}\" \
+  resource.labels.gateway_id=\"${SWP_INSTANCE_NAME}\"" \
+  --project="${PROJECT_ID}" \
+  --limit=500 \
+  --freshness=1d
+
+# Delete the old test if it exists
+gcloud network-management connectivity-tests delete swp-test --quiet || true
+
+# Create a new connectivity test from the master node to the SWP gateway
+gcloud network-management connectivity-tests create swp-test \
+  --source-instance=projects/${PROJECT_ID}/zones/${ZONE}/instances/${CLUSTER_NAME}-m \
+  --destination-ip-address=${SWP_IP} \
+  --destination-port=${SWP_PORT} \
+  --protocol=TCP \
+  --source-network=projects/${PROJECT_ID}/global/networks/${NETWORK}
+
+echo "Waiting for connectivity test to complete..."
+sleep 10
+
+# Get the results
+gcloud network-management connectivity-tests describe swp-test
