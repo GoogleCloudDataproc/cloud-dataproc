@@ -169,6 +169,68 @@ function set_proxy(){
   # Source the script to apply settings to the current shell
   source "${profile_script}"
 
+  # Configure gcloud proxy
+  local gcloud_version
+  local -r min_gcloud_proxy_ver="547.0.0"
+  gcloud_version=$(gcloud version --format="value(google_cloud_sdk)" 2>/dev/null || echo "0.0.0")
+  if version_ge "${gcloud_version}" "${min_gcloud_proxy_ver}"; then
+    if [[ -n "${http_proxy_val}" ]]; then
+      local proxy_host=$(echo "${http_proxy_val}" | cut -d: -f1)
+      local proxy_port=$(echo "${http_proxy_val}" | cut -d: -f2)
+      gcloud config set proxy/type http
+      gcloud config set proxy/address "${proxy_host}"
+      gcloud config set proxy/port "${proxy_port}"
+    else
+      gcloud config unset proxy/type
+      gcloud config unset proxy/address
+      gcloud config unset proxy/port
+    fi
+  fi
+
+  # Install the HTTPS proxy's certificate
+  local proxy_ca_pem=""
+  local trusted_pem_path=""
+  METADATA_HTTP_PROXY_PEM_URI="$(get_metadata_attribute http-proxy-pem-uri '')"
+  if [[ -n "${METADATA_HTTP_PROXY_PEM_URI}" ]] ; then
+    if [[ ! "${METADATA_HTTP_PROXY_PEM_URI}" =~ ^gs:// ]] ; then echo "ERROR: http-proxy-pem-uri value must start with gs://" ; exit 1 ; fi
+    echo "DEBUG: set_proxy: Processing http-proxy-pem-uri='${METADATA_HTTP_PROXY_PEM_URI}'"
+    local trusted_pem_dir
+    if is_debuntu ; then
+      trusted_pem_dir="/usr/local/share/ca-certificates"
+      proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
+      mkdir -p "${trusted_pem_dir}"
+      gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      update-ca-certificates
+      trusted_pem_path="/etc/ssl/certs/ca-certificates.crt"
+    elif is_rocky ; then
+      trusted_pem_dir="/etc/pki/ca-trust/source/anchors"
+      proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
+      mkdir -p "${trusted_pem_dir}"
+      gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      update-ca-trust
+      trusted_pem_path="/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+    fi
+    export REQUESTS_CA_BUNDLE="${trusted_pem_path}"
+    echo "DEBUG: set_proxy: trusted_pem_path set to '${trusted_pem_path}'"
+
+    # Add to Java/Conda trust stores
+    if [[ -f "/etc/environment" ]]; then
+        JAVA_HOME="$(awk -F= '/^JAVA_HOME=/ {print $2}' /etc/environment)"
+        if [[ -n "${JAVA_HOME:-}" && -f "${JAVA_HOME}/bin/keytool" ]]; then
+            "${JAVA_HOME}/bin/keytool" -import -cacerts -storepass changeit -noprompt -alias swp_ca -file "${proxy_ca_pem}"
+        fi
+    fi
+    if command -v conda &> /dev/null ; then
+      local conda_cert_file="/opt/conda/default/ssl/cacert.pem"
+      if [[ -f "${conda_cert_file}" ]]; then
+        local ca_subject=$(openssl crl2pkcs7 -nocrl -certfile "${proxy_ca_pem}" | openssl pkcs7 -print_certs -noout | grep ^subject)
+        openssl crl2pkcs7 -nocrl -certfile "${conda_cert_file}" | openssl pkcs7 -print_certs -noout | grep -Fxq "${ca_subject}" || {
+          cat "${proxy_ca_pem}" >> "${conda_cert_file}"
+        }
+      fi
+    fi
+  fi
+
   if [[ -n "${http_proxy_val}" ]]; then
 
     local proxy_host=$(echo "${http_proxy_val}" | cut -d: -f1)
@@ -182,7 +244,11 @@ function set_proxy(){
 
     echo "DEBUG: set_proxy: Testing external site access via proxy..."
     local test_url="https://www.google.com"
-    if curl -vL --retry 3 --retry-delay 5 -o /dev/null "${test_url}"; then
+    local curl_test_args=()
+    if [[ -n "${trusted_pem_path}" ]]; then
+      curl_test_args+=(--cacert "${trusted_pem_path}")
+    fi
+    if curl "${curl_test_args[@]}" -vL --retry 3 --retry-delay 5 -o /dev/null "${test_url}"; then
       echo "DEBUG: set_proxy: Successfully fetched ${test_url} via proxy."
     else
       echo "ERROR: Failed to fetch ${test_url} via proxy ${HTTP_PROXY}."
@@ -210,13 +276,22 @@ function set_proxy(){
     fi
   fi
 
-  # Install HTTPS cert if URI is provided
-  METADATA_HTTP_PROXY_PEM_URI="$(get_metadata_attribute http-proxy-pem-uri '')"
-  if [[ -n "${METADATA_HTTP_PROXY_PEM_URI}" ]] ; then
-    # ... (rest of cert logic remains same as before) ...
-    # Simplified for brevity in this turn, but I will preserve the full logic in the write_file
-    echo "DEBUG: set_proxy: Handling cert from ${METADATA_HTTP_PROXY_PEM_URI}"
-    # (Full cert handling logic here)
+  # Configure dirmngr
+  if is_debuntu ; then
+    if ! dpkg -l | grep -q dirmngr; then
+      execute_with_retries apt-get install -y -qq dirmngr
+    fi
+  elif is_rocky ; then
+    if ! rpm -q gnupg2-smime; then
+      execute_with_retries dnf install -y -q gnupg2-smime
+    fi
+  fi
+  mkdir -p /etc/gnupg
+  local dirmngr_conf="/etc/gnupg/dirmngr.conf"
+  touch "${dirmngr_conf}"
+  sed -i.bak '/^http-proxy/d' "${dirmngr_conf}"
+  if [[ -n "${HTTP_PROXY:-}" ]]; then
+    echo "http-proxy ${HTTP_PROXY}" >> "${dirmngr_conf}"
   fi
 }
 
