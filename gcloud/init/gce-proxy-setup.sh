@@ -119,7 +119,26 @@ function set_proxy(){
     "169.254.169.254"
     ".google.com"
     ".googleapis.com"
+    ".internal"
   )
+
+  # Add project-specific internal domain
+  local project_id
+  project_id=$(get_metadata_attribute 'project-id' "${PROJECT_ID:-}")
+  if [[ -n "${project_id}" ]]; then
+    default_no_proxy_list+=( ".c.${project_id}.internal" )
+  fi
+
+  # Add cluster-specific hostnames
+  local cluster_name
+  cluster_name=$(get_metadata_attribute 'dataproc-cluster-name' '')
+  if [[ -n "${cluster_name}" ]]; then
+    # Add wildcard patterns (supported by some tools like Go/Java)
+    default_no_proxy_list+=( "${cluster_name}-m" "${cluster_name}-m-*" "${cluster_name}-w-*" "${cluster_name}-sw-*" )
+    # Add FQDN suffixes to ensure bypass for tools like curl/wget
+    default_no_proxy_list+=( "${cluster_name}-m.c.${project_id}.internal" )
+    default_no_proxy_list+=( ".c.${project_id}.internal" )
+  fi
 
   local user_no_proxy
   user_no_proxy=$(get_metadata_attribute 'no-proxy' '')
