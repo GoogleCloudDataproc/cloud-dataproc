@@ -1,21 +1,33 @@
 #!/bin/bash
 source lib/env.sh
 
-echo "Uploading latest init scripts to gs://${BUCKET}/dataproc-initialization-actions..."
-gsutil -m cp -r init/* gs://${BUCKET}/dataproc-initialization-actions
+echo "--- Debug Init Action Workflow ---"
+echo "Step 1: Ensure your local 'init/' directory is populated with the scripts you want to test."
+echo "If you need to sync from the public repository, run something like:"
+echo "  mkdir -p init"
+echo "  cp -r ../../initialization-actions/gpu init/"
+echo "  cp -r ../../initialization-actions/spark-rapids init/"
+echo " "
+
+if [[ ! -d init ]]; then
+  echo "ERROR: 'init/' directory not found. Please create and populate it before running this script."
+  exit 1
+fi
+
+echo "Step 2: Copying local 'init/' directory to the master node's /tmp via IAP..."
+bash bin/scp-m init
 
 echo " "
-echo "SSH to the -m node:"
-echo "gcloud compute ssh --zone ${ZONE} ${CLUSTER_NAME}-m --project ${PROJECT_ID}"
+echo "Step 3: SSH to the master node using the helper script:"
+echo "  bash bin/ssh-m"
 echo " "
-echo "Once SSHed, run these commands:"
+echo "Step 4: Once SSHed, run the script directly from /tmp/init:"
 echo "----"
 echo "sudo -i"
-echo "rm -f /tmp/install_gpu_driver.sh /tmp/install.log"
-echo "gsutil cp gs://${BUCKET}/dataproc-initialization-actions/gpu/install_gpu_driver.sh /tmp/"
-echo "chmod +x /tmp/install_gpu_driver.sh"
-echo "time bash -x /tmp/install_gpu_driver.sh 2>&1 | tee /tmp/install.log"
+echo "# The 'init' directory is available at /tmp/init"
+echo "chmod +x /tmp/init/gpu/install_gpu_driver.sh"
+echo "time bash -x /tmp/init/gpu/install_gpu_driver.sh 2>&1 | tee /tmp/install.log"
 echo "----"
 echo " "
-echo "After the script finishes on the VM, download the log on your local machine:"
-echo "gcloud compute scp --zone ${ZONE} ${CLUSTER_NAME}-m:/tmp/install.log ./tmp --tunnel-through-iap --project ${PROJECT_ID}"
+echo "Step 5: After the script finishes, you can download the log with this command:"
+echo "  gcloud compute scp --zone ${ZONE} ${CLUSTER_NAME}-m:/tmp/install.log ./tmp --tunnel-through-iap --project ${PROJECT_ID}"
