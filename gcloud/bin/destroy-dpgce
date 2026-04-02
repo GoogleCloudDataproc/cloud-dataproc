@@ -10,16 +10,9 @@ export GCLOUD_DIR
 
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
-
-# SET TIMESTAMP for THIS run
-export TIMESTAMP=$(date +%s)
-export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
-export LOG_DIR="${REPRO_TMPDIR}/logs"
-export STATE_DB="${REPRO_TMPDIR}/state.db"
-mkdir -p "${REPRO_TMPDIR}"
-mkdir -p "${LOG_DIR}"
-echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
 source "${GCLOUD_DIR}/lib/script-utils.sh"
+
+echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
 source "${GCLOUD_DIR}/lib/gcp/misc.sh"
 source "${GCLOUD_DIR}/lib/network/network.sh"
 source "${GCLOUD_DIR}/lib/network/subnet.sh"
@@ -65,7 +58,19 @@ done
 
 # --- Main Logic ---
 configure_gcloud
-init_state_db
+
+if [[ "${FORCE_DELETE}" == "true" ]]; then
+  echo "INFO: --force set. Clearing state database and generating fresh TIMESTAMP." >&2
+  rm -f "${STATE_DB}"
+  unset TIMESTAMP
+  # Re-source env.sh to get a fresh TIMESTAMP and recreate state.db
+  source "${GCLOUD_DIR}/lib/env.sh"
+  init_state_db
+  # Update the persistent timestamp so future runs use this new one
+  update_state "config.timestamp" "${TIMESTAMP}"
+else
+  init_state_db
+fi
 
 echo "========================================"
 echo "Starting DPGCE Environment Teardown"

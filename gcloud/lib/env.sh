@@ -19,16 +19,32 @@ LIB_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 GCLOUD_DIR="$(realpath "${LIB_DIR}/..")"
 export GCLOUD_DIR
 
-export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/$(date +%s)}"
-mkdir -p "${REPRO_TMPDIR}"
-export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
-mkdir -p "${LOG_DIR}"
 export STATE_DIR="${GCLOUD_DIR}/.state"
 mkdir -p "${STATE_DIR}"
 export STATE_DB="${STATE_DIR}/state.db"
 
-
 source "${GCLOUD_DIR}/lib/script-utils.sh"
+init_state_db
+
+# Load or generate persistent TIMESTAMP
+if [[ -z "${TIMESTAMP:-}" ]]; then
+  # Try to load from state database
+  PERSISTENT_TIMESTAMP=$(get_state "config.timestamp")
+  if [[ "${PERSISTENT_TIMESTAMP}" != "null" && -n "${PERSISTENT_TIMESTAMP}" ]]; then
+    export TIMESTAMP="${PERSISTENT_TIMESTAMP}"
+    # echo "INFO: Loaded persistent TIMESTAMP: ${TIMESTAMP}" >&2
+  else
+    # Fallback to current time and save it
+    export TIMESTAMP=$(date +%s)
+    update_state "config.timestamp" "${TIMESTAMP}"
+    # echo "INFO: Generated new persistent TIMESTAMP: ${TIMESTAMP}" >&2
+  fi
+fi
+
+export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${TIMESTAMP}}"
+mkdir -p "${REPRO_TMPDIR}"
+export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
+mkdir -p "${LOG_DIR}"
 
 export PATH_SEPARATOR=";"
 export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER "${GCLOUD_DIR}/env.json")"
@@ -36,7 +52,7 @@ export DOMAIN="$(jq -r .DOMAIN "${GCLOUD_DIR}/env.json")"
 export USER="$(jq -r .USER "${GCLOUD_DIR}/env.json")"
 export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN "${GCLOUD_DIR}/env.json")"
 export PRIV_USER="$(jq -r .PRIV_USER "${GCLOUD_DIR}/env.json")"
-export PROJECT_ID="$(jq -r .PROJECT_ID "${GCLOUD_DIR}/env.json")"
+export PROJECT_ID="${PROJECT_ID:-$(jq -r .PROJECT_ID "${GCLOUD_DIR}/env.json")}"
 if [[ "${PROJECT_ID}" == "ldap-example-yyyy-nn" ]]; then
   export PROJECT_ID="${USER}-example-$(date +%Y-%U)"
 fi
@@ -53,8 +69,8 @@ if [[ "${ASN_NUMBER}" == "null" ]]; then
   export ASN_NUMBER="65531"
 fi
 export IMAGE_VERSION="$(jq -r .IMAGE_VERSION "${GCLOUD_DIR}/env.json")"
-export REGION="$(jq -r .REGION "${GCLOUD_DIR}/env.json")"
-export ZONE="$(jq -r .ZONE "${GCLOUD_DIR}/env.json")"
+export REGION="${REGION:-$(jq -r .REGION "${GCLOUD_DIR}/env.json")}"
+export ZONE="${ZONE:-$(jq -r .ZONE "${GCLOUD_DIR}/env.json")}"
 export SWP_IP="$(jq -r .SWP_IP "${GCLOUD_DIR}/env.json")"
 export SWP_PORT="$(jq -r .SWP_PORT "${GCLOUD_DIR}/env.json")"
 export SWP_HOSTNAME="$(jq -r .SWP_HOSTNAME "${GCLOUD_DIR}/env.json")"
@@ -313,6 +329,9 @@ export CI_CSR_REGION="$(jq -r .CI_CSR_REGION "${GCLOUD_DIR}/env.json")"
 export CI_GITHUB_CONNECTION_NAME="$(jq -r .CI_GITHUB_CONNECTION_NAME "${GCLOUD_DIR}/env.json")"
 export CI_TRIGGER_BRANCH="$(jq -r .CI_TRIGGER_BRANCH "${GCLOUD_DIR}/env.json")"
 export CUSTOM_IMAGE_URI="$(jq -r .CUSTOM_IMAGE_URI "${GCLOUD_DIR}/env.json")"
+if [[ "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+  unset CUSTOM_IMAGE_URI
+fi
 export CI_REPO_OWNER="$(jq -r .CI_REPO_OWNER "${GCLOUD_DIR}/env.json")"
 export CI_BYOSA_EMAIL="$(jq -r .CI_BYOSA_EMAIL "${GCLOUD_DIR}/env.json")"
 
@@ -382,10 +401,7 @@ function configure_environment() {
   # The reader will then need to pass the
   # `--image="projects/${PROJECT_ID}/global/images/"${PURPOSE}-${dataproc_version/\./-}-${timestamp}"`
   # argument instead of `--image-version "${IMAGE_VERSION}"` when
-  # performing the gcloud dataproc clusters create command.  Modify the
-  # call to gcloud in lib/shared-functions.sh's create_dpgce_cluster
-  # function.
-
+  # performing the gcloud dataproc clusters create command.
 }
 
 [[ -v dataproc_repro_configure_environment ]] || configure_environment

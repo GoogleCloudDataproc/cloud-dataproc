@@ -23,6 +23,12 @@ function report_result() {
 }
 export -f report_result
 
+# Compatibility wrapper for older scripts
+function print_result() {
+  report_result "$@"
+}
+export -f print_result
+
 # Usage: report_audit_status "Exists" | "Not Found"
 function report_audit_status() {
   local status="$1"

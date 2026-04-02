@@ -36,6 +36,13 @@ export IS_CUSTOM
 export NAT_EGRESS
 export SWP_EGRESS
 
+if [[ "${IS_CUSTOM}" == "true" ]]; then
+  if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+    echo "ERROR: IS_CUSTOM is true (from state.db) but CUSTOM_IMAGE_URI is not defined in env.json" >&2
+    exit 1
+  fi
+fi
+
 echo "INFO: Loaded configuration - IS_CUSTOM=${IS_CUSTOM}, NAT_EGRESS=${NAT_EGRESS}, SWP_EGRESS=${SWP_EGRESS}" >&2
 
 # --- Run an audit to refresh the current state of resources ---

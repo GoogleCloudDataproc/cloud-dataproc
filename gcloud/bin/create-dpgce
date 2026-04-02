@@ -9,14 +9,8 @@ export GCLOUD_DIR
 
 # --- Source environment variables and utility functions ---
 source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
 
-# SET TIMESTAMP for THIS run
-export TIMESTAMP=$(date +%s)
-export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
-export LOG_DIR="${REPRO_TMPDIR}/logs"
-# STATE_DB is now set in lib/env.sh to a fixed path
-mkdir -p "${REPRO_TMPDIR}"
-mkdir -p "${LOG_DIR}"
 echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run's logs." >&2
 
 # --- Argument Parsing ---
@@ -42,6 +36,13 @@ done
 export IS_CUSTOM
 export SWP_EGRESS
 export NAT_EGRESS
+
+if [[ "${IS_CUSTOM}" == "true" ]]; then
+  if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+    echo "ERROR: --custom flag is set but CUSTOM_IMAGE_URI is not defined in env.json" >&2
+    exit 1
+  fi
+fi
 
 if (( DEBUG != 0 )); then
   set -x
