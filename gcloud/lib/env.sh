@@ -41,9 +41,10 @@ if [[ -z "${TIMESTAMP:-}" ]]; then
   fi
 fi
 
-export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${TIMESTAMP}}"
+# Ensure paths are based on the correct persistent TIMESTAMP
+export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
 mkdir -p "${REPRO_TMPDIR}"
-export LOG_DIR="${LOG_DIR:-${REPRO_TMPDIR}/logs}"
+export LOG_DIR="${REPRO_TMPDIR}/logs"
 mkdir -p "${LOG_DIR}"
 
 export PATH_SEPARATOR=";"

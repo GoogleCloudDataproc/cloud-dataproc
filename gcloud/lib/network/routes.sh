@@ -56,7 +56,7 @@ function delete_route() {
     else
       report_result "Fail"
       echo "  - Failed to delete route ${route_name}. Log content:" >&2
-      cat "${REPRO_TMPDIR}/${log_file}" >&2
+      cat "${LOG_DIR}/${log_file}" >&2
       return 1
     fi
   else
