@@ -57,7 +57,7 @@ class Benchmark:
             experiment_name,
             scenario.name,
             self.clusterName)
-        command = "gsutil cp {} {} ".format(scenario.config_file_name,
+        command = "gcloud storage cp {} {} ".format(scenario.config_file_name,
                                             scenario_destination_bucket_path)
         execute_shell(command)
 

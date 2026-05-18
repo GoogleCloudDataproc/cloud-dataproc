@@ -78,7 +78,7 @@ fi
 MODEL_NAME=test_model
 MODEL_VERSION=v$TEST_TIME
 
-ORIGIN=$(gsutil ls "$JOB_DIR/**/saved_model.pb" | sed 's/\(.\)saved_model.pb/\1/g')
+ORIGIN=$(gcloud storage ls "$JOB_DIR/**/saved_model.pb" | sed 's/\(.\)saved_model.pb/\1/g')
 
 echo "Training succeeded. Creating model from saved model at $ORIGIN ..."
 

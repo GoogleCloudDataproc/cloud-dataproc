@@ -108,8 +108,8 @@ check_exists "Main Subnet ${SUBNET}" "gcloud compute networks subnets describe '
 check_exists "Service Account ${GSA}" "gcloud iam service-accounts describe '${GSA}' --project='${PROJECT_ID}'"
 
 # 4. GCS Buckets
-check_exists "GCS Staging Bucket gs://${BUCKET}" "gsutil ls -b 'gs://${BUCKET}'"
-check_exists "GCS Temp Bucket gs://${TEMP_BUCKET}" "gsutil ls -b 'gs://${TEMP_BUCKET}'"
+check_exists "GCS Staging Bucket gs://${BUCKET}" "gcloud storage ls --buckets 'gs://${BUCKET}'"
+check_exists "GCS Temp Bucket gs://${TEMP_BUCKET}" "gcloud storage ls --buckets 'gs://${TEMP_BUCKET}'"
 
 # 5. Cloud Router
 check_exists "Cloud Router ${ROUTER_NAME}" "gcloud compute routers describe '${ROUTER_NAME}' --region='${REGION}' --project='${PROJECT_ID}'"

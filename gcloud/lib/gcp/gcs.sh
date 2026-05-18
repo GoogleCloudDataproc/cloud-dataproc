@@ -12,8 +12,8 @@ function create_bucket () {
 
   print_status "Creating GCS Staging Bucket gs://${BUCKET}..."
   local log_file="create_bucket_${BUCKET}.log"
-  if ! gsutil ls -b "gs://${BUCKET}" > /dev/null 2>&1 ; then
-    if run_gcloud "${log_file}" gsutil mb -l ${REGION} gs://${BUCKET}; then
+  if ! gcloud storage ls --buckets "gs://${BUCKET}" > /dev/null 2>&1 ; then
+    if run_gcloud "${log_file}" gcloud storage buckets create --location ${REGION} gs://${BUCKET}; then
       report_result "Created"
     else
       report_result "Fail"
@@ -24,7 +24,7 @@ function create_bucket () {
   fi
   # Grant SA permissions on BUCKET
   print_status "  Granting Storage Admin on gs://${BUCKET}..."
-  if run_gcloud "${log_file}" gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${BUCKET}"; then
+  if run_gcloud "${log_file}" gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" --member="serviceAccount:${GSA}" --role="roles/storage.admin"; then
     report_result "Pass"
   else
     report_result "Fail"
@@ -32,8 +32,8 @@ function create_bucket () {
 
   print_status "Creating GCS Temp Bucket gs://${TEMP_BUCKET}..."
   local temp_log_file="create_bucket_${TEMP_BUCKET}.log"
-  if ! gsutil ls -b "gs://${TEMP_BUCKET}" > /dev/null 2>&1 ; then
-     if run_gcloud "${temp_log_file}" gsutil mb -l ${REGION} gs://${TEMP_BUCKET}; then
+  if ! gcloud storage ls --buckets "gs://${TEMP_BUCKET}" > /dev/null 2>&1 ; then
+     if run_gcloud "${temp_log_file}" gcloud storage buckets create --location ${REGION} gs://${TEMP_BUCKET}; then
       report_result "Created"
     else
       report_result "Fail"
@@ -44,7 +44,7 @@ function create_bucket () {
   fi
   # Grant SA permissions on TEMP_BUCKET
   print_status "  Granting Storage Admin on gs://${TEMP_BUCKET}..."
-  if run_gcloud "${temp_log_file}" gsutil iam ch "serviceAccount:${GSA}:roles/storage.admin" "gs://${TEMP_BUCKET}"; then
+  if run_gcloud "${temp_log_file}" gcloud storage buckets add-iam-policy-binding "gs://${TEMP_BUCKET}" --member="serviceAccount:${GSA}" --role="roles/storage.admin"; then
     report_result "Pass"
   else
     report_result "Fail"
@@ -54,7 +54,7 @@ function create_bucket () {
   if [[ -d init ]] ; then
     print_status "Copying init scripts to ${INIT_ACTIONS_ROOT}..."
     local cp_log="copy_init_scripts.log"
-    if run_gcloud "${cp_log}" gsutil -m cp -r "init/*" "${INIT_ACTIONS_ROOT}/"; then
+    if run_gcloud "${cp_log}" gcloud storage cp --recursive "init/*" "${INIT_ACTIONS_ROOT}/"; then
       report_result "Pass"
     else
       report_result "Fail"
@@ -66,8 +66,8 @@ function create_bucket () {
 function delete_bucket () {
   print_status "Deleting GCS Bucket gs://${BUCKET}..."
   local log_file="delete_bucket_${BUCKET}.log"
-  if gsutil ls -b "gs://${BUCKET}" > /dev/null 2>&1; then
-    if run_gcloud "${log_file}" gsutil -m rm -r "gs://${BUCKET}"; then
+  if gcloud storage ls --buckets "gs://${BUCKET}" > /dev/null 2>&1; then
+    if run_gcloud "${log_file}" gcloud storage rm --recursive "gs://${BUCKET}"; then
       report_result "Deleted"
       remove_sentinel "create_bucket" "done"
     else
@@ -76,5 +76,5 @@ function delete_bucket () {
   else
     report_result "Not Found"
   fi
-  #  gsutil -m rm -r "gs://${TEMP_BUCKET}" > /dev/null 2>&1 || true # huge cache here, not so great to lose it
+  #  gcloud storage rm --recursive "gs://${TEMP_BUCKET}" > /dev/null 2>&1 || true # huge cache here, not so great to lose it
 }

@@ -29,7 +29,7 @@ function diagnose () {
     DIAG_URL=$(cat "${REPRO_TMPDIR}/${log_file}" | perl -ne 'print if m{^gs://.*/diagnostic.tar.gz\s*$}')
     if [[ -n "${DIAG_URL}" ]]; then
       print_status "  Downloading ${DIAG_URL}..."
-      if run_gcloud "download_diagnose.log" gsutil cp -q "${DIAG_URL}" "${REPRO_TMPDIR}/"; then
+      if run_gcloud "download_diagnose.log" gcloud storage cp "${DIAG_URL}" "${REPRO_TMPDIR}/"; then
          report_result "Pass"
          local diag_file="${REPRO_TMPDIR}/$(basename ${DIAG_URL})"
          print_status "  Running drproc on ${diag_file}..."
