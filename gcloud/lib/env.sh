@@ -53,7 +53,7 @@ export DOMAIN="$(jq -r .DOMAIN "${GCLOUD_DIR}/env.json")"
 export USER="$(jq -r .USER "${GCLOUD_DIR}/env.json")"
 export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN "${GCLOUD_DIR}/env.json")"
 export PRIV_USER="$(jq -r .PRIV_USER "${GCLOUD_DIR}/env.json")"
-export PROJECT_ID="${PROJECT_ID:-$(jq -r .PROJECT_ID "${GCLOUD_DIR}/env.json")}"
+export PROJECT_ID="$(jq -r .PROJECT_ID "${GCLOUD_DIR}/env.json")"
 if [[ "${PROJECT_ID}" == "ldap-example-yyyy-nn" ]]; then
   export PROJECT_ID="${USER}-example-$(date +%Y-%U)"
 fi
@@ -70,8 +70,9 @@ if [[ "${ASN_NUMBER}" == "null" ]]; then
   export ASN_NUMBER="65531"
 fi
 export IMAGE_VERSION="$(jq -r .IMAGE_VERSION "${GCLOUD_DIR}/env.json")"
-export REGION="${REGION:-$(jq -r .REGION "${GCLOUD_DIR}/env.json")}"
-export ZONE="${ZONE:-$(jq -r .ZONE "${GCLOUD_DIR}/env.json")}"
+export REGION="$(jq -r .REGION "${GCLOUD_DIR}/env.json")"
+export ZONE="$(jq -r .ZONE "${GCLOUD_DIR}/env.json")"
+export REGION ZONE
 export SWP_IP="$(jq -r .SWP_IP "${GCLOUD_DIR}/env.json")"
 export SWP_PORT="$(jq -r .SWP_PORT "${GCLOUD_DIR}/env.json")"
 export SWP_HOSTNAME="$(jq -r .SWP_HOSTNAME "${GCLOUD_DIR}/env.json")"
@@ -79,6 +80,10 @@ export UNIVERSE_DOMAIN="$(jq -r .UNIVERSE_DOMAIN "${GCLOUD_DIR}/env.json")"
 if [[ "${UNIVERSE_DOMAIN}" == "null" ]]; then
   export UNIVERSE_DOMAIN="googleapis.com"
 fi
+
+# Manual overrides for testing specific driver/CUDA packages during cluster creation
+# export CUDA_URL="$(jq -r .CUDA_URL "${GCLOUD_DIR}/env.json")"
+# export GPU_DRIVER_URL="$(jq -r .GPU_DRIVER_URL "${GCLOUD_DIR}/env.json")"
 export SWP_POLICY_NAME="swp-policy-${CLUSTER_NAME}"
 export SWP_INSTANCE_NAME="swp-gateway-${CLUSTER_NAME}"
 export SWP_CERT_NAME="swp-cert-${CLUSTER_NAME}-${RESOURCE_SUFFIX}"
@@ -219,76 +224,6 @@ export PRIMARY_MACHINE_TYPE="${MACHINE_TYPE}"
 #export PRIMARY_MACHINE_TYPE="e2-standard-4"
 #export PRIMARY_MACHINE_TYPE="n2d-highmem-32"
 export SECONDARY_MACHINE_TYPE="${PRIMARY_MACHINE_TYPE}"
-
-#export CUDNN_VERSION="8.0.5.39"
-#export NCCL_VERSION="2.8.4"
-#export DRIVER_VERSION="455.45.01"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100"
-#export ACCELERATOR_TYPE="nvidia-tesla-a100"
-#export ACCELERATOR_TYPE="nvidia-tesla-a100,count=2"
-export ACCELERATOR_TYPE="nvidia-tesla-t4"
-#export ACCELERATOR_TYPE="nvidia-tesla-t4,count=4"
-#export ACCELERATOR_TYPE="nvidia-rtx-pro-6000,count=1"
-#export ACCELERATOR_TYPE="nvidia-rtx-pro-6000,count=2"
-#export ACCELERATOR_TYPE="nvidia-rtx-pro-6000,count=4" # works
-#export ACCELERATOR_TYPE="nvidia-rtx-pro-6000,count=8"
-#export ACCELERATOR_TYPE="nvidia-gb300,count=4"
-#export ACCELERATOR_TYPE="nvidia-gb200,count=8"
-#export ACCELERATOR_TYPE="nvidia-b200,count=4"
-#export ACCELERATOR_TYPE="nvidia-l4"
-#export ACCELERATOR_TYPE="nvidia-tesla-p4,count=2"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100,count=2"
-#export ACCELERATOR_TYPE="nvidia-tesla-v100,count=4"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=8"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=4"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=2"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=1"
-#export M_ACCELERATOR_TYPE="nvidia-tesla-t4,count=4"
-#export M_ACCELERATOR_TYPE="nvidia-tesla-t4"
-#export M_ACCELERATOR_TYPE="nvidia-tesla-a100,count=2"
-#export M_ACCELERATOR_TYPE="nvidia-tesla-a100,count=8"
-#export M_ACCELERATOR_TYPE="nvidia-h100-80gb,count=8"
-export M_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-export PRIMARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-#export CUDA_VERSION=10.2.89
-#export CUDA_VERSION=11.0
-#export DRIVER_VERSION="440.100"
-#export CUDA_VERSION=11.1
-#export DRIVER_VERSION="455.45.01"
-#export CUDA_VERSION=11.2
-#export DRIVER_VERSION="460.91.03"
-#export CUDA_VERSION=11.3
-#export DRIVER_VERSION="465.31"
-#export CUDA_VERSION=11.5
-#export CUDA_VERSION="11.1"
-#export DRIVER_VERSION="455.45.01"
-#export DRIVER_VERSION="470.256.02"
-#export CUDA_VERSION=11.2
-#export CUDA_VERSION=11.7
-#export CUDA_VERSION=11.8
-#export CUDA_VERSION=12.0
-#export CUDA_VERSION=12.1.1
-#export CUDA_VERSION=12.2
-#export CUDA_VERSION=12.1.1
-#export CUDA_VERSION=12.4
-# export CUDA_VERSION=12.4.0
-#export CUDA_VERSION="12.4.1"
-#export DRIVER_VERSION="550.135"
-#export CUDA_VERSION="12.6"
-#export CUDA_VERSION="12.6.2"
-#export CUDA_VERSION="12.6.3"
-export CUDA_VERSION="13.1.0"
-export DRIVER_VERSION="590.48.01"
-#export DRIVER_VERSION="550.142"
-#export DRIVER_VERSION="460.73.01"
-#export DRIVER_VERSION="550.54.14"
-#export DRIVER_VERSION="560.35.03"
-#export DRIVER_VERSION="550.135"
-#export NCCL_VERSION="2.8.3"
-#export CUDNN_VERSION="8.0.5.39"
-#export NCCL_VERSION="2.8.4"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100"
 
 # DPGKE
 export DPGKE_NAMESPACE=k8sns-${CLUSTER_NAME}

@@ -1,14 +1,17 @@
 #!/bin/bash
 # Exit on failure
+unset REGION ZONE
+set -e
 set -e
 
 # --- Get script's real directory ---
 SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
 export GCLOUD_DIR
+DP_EVOLUTION_DIR=$(realpath "${GCLOUD_DIR}/../..")
+export DP_EVOLUTION_DIR
 
-# --- Source environment variables and utility functions ---
-source "${GCLOUD_DIR}/lib/env.sh"
+# --- Source utility functions ---
 source "${GCLOUD_DIR}/lib/script-utils.sh"
 
 echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run's logs." >&2
@@ -18,6 +21,7 @@ IS_CUSTOM=false
 CREATE_CLUSTER=true
 SWP_EGRESS=false
 NAT_EGRESS=true
+ENABLE_GPU=false
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -27,6 +31,8 @@ while [[ "$#" -gt 0 ]]; do
         --no-swp-egress) SWP_EGRESS=false; shift ;;
         --nat-egress) NAT_EGRESS=true; shift ;;
         --no-nat-egress) NAT_EGRESS=false; shift ;;
+        --gpu) ENABLE_GPU=true; shift ;;
+        --no-gpu) ENABLE_GPU=false; shift ;;
         --no-create-cluster) CREATE_CLUSTER=false; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
@@ -36,6 +42,64 @@ done
 export IS_CUSTOM
 export SWP_EGRESS
 export NAT_EGRESS
+export ENABLE_GPU
+
+# --- Source environment variables AFTER arguments are parsed ---
+source "${GCLOUD_DIR}/lib/env.sh"
+
+# GPU Configuration - only applied if ENABLE_GPU is true
+export ACCELERATOR_TYPE="$(jq -r .ACCELERATOR_TYPE "${GCLOUD_DIR}/env.json")"
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  if [[ -z "${ACCELERATOR_TYPE}" || "${ACCELERATOR_TYPE}" == "null" ]]; then
+    export ACCELERATOR_TYPE="nvidia-tesla-t4"
+  fi
+
+  # Read from env.json, but do not export if not set, to allow init action defaults
+  CUDA_VERSION_FROM_ENV=$(jq -r .CUDA_VERSION "${GCLOUD_DIR}/env.json")
+  DRIVER_VERSION_FROM_ENV=$(jq -r .DRIVER_VERSION "${GCLOUD_DIR}/env.json")
+  CUDA_URL_FROM_ENV=$(jq -r .CUDA_URL "${GCLOUD_DIR}/env.json")
+  GPU_DRIVER_URL_FROM_ENV=$(jq -r .GPU_DRIVER_URL "${GCLOUD_DIR}/env.json")
+
+  if [[ -n "${CUDA_VERSION_FROM_ENV}" && "${CUDA_VERSION_FROM_ENV}" != "null" ]]; then
+    export CUDA_VERSION="${CUDA_VERSION_FROM_ENV}"
+  else
+    unset CUDA_VERSION
+  fi
+  if [[ -n "${DRIVER_VERSION_FROM_ENV}" && "${DRIVER_VERSION_FROM_ENV}" != "null" ]]; then
+    export DRIVER_VERSION="${DRIVER_VERSION_FROM_ENV}"
+  else
+    unset DRIVER_VERSION
+  fi
+  if [[ -n "${CUDA_URL_FROM_ENV}" && "${CUDA_URL_FROM_ENV}" != "null" ]]; then
+    export CUDA_URL="${CUDA_URL_FROM_ENV}"
+  else
+    unset CUDA_URL
+  fi
+  if [[ -n "${GPU_DRIVER_URL_FROM_ENV}" && "${GPU_DRIVER_URL_FROM_ENV}" != "null" ]]; then
+    export GPU_DRIVER_URL="${GPU_DRIVER_URL_FROM_ENV}"
+  else
+    unset GPU_DRIVER_URL
+  fi
+  echo "INFO: GPU enabled: Type=${ACCELERATOR_TYPE}, CUDA_VER=${CUDA_VERSION:-Default}, DRIVER_VER=${DRIVER_VERSION:-Default}, CUDA_URL=${CUDA_URL:-None}, DRIVER_URL=${GPU_DRIVER_URL:-None}" >&2
+else
+  export ACCELERATOR_TYPE=""
+  unset CUDA_VERSION
+  unset DRIVER_VERSION
+  unset CUDA_URL
+  unset GPU_DRIVER_URL
+fi
+export M_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export PRIMARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+
+# Upload local GPU init action if --gpu is enabled
+unset GPU_INIT_ACTION_URI
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  TIMESTAMP=$(date +%s)
+  export GPU_INIT_ACTION_URI="gs://${BUCKET}/tmp_init_actions/install_gpu_driver_${TIMESTAMP}.sh"
+  echo "INFO: Uploading local GPU init action to ${GPU_INIT_ACTION_URI}" >&2
+  gsutil cp "${DP_EVOLUTION_DIR}/initialization-actions/gpu/install_gpu_driver.sh" "${GPU_INIT_ACTION_URI}"
+fi
 
 if [[ "${IS_CUSTOM}" == "true" ]]; then
   if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
@@ -76,6 +140,7 @@ init_state_db # Ensures the fixed state.db and table exist
 update_state "config.isCustom" "${IS_CUSTOM}"
 update_state "config.swpEgress" "${SWP_EGRESS}"
 update_state "config.natEgress" "${NAT_EGRESS}"
+update_state "config.enableGpu" "${ENABLE_GPU}"
 
 print_status "Auditing environment to ensure cache is fresh..."
 "${GCLOUD_DIR}/bin/audit-dpgce" &> /dev/null

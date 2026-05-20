@@ -16,25 +16,39 @@ function create_dpgce_cluster() {
     "secret_project=${secret_project}"
     "secret_version=${secret_version}"
     "modulus_md5sum=${modulus_md5sum}"
-    "install-gpu-agent=true"
-    "gpu-driver-provider=NVIDIA"
-    "cuda-version=${CUDA_VERSION}"
-    "gpu-driver-version=${DRIVER_VERSION}"
-    "cuda-url=https://developer.download.nvidia.com/compute/cuda/13.1.0/local_installers/cuda_13.1.0_590.44.01_linux.run"
-    "gpu-driver-url=https://us.download.nvidia.com/XFree86/Linux-x86_64/590.48.01/NVIDIA-Linux-x86_64-590.48.01.run"
-    "gpu-conda-env=dpgce"
     "init-actions-repo=${INIT_ACTIONS_ROOT}"
     "debug=true"
-    "include-pytorch=yes"
     "enable-oslogin=TRUE"
-    "dask-runtime=standalone"
-    "rapids-runtime=SPARK"
-    "bigtable-instance=${BIGTABLE_INSTANCE}"
-    "include-gpus=1"
     "universe-domain=${UNIVERSE_DOMAIN}"
     "startup-script=gcloud config set core/universe_domain '${UNIVERSE_DOMAIN}'"
     "startup-script-url=${GCE_PROXY_SETUP_URI}"
   )
+
+  if [[ "${ENABLE_GPU}" == "true" ]]; then
+    metadata_array+=(
+      "install-gpu-agent=true"
+      "gpu-driver-provider=NVIDIA"
+      "gpu-conda-env=dpgce"
+      "include-pytorch=yes"
+      "include-tensorflow=yes"
+      "include-rapids=yes"
+      "dask-runtime=standalone"
+      "rapids-runtime=SPARK"
+      "bigtable-instance=${BIGTABLE_INSTANCE}"
+      "include-gpus=1"
+    )
+    if [[ -n "${CUDA_URL}" && "${CUDA_URL}" != "null" ]] ; then
+      metadata_array+=( "cuda-url=${CUDA_URL}" )
+    elif [[ -n "${CUDA_VERSION}" && "${CUDA_VERSION}" != "null" ]] ; then
+      metadata_array+=( "cuda-version=${CUDA_VERSION}" )
+    fi
+    if [[ -n "${GPU_DRIVER_URL}" && "${GPU_DRIVER_URL}" != "null" ]] ; then
+      metadata_array+=( "gpu-driver-url=${GPU_DRIVER_URL}" )
+    elif [[ -n "${DRIVER_VERSION}" && "${DRIVER_VERSION}" != "null" ]] ; then
+      metadata_array+=( "gpu-driver-version=${DRIVER_VERSION}" )
+    fi
+  fi
+
   if [[ "${SWP_EGRESS}" == "true" ]]; then
     metadata_array+=(
       "http-proxy=${SWP_IP}:${SWP_PORT}"
@@ -48,10 +62,11 @@ function create_dpgce_cluster() {
   all_metadata="$(IFS='|'; echo "${metadata_array[*]}")"
   all_metadata="^|^${all_metadata}"
 
+  echo "DEBUG: all_metadata string: ${all_metadata}" >&2
+
   local gcloud_cmd=(
     gcloud dataproc clusters create "${CLUSTER_NAME}"
     --single-node
-    --master-accelerator "type=${M_ACCELERATOR_TYPE}"
     --master-machine-type "${M_MACHINE_TYPE}"
     --master-boot-disk-size 600
     --master-local-ssd-interface=NVME
@@ -69,10 +84,14 @@ function create_dpgce_cluster() {
     --metadata "${all_metadata}"
     # NO --image or --image-version here
     --initialization-action-timeout 90m
-    --optional-components "DOCKER,JUPYTER"
+#    --optional-components "DOCKER,JUPYTER"
     --properties "spark:spark.history.fs.logDirectory=gs://${BUCKET}/phs/eventLog"
     --scopes 'https://www.googleapis.com/auth/cloud-platform,sql-admin'
   )
+
+  if [[ "${ENABLE_GPU}" == "true" ]]; then
+    gcloud_cmd+=(--master-accelerator "type=${M_ACCELERATOR_TYPE}")
+  fi
 
   if [[ "${IS_CUSTOM}" == "true" ]]; then
     if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
@@ -83,9 +102,27 @@ function create_dpgce_cluster() {
     gcloud_cmd+=(--shielded-secure-boot)
     echo "INFO: Using Custom Image URI: ${CUSTOM_IMAGE_URI} with Secure Boot enabled."
   else
+    gcloud_cmd+=(--no-shielded-secure-boot)
     gcloud_cmd+=(--image-version "${IMAGE_VERSION}")
-    gcloud_cmd+=(--initialization-actions "${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh")
-     echo "INFO: Using Image Version: ${IMAGE_VERSION}. Init actions enabled."
+    if [[ "${ENABLE_GPU}" == "true" ]]; then
+      echo "INFO: Using Image Version: ${IMAGE_VERSION}. GPU Init actions enabled from default repo."
+    else
+      echo "INFO: Using Image Version: ${IMAGE_VERSION}. No additional init actions."
+    fi
+  fi
+
+  # Add init actions if any are specified
+  INIT_ACTIONS_LIST=()
+  if [[ "${ENABLE_GPU}" == "true" ]] && [[ -n "${GPU_INIT_ACTION_URI:-}" ]]; then
+    INIT_ACTIONS_LIST+=("${GPU_INIT_ACTION_URI}")
+    echo "INFO: Using custom GPU init action: ${GPU_INIT_ACTION_URI}" >&2
+  elif [[ "${ENABLE_GPU}" == "true" ]]; then
+    INIT_ACTIONS_LIST+=("${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh")
+    echo "INFO: Using default GPU init action: ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh" >&2
+  fi
+
+  if [[ ${#INIT_ACTIONS_LIST[@]} -gt 0 ]]; then
+    gcloud_cmd+=(--initialization-actions $(IFS=,; echo "${INIT_ACTIONS_LIST[*]}"))
   fi
 
   if [[ "${GCLOUD_QUIET}" != "true" ]]; then
