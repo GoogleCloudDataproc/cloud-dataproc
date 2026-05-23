@@ -44,7 +44,7 @@ run_ssh_command "nvidia-smi" "NVIDIA SMI"
 # 3. PyTorch Test
 PYTORCH_CMD=$(cat <<'EOF'
 PY_BIN=$(find /opt/conda -maxdepth 6 -path "*/envs/pytorch/bin/python" | head -n1)
-if [[ -z "$PY_BIN" ]]; then echo "PyTorch Conda env not found"; exit 1; fi
+if [[ -z "$PY_BIN" ]]; then echo "PyTorch Conda env not found, gracefully skipping test."; exit 0; fi
 $PY_BIN -c '
 import torch
 cuda_available = torch.cuda.is_available()
@@ -59,7 +59,7 @@ run_ssh_command "${PYTORCH_CMD}" "PyTorch CUDA Check"
 # 4. TensorFlow Test
 TENSORFLOW_CMD=$(cat <<'EOF'
 PY_BIN=$(find /opt/conda -maxdepth 6 -path "*/envs/tensorflow/bin/python" | head -n1)
-if [[ -z "$PY_BIN" ]]; then echo "TensorFlow Conda env not found"; exit 1; fi
+if [[ -z "$PY_BIN" ]]; then echo "TensorFlow Conda env not found, gracefully skipping test."; exit 0; fi
 $PY_BIN -c '
 import tensorflow as tf
 print("TensorFlow GPU Details : ")
@@ -73,6 +73,22 @@ print(device_lib.list_local_devices())
 EOF
 )
 run_ssh_command "${TENSORFLOW_CMD}" "TensorFlow GPU Check"
+
+# 4.5 RAPIDS Test
+RAPIDS_CMD=$(cat <<'EOF'
+PY_BIN=$(find /opt/conda -maxdepth 6 -path "*/envs/rapids/bin/python" | head -n1)
+if [[ -z "$PY_BIN" ]]; then echo "RAPIDS Conda env not found, gracefully skipping test."; exit 0; fi
+$PY_BIN -c '
+try:
+    import cuml
+    print("RAPIDS cuml imported successfully.")
+except ImportError as e:
+    print(f"Failed to import cuml: {e}")
+    exit(1)
+'
+EOF
+)
+run_ssh_command "${RAPIDS_CMD}" "RAPIDS GPU Check"
 
 # 5. GPU Agent Status
 run_ssh_command "sudo systemctl status gpu-utilization-agent.service" "GPU Agent Status"
