@@ -38,6 +38,7 @@ while [[ "$#" -gt 0 ]]; do
         --no-nat-egress) NAT_EGRESS=false; shift ;;
         --gpu) ENABLE_GPU=true; shift ;;
         --no-gpu) ENABLE_GPU=false; shift ;;
+        --no-init-action) export SKIP_INIT_ACTIONS=true; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
 done
@@ -88,8 +89,8 @@ if [[ "${ENABLE_GPU}" == "true" ]]; then
         "1.5" ) DEFAULT_CUDA_VERSION="11.6.2" ; DEFAULT_DRIVER_VERSION="510.47.03" ;;
         "2.0" ) DEFAULT_CUDA_VERSION="12.1.1" ; DEFAULT_DRIVER_VERSION="530.30.02" ;; # Cuda 12.1.1 - Driver v530.30.02 is the latest version supported by Ubuntu 18)
         "2.1" ) DEFAULT_CUDA_VERSION="12.4.1" ; DEFAULT_DRIVER_VERSION="550.135" ;;
-        "2.2" ) DEFAULT_CUDA_VERSION="12.6.3" ; DEFAULT_DRIVER_VERSION="550.142" ;;
-        "2.3" ) DEFAULT_CUDA_VERSION="12.6.3" ; DEFAULT_DRIVER_VERSION="550.142" ;;
+        "2.2" ) DEFAULT_CUDA_VERSION="13.1.1" ; DEFAULT_DRIVER_VERSION="550.142" ;;
+        "2.3" ) DEFAULT_CUDA_VERSION="13.1.1" ; DEFAULT_DRIVER_VERSION="550.142" ;;
         *   )
           echo "ERROR: Unrecognized Dataproc image version: ${DATAPROC_IMAGE_VERSION}" >&2
           exit 1

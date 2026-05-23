@@ -113,12 +113,16 @@ function create_dpgce_cluster() {
 
   # Add init actions if any are specified
   INIT_ACTIONS_LIST=()
-  if [[ "${ENABLE_GPU}" == "true" ]] && [[ -n "${GPU_INIT_ACTION_URI:-}" ]]; then
-    INIT_ACTIONS_LIST+=("${GPU_INIT_ACTION_URI}")
-    echo "INFO: Using custom GPU init action: ${GPU_INIT_ACTION_URI}" >&2
-  elif [[ "${ENABLE_GPU}" == "true" ]]; then
-    INIT_ACTIONS_LIST+=("${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh")
-    echo "INFO: Using default GPU init action: ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh" >&2
+  if [[ "${SKIP_INIT_ACTIONS:-}" != "true" ]]; then
+    if [[ "${ENABLE_GPU}" == "true" ]] && [[ -n "${GPU_INIT_ACTION_URI:-}" ]]; then
+      INIT_ACTIONS_LIST+=("${GPU_INIT_ACTION_URI}")
+      echo "INFO: Using custom GPU init action: ${GPU_INIT_ACTION_URI}" >&2
+    elif [[ "${ENABLE_GPU}" == "true" ]]; then
+      INIT_ACTIONS_LIST+=("${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh")
+      echo "INFO: Using default GPU init action: ${INIT_ACTIONS_ROOT}/gpu/install_gpu_driver.sh" >&2
+    fi
+  else
+    echo "INFO: Skipping initialization actions because SKIP_INIT_ACTIONS is set to true." >&2
   fi
 
   if [[ ${#INIT_ACTIONS_LIST[@]} -gt 0 ]]; then

@@ -34,8 +34,9 @@ fi
 
 date
 
-gcloud compute scp --recurse "$*" \
-  --zone ${ZONE} \
-  ${M_HOSTNAME}:/tmp  \
-  --tunnel-through-iap \
-  --project ${PROJECT_ID}
+STAGING_URI="gs://${TEMP_BUCKET}/tmp_scp_m/"
+echo "Staging files to ${STAGING_URI}..."
+gcloud storage cp "$@" "${STAGING_URI}"
+
+echo "Fetching files to ${M_HOSTNAME}:/tmp..."
+gcloud compute ssh --zone "${ZONE}" "${M_HOSTNAME}" --tunnel-through-iap --project "${PROJECT_ID}" --command "gcloud storage cp ${STAGING_URI}* /tmp/"

@@ -16,128 +16,100 @@ limitations under the License.
 
 -->
 
-## Dataproc Environment Reproduction Scripts
+# Dataproc Environment Reproduction Scripts
 
-This collection of bash scripts helps create and manage Google Cloud environments to reproduce and test Google Dataproc cluster setups, particularly useful for troubleshooting issues related to startup scripts, initialization actions, and network configurations.
+This collection of bash scripts facilitates the rapid provisioning, management, and teardown of Google Cloud environments to reproduce and test Google Dataproc cluster setups. It is particularly useful for troubleshooting initialization actions, custom images, complex network topologies (like SWP and NAT), and GPU driver integrations.
 
 **Core Principles:**
 
-*   **Declarative & Idempotent:** The `create-dpgce` script is designed to be declarative. It audits the current state of the cloud environment and only creates missing resources to reach the desired state defined by the flags and `env.json`.
-*   **Audit-Driven:** The `audit-dpgce` script is the foundation, performing a comprehensive, concurrent scan of the GCP environment to populate a local SQLite database (`state.db`).
-*   **Stateful Cache:** A local SQLite database (`${GCLOUD_DIR}/.state/state.db`) is used to cache the audit results and persist configuration flags between runs.
-*   **Modular:** Core logic is organized into functions within the `lib/` directory.
+*   **Declarative & Idempotent:** The `create-dpgce` script operates declaratively. It audits the current state of the cloud environment and only creates missing resources required to reach the desired configuration state (defined by CLI flags and `env.json`).
+*   **Audit-Driven:** The `audit-dpgce` (and `audit-dpgke`) script forms the foundation, performing a comprehensive, concurrent scan of your GCP project to populate a local SQLite database (`.state/state.db`).
+*   **Stateful Cache:** A persistent local SQLite database (`.state/state.db`) caches audit results and persists your operational configuration flags between runs (e.g., remembering if you deployed with `--gpu` and `--custom`).
+*   **Modular:** Core infrastructure logic is organized cleanly into functions within the `lib/` directory.
 
 ## Supported Scenarios
 
-These scripts are designed to deploy and manage Dataproc clusters in various configurations:
+These scripts deploy Dataproc clusters in various configurations, supporting both Compute Engine (DPGCE) and Kubernetes Engine (DPGKE) architectures:
 
-*   **Standard Dataproc on GCE:** A cluster with default network settings.
-*   **Egress Control:** Options for `--nat-egress` (Cloud NAT) or `--swp-egress` (Secure Web Proxy).
-*   **Custom Images:** Support for deploying clusters using pre-built custom images via the `--custom` flag.
-*   **GPU-Enabled Clusters:** Facilitates testing GPU-enabled clusters, often used with custom images containing pre-installed drivers.
-*   **Secure Boot Clusters:** Deployment of clusters using custom images built with Secure Boot enabled.
+*   **Standard Dataproc on GCE (DPGCE):** Clusters with default or advanced network settings.
+*   **Dataproc on GKE (DPGKE):** Provisioning of GKE clusters and registration of Dataproc virtual clusters.
+*   **Egress Control:** Options for `--nat-egress` (Cloud NAT) or `--swp-egress` (Secure Web Proxy) to test isolated network environments.
+*   **Custom Images & Secure Boot:** Support for deploying clusters using pre-built custom images (`--custom`) and validating Shielded VM Secure Boot constraints.
+*   **GPU-Enabled Clusters:** Facilitates testing hardware accelerators (`--gpu`), integrating seamlessly with local or remote GPU initialization scripts.
 
-## Setup
+## Setup & Configuration
 
-1.  **Prerequisites:** Ensure you have the following tools installed:
-    *   `gcloud` CLI
-    *   `gsutil` (usually part of `gcloud`)
-    *   `jq`: Used to parse and manipulate JSON.
-    *   `sqlite3`: Used to query the state cache.
-    *   `perl`: Used in some utility scripts.
+1.  **Prerequisites:**
+    *   `gcloud` CLI and `gsutil`
+    *   `jq` (for JSON parsing)
+    *   `sqlite3` (for state cache queries)
+    *   `perl` (used in some robust text-manipulation utilities)
 
-2.  **Clone the repository:**
+2.  **Configure Environment (`env.json`):**
+    Copy the sample configuration file to begin:
     ```bash
-    git clone https://github.com/cjac/dataproc-evolution
-    cd dataproc-evolution/cloud-dataproc/gcloud
+    cp env.json.sample env.json
     ```
-    (Note: Adjust clone URL if using a different fork)
+    Edit `env.json` with your specific details. Critical fields include:
+    *   `PROJECT_ID`, `REGION`, `ZONE`: Your target GCP deployment topology.
+    *   `IMAGE_VERSION`: The Dataproc OS/Version to test (e.g., `2.2-ubuntu22`, `2.0-rocky8`).
+    *   `CUSTOM_IMAGE_URI`: The specific GCP image URI to use when deploying with `--custom`.
+    *   `ACCELERATOR_TYPE`: The GPU hardware type to attach when deploying with `--gpu` (e.g., `nvidia-tesla-t4`).
+    *   `BUCKET` / `TEMP_BUCKET`: Target GCS buckets for staging initialization scripts and staging large files.
+    *   `RANGE`, `PRIVATE_RANGE`, `SWP_RANGE`: Subnet CIDR blocks.
 
-3.  **Configure Environment:**
-    *   Copy the sample configuration: `cp env.json.sample env.json`
-    *   Edit `env.json` with your specific Google Cloud project details, region, network ranges, custom image URI, etc.
+## Main Lifecycle Scripts (`bin/`)
 
-## Main Scripts (`bin/`)
+The core workflow centers around the following lifecycle management scripts. Note that scripts ending in `-dpgce` target Dataproc on Compute Engine, while `-dpgke` target Dataproc on GKE.
 
-The workflow centers around these main scripts:
+*   **`bin/audit-dpgce` / `bin/audit-dpgke`**: Queries the live cloud environment to discover deployed resources and updates the local SQLite state cache. Typically called automatically, but useful for manual state inspection.
+*   **`bin/create-dpgce` / `bin/create-dpgke`**: The idempotent creation script. Generates a deployment plan based on missing infrastructure and creates the necessary resources (networks, routers, proxies, node pools, clusters). 
+*   **`bin/destroy-dpgce` / `bin/destroy-dpgke`**: The teardown script. Audits the environment and de-provisions all discovered resources in a safe dependency order. Add `--force` to forcefully delete persistent storage (GCS buckets) and SWP policies.
+*   **`bin/recreate-dpgce` / `bin/recreate-dpgke`**: Utility script to rapidly delete and recreate *only* the Dataproc cluster (or GKE node pools) while leaving the underlying network infrastructure intact. It intelligently loads the *last used flags* from `.state/state.db`.
 
-*   **`bin/audit-dpgce`**: Queries the live cloud environment to discover deployed resources and updates the local SQLite state cache (`${GCLOUD_DIR}/.state/state.db`). Typically called automatically by other scripts, but can be run manually to inspect the current state.
+## Utilities (`bin/`)
 
-*   **`bin/create-dpgce`**: The idempotent creation script. It runs an audit, stores the provided flags (e.g., `--custom`, `--nat-egress`) in the state cache, then generates and executes a plan to create any resources that are missing to achieve the desired state. It does not delete or modify existing resources if they are already present.
+*   **`bin/ssh-m [node-index] [command...]`**: SSH into the master node. Target HA masters using numeric indexes (e.g., `bin/ssh-m 1` for `-m-1`).
+*   **`bin/ssh-w [node-index] [command...]`**: SSH into a worker node (e.g., `bin/ssh-w 0` for `-w-0`).
+*   **`bin/scp-m` / `bin/scp-w`**: Optimized file transfer to cluster nodes. These scripts bypass slow IAP TCP windowing by staging files to a GCS `TEMP_BUCKET` and invoking a remote `gcloud storage cp` pull on the node, dramatically reducing transfer times.
+*   **`bin/setup-cicd.sh`**: Automates the provisioning of a Cloud Build CI/CD pipeline, connecting Cloud Source Repositories, and configuring necessary IAM service accounts for remote integration testing.
 
-*   **`bin/destroy-dpgce`**: The teardown script. It audits the environment and then de-provisions all discovered resources in a safe dependency order. Uses the state cache to know what to delete. Add `--force` to also delete GCS buckets and SWP policies/certificate authorities.
+## Fast Iterative Development (Initialization Actions)
 
-*   **`bin/recreate-cluster.sh`**: Utility script to quickly delete and recreate just the Dataproc cluster VMs. It loads the *last used* flags (`--custom`, `--nat-egress`, etc.) from the `${GCLOUD_DIR}/.state/state.db` to ensure the cluster is recreated with the same configuration. Useful for testing changes to init actions or cluster properties without tearing down the whole network.
+When developing or debugging complex initialization actions (like GPU drivers), destroying and recreating the entire Dataproc cluster takes too much time. Use this optimized workflow for rapid manual testing:
 
-*   **`bin/ssh-m [node-index] [command...]`**: SSHes into the master node. Without arguments, it opens a shell. With arguments, it runs the command on the master node. Defaults to the first master (`-m`). If a number is provided as the first argument, it targets that index in an HA cluster (e.g., `bash bin/ssh-m 1` for `-m-1`).
-
-*   **`bin/scp-m [node-index] <local_path(s)>`**: Copies files or directories from your local machine to the `/tmp` directory on the master node. Similar to `ssh-m`, the first argument can be a node index for HA clusters.
-
-### Example Usage
-
-*   **Create Environment & Cluster with NAT:**
+1.  **Provision a Bare Cluster:** Deploy the cluster with hardware attached but bypass the initialization action execution during boot.
     ```bash
-    bash bin/create-dpgce --nat-egress
+    ./bin/recreate-dpgce --gpu --no-init-action
     ```
-
-*   **Create Environment & Cluster with Custom Image and NAT:**
+2.  **Stage Your Script:** Use the optimized `scp-m` command to transfer your local development script to the node quickly.
     ```bash
-    bash bin/create-dpgce --nat-egress --custom
+    ./bin/scp-m /path/to/your/install_gpu_driver.sh
     ```
-
-*   **Recreate the Cluster (using last saved flags):**
+3.  **Execute and Monitor:** SSH into the node and run the script manually, piping the output to `tee` to mirror standard Dataproc logging.
     ```bash
-    bash bin/recreate-cluster.sh
+    ./bin/ssh-m 'sudo bash -x /tmp/install_gpu_driver.sh 2>&1 | tee /tmp/install_gpu_driver.log'
     ```
-
-*   **Tear Down All Environment Infrastructure:**
+4.  *(Idempotent Retries)*: If your script uses completion sentinels, purge them before testing your fix to ensure the specific phase executes again.
     ```bash
-    bash bin/destroy-dpgce
-    ```
-
-*   **Tear Down Everything, Including Persistent Resources (DANGEROUS):**
-    ```bash
-    bash bin/destroy-dpgce --force
+    ./bin/ssh-m 'sudo rm -rf /opt/install-dpgce/complete'
     ```
 
-*   **SSH to the master node:**
-    ```bash
-    bash bin/ssh-m
-    ```
+## Common CLI Flags
 
-*   **Run a command on the master node:**
-    ```bash
-    bash bin/ssh-m nvidia-smi
-    ```
+Applicable primarily to `create-dpgce` and `recreate-dpgce`:
 
-*   **Copy a file to the master node's /tmp:**
-    ```bash
-    bash bin/scp-m my_script.sh
-    ```
+*   `--custom` / `--no-custom`: Toggle between the `CUSTOM_IMAGE_URI` and standard `IMAGE_VERSION` defined in `env.json`.
+*   `--nat-egress` / `--no-nat-egress`: Enable/disable Cloud NAT for outbound internet access on the cluster subnet.
+*   `--swp-egress` / `--no-swp-egress`: Enable/disable Secure Web Proxy (SWP) for restricted, proxied internet egress.
+*   `--gpu` / `--no-gpu`: Enable/disable attachment of the `ACCELERATOR_TYPE` to the cluster nodes.
+*   `--no-init-action`: Provisions the cluster but skips appending initialization action URIs to the cluster creation command.
+*   `--no-create-cluster`: Sets up all underlying networking, proxies, and dependencies but skips the final `gcloud dataproc clusters create` command.
 
-### Default Behavior
+## Debugging
 
-If `bin/create-dpgce` is run without any flags, it defaults to the following settings:
-
-*   `--no-custom`: Uses the standard image version.
-*   `--nat-egress`: Enables Cloud NAT for internet access.
-*   `--no-swp-egress`: Secure Web Proxy is disabled.
-*   A Dataproc cluster *will* be created.
-
-### Common Flags for `create-dpgce`
-
-*   `--custom`: Use the `CUSTOM_IMAGE_URI` from `env.json` for the cluster.
-*   `--no-custom`: Use the standard `IMAGE_VERSION` from `env.json`.
-*   `--nat-egress`: Ensure Cloud NAT is configured for internet egress from the standard subnet.
-*   `--no-nat-egress`: Do not configure Cloud NAT.
-*   `--swp-egress`: Ensure Secure Web Proxy (SWP) is configured for internet egress.
-*   `--no-swp-egress`: Do not configure Secure Web Proxy.
-*   `--no-create-cluster`: Set up all networking and dependencies but skip the `gcloud dataproc clusters create` command.
-
-### Debugging
-
-*   `DEBUG=1`: Set this environment variable before running any script to enable verbose debug output (`set -x`).
+*   **Trace Execution:** Set `DEBUG=1` before running any script to enable verbose bash execution tracing (`set -x`).
     ```bash
     DEBUG=1 bash bin/create-dpgce --nat-egress
     ```
-*   Logs for each script run are stored in timestamped directories under `/tmp/dataproc-repro/`.
+*   **Audit Logs:** Detailed execution logs for the scripts are stored in timestamped directories under `/tmp/dataproc-repro/`.

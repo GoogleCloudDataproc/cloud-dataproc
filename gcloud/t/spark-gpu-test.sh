@@ -43,7 +43,9 @@ run_ssh_command "nvidia-smi" "NVIDIA SMI"
 
 # 3. PyTorch Test
 PYTORCH_CMD=$(cat <<'EOF'
-source /opt/conda/default/etc/profile.d/conda.sh && conda activate pytorch && python -c '
+PY_BIN=$(find /opt/conda -maxdepth 6 -path "*/envs/pytorch/bin/python" | head -n1)
+if [[ -z "$PY_BIN" ]]; then echo "PyTorch Conda env not found"; exit 1; fi
+$PY_BIN -c '
 import torch
 cuda_available = torch.cuda.is_available()
 print(f"PyTorch CUDA Available: {cuda_available}")
@@ -56,7 +58,9 @@ run_ssh_command "${PYTORCH_CMD}" "PyTorch CUDA Check"
 
 # 4. TensorFlow Test
 TENSORFLOW_CMD=$(cat <<'EOF'
-source /opt/conda/default/etc/profile.d/conda.sh && conda activate tensorflow && python -c '
+PY_BIN=$(find /opt/conda -maxdepth 6 -path "*/envs/tensorflow/bin/python" | head -n1)
+if [[ -z "$PY_BIN" ]]; then echo "TensorFlow Conda env not found"; exit 1; fi
+$PY_BIN -c '
 import tensorflow as tf
 print("TensorFlow GPU Details : ")
 print(tf.config.list_physical_devices("GPU"))
@@ -71,7 +75,7 @@ EOF
 run_ssh_command "${TENSORFLOW_CMD}" "TensorFlow GPU Check"
 
 # 5. GPU Agent Status
-run_ssh_command "systemctl status gpu-utilization-agent.service" "GPU Agent Status"
+run_ssh_command "sudo systemctl status gpu-utilization-agent.service" "GPU Agent Status"
 
 # 6. NVCC Version
 NVCC_CMD='
