@@ -69,7 +69,7 @@ The core workflow centers around the following lifecycle management scripts. Not
 
 ## Utilities (`bin/`)
 
-*   **`bin/ssh-m [node-index] [command...]`**: SSH into the master node. Target HA masters using numeric indexes (e.g., `bin/ssh-m 1` for `-m-1`).
+*   **`bin/ssh-m [node-index] [command...]`**: SSH into the -m node. Target HA -m nodes using numeric indexes (e.g., `bin/ssh-m 1` for `-m-1`).
 *   **`bin/ssh-w [node-index] [command...]`**: SSH into a worker node (e.g., `bin/ssh-w 0` for `-w-0`).
 *   **`bin/scp-m` / `bin/scp-w`**: Optimized file transfer to cluster nodes. These scripts bypass slow IAP TCP windowing by staging files to a GCS `TEMP_BUCKET` and invoking a remote `gcloud storage cp` pull on the node, dramatically reducing transfer times.
 *   **`bin/setup-cicd.sh`**: Automates the provisioning of a Cloud Build CI/CD pipeline, connecting Cloud Source Repositories, and configuring necessary IAM service accounts for remote integration testing.
@@ -86,12 +86,14 @@ When developing or debugging complex initialization actions (like GPU drivers), 
     ```bash
     ./bin/scp-m /path/to/your/install_gpu_driver.sh
     ```
-3.  **Execute and Monitor:** SSH into the node and run the script manually, piping the output to `tee` to mirror standard Dataproc logging.
+4.  **Execute and Monitor (Robust Execution):** Instead of standard SSH, use the `install-in-screen.sh` wrapper to execute the script. This safely encapsulates the execution in a detached `screen` session. If your SSH connection drops, running the command again will instantly re-attach you without interrupting the build.
     ```bash
-    ./bin/ssh-m 'sudo bash -x /tmp/install_gpu_driver.sh 2>&1 | tee /tmp/install_gpu_driver.log'
+    cd ../initialization-actions
+    ./gpu/install-in-screen.sh
     ```
-4.  *(Idempotent Retries)*: If your script uses completion sentinels, purge them before testing your fix to ensure the specific phase executes again.
+5.  *(Idempotent Retries)*: If your script uses completion sentinels, purge them before testing your fix to ensure the specific phase executes again.
     ```bash
+    cd ../cloud-dataproc/gcloud
     ./bin/ssh-m 'sudo rm -rf /opt/install-dpgce/complete'
     ```
 
