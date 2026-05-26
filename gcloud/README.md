@@ -105,7 +105,7 @@ Applicable primarily to `create-dpgce` and `recreate-dpgce`:
 *   `--nat-egress` / `--no-nat-egress`: Enable/disable Cloud NAT for outbound internet access on the cluster subnet.
 *   `--swp-egress` / `--no-swp-egress`: Enable/disable Secure Web Proxy (SWP) for restricted, proxied internet egress.
 *   `--gpu` / `--no-gpu`: Enable/disable attachment of the `ACCELERATOR_TYPE` to the cluster nodes.
-*   `--no-init-action`: Provisions the cluster but skips appending initialization action URIs to the cluster creation command.
+*   `--no-init-action`: Provisions the cluster but skips appending initialization action URIs to the cluster creation command. Useful for development scenarios where init actions are applied manually after boot.
 *   `--no-create-cluster`: Sets up all underlying networking, proxies, and dependencies but skips the final `gcloud dataproc clusters create` command.
 
 ## Debugging
