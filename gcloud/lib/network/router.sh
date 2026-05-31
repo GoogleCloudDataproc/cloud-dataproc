@@ -2,115 +2,103 @@
 #
 # Router and NAT functions
 
-function create_router () {
-  local phase_name="create_router"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Creating Router ${ROUTER_NAME}..."
-    report_result "Exists"
-    return 0
-  fi
+function exists_router() {
+    _check_exists gcloud compute routers describe "${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="json(name,selfLink)"
+}
+export -f exists_router
 
+function create_router () {
   print_status "Creating Router ${ROUTER_NAME}..."
   local log_file="create_router_${ROUTER_NAME}.log"
-  if gcloud compute routers describe "${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > /dev/null 2>&1;
- then
-    report_result "Exists"
-    create_sentinel "${phase_name}" "done"
+  if run_gcloud "${log_file}" gcloud compute routers create "${ROUTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --network="${NETWORK}" \
+    --asn="${ASN_NUMBER}" \
+    --region="${REGION}"; then
+    report_result "Created"
+    refresh_resource_state "cloudRouter" "lib/network/router.sh" exists_router
   else
-    if run_gcloud "${log_file}" gcloud compute routers create ${ROUTER_NAME} \
-      --project=${PROJECT_ID} \
-      --network=${NETWORK} \
-      --asn=${ASN_NUMBER} \
-      --region=${REGION}; then
-      report_result "Created"
-      create_sentinel "${phase_name}" "done"
-    else
-      report_result "Fail"
-      return 1
-    fi
+    report_result "Fail"
+    return 1
   fi
 }
 export -f create_router
 
-function add_nat_policy () {
-  local phase_name="add_nat_policy"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Adding NAT to Router ${ROUTER_NAME}..."
-    report_result "Exists"
-    return 0
-  fi
-
+function add_nat_to_router () {
   print_status "Adding NAT to Router ${ROUTER_NAME}..."
   local log_file="add_nat_${ROUTER_NAME}.log"
-  if gcloud compute routers nats describe nat-config --router="${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > /dev/null 2>&1;
- then
-    report_result "Exists"
-    create_sentinel "${phase_name}" "done"
+
+  # Attempt to delete nat-config first, ignore errors
+  gcloud compute routers nats delete "nat-config" \
+    --router-region "${REGION}" \
+    --router "${ROUTER_NAME}" \
+    --project="${PROJECT_ID}" --quiet > /dev/null 2>&1 || true
+  sleep 5 # Brief pause to allow delete to propagate
+
+  if run_gcloud "${log_file}" gcloud compute routers nats create "nat-config" \
+    --router-region "${REGION}" \
+    --router "${ROUTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --nat-custom-subnet-ip-ranges "${SUBNET}" \
+    --auto-allocate-nat-external-ips; then
+    report_result "Created"
+    refresh_resource_state "cloudRouter" "lib/network/router.sh" exists_router
+    refresh_resource_state "cloudRouterNAT" "lib/network/router.sh" exists_router_nat "nat-config"
   else
-    if run_gcloud "${log_file}" gcloud compute routers nats create nat-config \
-      --router-region ${REGION} \
-      --router ${ROUTER_NAME} \
-      --project="${PROJECT_ID}" \
-      --nat-custom-subnet-ip-ranges "${SUBNET}" \
-      --auto-allocate-nat-external-ips; then
-      report_result "Created"
-      create_sentinel "${phase_name}" "done"
-    else
-      report_result "Fail"
-      return 1
-    fi
+    report_result "Fail"
+    return 1
   fi
 }
-export -f add_nat_policy
+export -f add_nat_to_router
 
-function delete_nat_configs() {
-  local phase_name="add_nat_policy"
-  print_status "Deleting NAT Configs from ${ROUTER_NAME}..."
-  local log_file="delete_nats_${ROUTER_NAME}.log"
-  local found_some=false
-  local all_ok=true
+function remove_nat_from_router () {
+  print_status "Removing NAT configuration 'nat-config' from ${ROUTER_NAME}..."
+  local log_file="remove_nat_${ROUTER_NAME}.log"
+  local cmd=(
+    gcloud compute routers nats delete "nat-config"
+    --router-region "${REGION}"
+    --router "${ROUTER_NAME}"
+    --project="${PROJECT_ID}"
+    --quiet
+  )
+  if run_gcloud "${log_file}" "${cmd[@]}"; then
+    report_result "Deleted"
+    update_state "cloudRouterNAT" "null"
+  else
+    report_result "Fail"
+    return 1
+  fi
+}
+export -f remove_nat_from_router
 
-  if gcloud compute routers describe "${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
-    NATS=$(gcloud compute routers nats list --router="${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --format="value(name)" 2>/dev/null || true)
-    if [[ -n "${NATS}" ]]; then
-      found_some=true
-      while read -r nat_name; do
-        # print_status "  Deleting NAT ${nat_name} from ${ROUTER_NAME}..."
-        if ! run_gcloud "${log_file}" gcloud compute routers nats delete "${nat_name}" --router="${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}" --quiet; then
-          all_ok=false
-        fi
-      done <<< "${NATS}"
-    fi
+function delete_router () {
+  if [[ -n $(get_state "cloudRouterNAT") ]]; then
+    print_status "Deleting NAT from Router ${ROUTER_NAME}..."
+    local log_file="delete_nat_${ROUTER_NAME}.log"
+    # Don't fail if the NAT doesn't exist in GCP, as state might be slightly stale
+    run_gcloud "${log_file}" gcloud compute routers nats delete "nat-config" \
+      --router-region "${REGION}" \
+      --router "${ROUTER_NAME}" \
+      --project="${PROJECT_ID}" --quiet || true
+    update_state "cloudRouterNAT" "null"
   fi
 
-  if [[ "${found_some}" = false ]]; then
-    report_result "Not Found"
-    remove_sentinel "${phase_name}" "done"
-  elif [[ "${all_ok}" = true ]]; then
+  print_status "Deleting Router ${ROUTER_NAME}..."
+  log_file="delete_router_${ROUTER_NAME}.log"
+  if run_gcloud "${log_file}" gcloud compute routers delete --quiet "${ROUTER_NAME}" \
+    --region="${REGION}" \
+    --project="${PROJECT_ID}"; then
     report_result "Deleted"
-    remove_sentinel "${phase_name}" "done"
+    update_state "cloudRouter" "null"
   else
     report_result "Fail"
   fi
 }
-export -f delete_nat_configs
-
-function delete_router () {
-  local phase_name="create_router"
-  print_status "Deleting Router ${ROUTER_NAME}..."
-  local log_file="delete_router_${ROUTER_NAME}.log"
-
-  local router_check=$(gcloud compute routers list --regions="${REGION}" --project="${PROJECT_ID}" --filter="name = ${ROUTER_NAME}" --format="value(name)" 2>/dev/null)
-  if [[ -n "${router_check}" ]]; then
-    if run_gcloud "${log_file}" gcloud compute routers delete --quiet --region ${REGION} "${ROUTER_NAME}" --project="${PROJECT_ID}"; then
-      report_result "Deleted"
-      remove_sentinel "${phase_name}" "done"
-    else
-      report_result "Fail"
-    fi
-  else
-    report_result "Not Found"
-    remove_sentinel "${phase_name}" "done"
-  fi
-}
 export -f delete_router
+
+function exists_router_nat() {
+  local nat_name="$1"
+  # gcloud compute routers nats describe returns non-zero if not found
+  _check_exists gcloud compute routers nats describe "${nat_name}" --router="${ROUTER_NAME}" --region="${REGION}" --project="${PROJECT_ID}"
+}
+export -f exists_router_nat

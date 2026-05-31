@@ -15,29 +15,23 @@
 # limitations under the License.
 #
 
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
 
-# perform_connectivity_tests
+source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gke.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
 
-# Perform some connectivity tests
+init_state_db
 
+# Only destroy GKE-specific components
+delete_dpgke_cluster
 delete_gke_cluster
-
-# Delete gke dataproc cluster
-
-delete_service_account
-
-delete_firewall_rules
-
-delete_subnet
-
-# Delete a cloud router
-delete_router
-
-# create_vpc_peering
-# create_ip_allocation
-delete_vpc_network
-
-#enable_services
-delete_bucket
-

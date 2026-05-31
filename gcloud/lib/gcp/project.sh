@@ -3,13 +3,6 @@
 # GCP Project related functions
 
 function create_project(){
-  local phase_name="create_project"
-  if check_sentinel "${phase_name}" "done"; then
-    print_status "Checking Project ${PROJECT_ID}..."
-    report_result "Exists"
-    return 0
-  fi
-
   print_status "Checking Project ${PROJECT_ID}..."
   local log_file="create_project_${PROJECT_ID}.log"
   local PROJ_DESCRIPTION=$(gcloud projects describe ${PROJECT_ID} --format json 2>/dev/null)
@@ -67,13 +60,11 @@ EOF
     else
       report_result "Pass"
     fi
-    create_sentinel "${phase_name}" "done"
   fi
 }
 export -f create_project
 
 function delete_project() {
-  local phase_name="create_project"
   print_status "Deleting Project ${PROJECT_ID}..."
   local log_file="delete_project_${PROJECT_ID}.log"
 
@@ -97,7 +88,6 @@ function delete_project() {
   print_status "  Deleting project ${PROJECT_ID}... "
   if gcloud projects delete --quiet ${PROJECT_ID} >> "${REPRO_TMPDIR}/${log_file}" 2>&1; then
     report_result "Deleted"
-    remove_sentinel "${phase_name}" "done"
   else
     report_result "Fail"
   fi

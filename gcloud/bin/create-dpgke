@@ -67,17 +67,17 @@ grant_gke_roles
 if [[ "${CREATE_CLUSTER}" = true ]]; then
   print_status "Creating GKE Cluster ${GKE_CLUSTER_NAME}..."
   if create_gke_cluster; then
-    print_result "Pass"
+    report_result "Pass"
   else
-    print_result "Fail"
+    report_result "Fail"
     exit 1
   fi
 
   print_status "Creating Dataproc on GKE Cluster ${DPGKE_CLUSTER_NAME}..."
   if create_dpgke_cluster; then
-    print_result "Pass"
+    report_result "Pass"
   else
-    print_result "Fail"
+    report_result "Fail"
     exit 1
   fi
 else

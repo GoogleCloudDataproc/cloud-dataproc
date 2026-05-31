@@ -14,43 +14,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Set RESOURCE_SUFFIX based on TIMESTAMP env var or generate new
-if [[ -n "${TIMESTAMP}" ]]; then
-  export RESOURCE_SUFFIX="${TIMESTAMP}"
-  echo "Using provided TIMESTAMP for resources: ${RESOURCE_SUFFIX}"
-else
-  export RESOURCE_SUFFIX="$(date +%s)"
-  echo "Generated new TIMESTAMP for resources: ${RESOURCE_SUFFIX}"
-fi
-export REPRO_TMPDIR="${REPRO_TMPDIR:-/tmp/dataproc-repro/${RESOURCE_SUFFIX}}"
-mkdir -p "${REPRO_TMPDIR}"
-export SENTINEL_DIR="${SENTINEL_DIR:-${REPRO_TMPDIR}/sentinels}"
-mkdir -p "${SENTINEL_DIR}"
+# --- Get lib's real directory ---
+LIB_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+GCLOUD_DIR="$(realpath "${LIB_DIR}/..")"
+export GCLOUD_DIR
 
-source lib/script-utils.sh
+export STATE_DIR="${GCLOUD_DIR}/.state"
+mkdir -p "${STATE_DIR}"
+export STATE_DB="${STATE_DIR}/state.db"
+
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+init_state_db
+
+# Load or generate persistent TIMESTAMP
+if [[ -z "${TIMESTAMP:-}" ]]; then
+  # Try to load from state database
+  PERSISTENT_TIMESTAMP=$(get_state "config.timestamp")
+  if [[ "${PERSISTENT_TIMESTAMP}" != "null" && -n "${PERSISTENT_TIMESTAMP}" ]]; then
+    export TIMESTAMP="${PERSISTENT_TIMESTAMP}"
+    # echo "INFO: Loaded persistent TIMESTAMP: ${TIMESTAMP}" >&2
+  else
+    # Fallback to current time and save it
+    export TIMESTAMP=$(date +%s)
+    update_state "config.timestamp" "${TIMESTAMP}"
+    # echo "INFO: Generated new persistent TIMESTAMP: ${TIMESTAMP}" >&2
+  fi
+fi
+
+# Ensure paths are based on the correct persistent TIMESTAMP
+export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+mkdir -p "${REPRO_TMPDIR}"
+export LOG_DIR="${REPRO_TMPDIR}/logs"
+mkdir -p "${LOG_DIR}"
 
 export PATH_SEPARATOR=";"
-export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER env.json)"
-export DOMAIN="$(jq -r .DOMAIN env.json)"
-export USER="$(jq -r .USER env.json)"
-export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN env.json)"
-export PRIV_USER="$(jq -r .PRIV_USER env.json)"
-export PROJECT_ID="$(jq -r .PROJECT_ID env.json)"
+export FOLDER_NUMBER="$(jq -r .FOLDER_NUMBER "${GCLOUD_DIR}/env.json")"
+export DOMAIN="$(jq -r .DOMAIN "${GCLOUD_DIR}/env.json")"
+export USER="$(jq -r .USER "${GCLOUD_DIR}/env.json")"
+export PRIV_DOMAIN="$(jq -r .PRIV_DOMAIN "${GCLOUD_DIR}/env.json")"
+export PRIV_USER="$(jq -r .PRIV_USER "${GCLOUD_DIR}/env.json")"
+export PROJECT_ID="$(jq -r .PROJECT_ID "${GCLOUD_DIR}/env.json")"
 if [[ "${PROJECT_ID}" == "ldap-example-yyyy-nn" ]]; then
   export PROJECT_ID="${USER}-example-$(date +%Y-%U)"
 fi
-export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT env.json)"
-export CLUSTER_NAME="$(jq -r .CLUSTER_NAME env.json)"
-export BUCKET="$(jq -r .BUCKET env.json)"
-export TEMP_BUCKET="$(jq -r .TEMP_BUCKET env.json)"
-export RANGE="$(jq -r .RANGE env.json)"
-export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT env.json)"
-export ASN_NUMBER="$(jq -r .ASN_NUMBER env.json)"
-export IMAGE_VERSION="$(jq -r .IMAGE_VERSION env.json)"
-export REGION="$(jq -r .REGION env.json)"
-export DEBUG="${DEBUG:-0}"
+export BILLING_ACCOUNT="$(jq -r .BILLING_ACCOUNT "${GCLOUD_DIR}/env.json")"
+export CLUSTER_NAME="$(jq -r .CLUSTER_NAME "${GCLOUD_DIR}/env.json")"
+export BUCKET="$(jq -r .BUCKET "${GCLOUD_DIR}/env.json")"
+export TEMP_BUCKET="$(jq -r .TEMP_BUCKET "${GCLOUD_DIR}/env.json")"
+export RANGE="$(jq -r .RANGE "${GCLOUD_DIR}/env.json")"
+export SWP_RANGE="$(jq -r .SWP_RANGE "${GCLOUD_DIR}/env.json")"
+export SWP_SUBNET="swp-subnet-${CLUSTER_NAME}"
+export IDLE_TIMEOUT="$(jq -r .IDLE_TIMEOUT "${GCLOUD_DIR}/env.json")"
+export ASN_NUMBER="$(jq -r .ASN_NUMBER "${GCLOUD_DIR}/env.json")"
+if [[ "${ASN_NUMBER}" == "null" ]]; then
+  export ASN_NUMBER="65531"
+fi
+export IMAGE_VERSION="$(jq -r .IMAGE_VERSION "${GCLOUD_DIR}/env.json")"
+export REGION="$(jq -r .REGION "${GCLOUD_DIR}/env.json")"
+export ZONE="$(jq -r .ZONE "${GCLOUD_DIR}/env.json")"
+export REGION ZONE
+export SWP_IP="$(jq -r .SWP_IP "${GCLOUD_DIR}/env.json")"
+export SWP_PORT="$(jq -r .SWP_PORT "${GCLOUD_DIR}/env.json")"
+export SWP_HOSTNAME="$(jq -r .SWP_HOSTNAME "${GCLOUD_DIR}/env.json")"
+export UNIVERSE_DOMAIN="$(jq -r .UNIVERSE_DOMAIN "${GCLOUD_DIR}/env.json")"
+if [[ "${UNIVERSE_DOMAIN}" == "null" ]]; then
+  export UNIVERSE_DOMAIN="googleapis.com"
+fi
 
-export ZONE="${REGION}-b"
+# Manual overrides for testing specific driver/CUDA packages during cluster creation
+# export CUDA_URL="$(jq -r .CUDA_URL "${GCLOUD_DIR}/env.json")"
+# export GPU_DRIVER_URL="$(jq -r .GPU_DRIVER_URL "${GCLOUD_DIR}/env.json")"
+export SWP_POLICY_NAME="swp-policy-${CLUSTER_NAME}"
+export SWP_INSTANCE_NAME="swp-gateway-${CLUSTER_NAME}"
+export SWP_CERT_NAME="swp-cert-${CLUSTER_NAME}-${RESOURCE_SUFFIX}"
+export DEBUG="${DEBUG:-0}"
 #export ZONE="${REGION}-b"
 #export IMAGE_VERSION="2.0"
 #export IMAGE_VERSION="2.0.67-debian10" # final proprietary gpu support - April 26, 2024 - 5.10.0-0.deb10.16-amd64
@@ -86,6 +123,7 @@ else
 fi
 
 export INIT_ACTIONS_ROOT="gs://${BUCKET}/dataproc-initialization-actions"
+export GCE_PROXY_SETUP_URI="${INIT_ACTIONS_ROOT}/gce-proxy-setup.sh"
 export YARN_DOCKER_IMAGE="gcr.io/${PROJECT_ID}/${USER}/cudatest-ubuntu18:latest"
 export SPARK_PROPERTIES="spark:spark.yarn.unmanagedAM.enabled=false,spark:spark.task.resource.gpu.amount=1,spark:spark.executor.cores=1,spark:spark.task.cpus=1,spark:spark.executor.memory=4G"
 export DOCKER_PROPERTIES="dataproc:docker.yarn.enable=true"
@@ -109,15 +147,15 @@ export PRINCIPAL="${USER}@${DOMAIN}"
 export ARTIFACT_REPOSITORY="${PROJECT_ID}-dataproc-repro"
 
 # BigTable
-export BIGTABLE_INSTANCE="$(jq -r .BIGTABLE_INSTANCE env.json)"
+export BIGTABLE_INSTANCE="$(jq -r .BIGTABLE_INSTANCE "${GCLOUD_DIR}/env.json")"
 if [[ "${BIGTABLE_INSTANCE}" == "null" ]]; then
   BIGTABLE_INSTANCE="${USER}-bigtable0"
 fi
-export BIGTABLE_DISPLAY_NAME="$(jq -r .BIGTABLE_DISPLAY_NAME env.json)"
+export BIGTABLE_DISPLAY_NAME="$(jq -r .BIGTABLE_DISPLAY_NAME "${GCLOUD_DIR}/env.json")"
 if [[ "${BIGTABLE_DISPLAY_NAME}" == "null" ]]; then
   BIGTABLE_DISPLAY_NAME="bigtable-${CLUSTER_NAME}"
 fi
-export BIGTABLE_CLUSTER_CONFIG="$(jq -r .BIGTABLE_CLUSTER_CONFIG env.json)"
+export BIGTABLE_CLUSTER_CONFIG="$(jq -r .BIGTABLE_CLUSTER_CONFIG "${GCLOUD_DIR}/env.json")"
 if [[ "${BIGTABLE_CLUSTER_CONFIG}" == "null" ]]; then
   BIGTABLE_CLUSTER_CONFIG="id=${BIGTABLE_DISPLAY_NAME},zone=${ZONE},nodes=3"
 fi
@@ -151,7 +189,12 @@ export MR_HISTORY_BUCKET="${BUCKET}/*/mapreduce-job-history/done"
 #export MACHINE_TYPE="n1-highmem-8"
 #export MACHINE_TYPE="n1-standard-16"
 export MACHINE_TYPE="n1-standard-32"
+#export MACHINE_TYPE="n1-standard-64"
 #export MACHINE_TYPE="n1-standard-96"
+#export MACHINE_TYPE="n1-highmem-32"
+#export MACHINE_TYPE="a4x-highgpu-4g"
+#export MACHINE_TYPE="a4x-maxgpu-4g-metal"
+#export MACHINE_TYPE="a4-highgpu-8g"
 #export MACHINE_TYPE="e2-standard-2"
 # g2- are for l4 GPUs
 #export MACHINE_TYPE="g2-standard-4"
@@ -161,79 +204,26 @@ export MACHINE_TYPE="n1-standard-32"
 #export MACHINE_TYPE="a2-highgpu-1g"
 #export MACHINE_TYPE="a2-highgpu-2g"
 # a3- are for h100 GPUs
+# export MACHINE_TYPE="g4-standard-48" # (1 GPU)
+# export MACHINE_TYPE="g4-standard-96" # (2 GPUs)
+# export MACHINE_TYPE="g4-standard-192" # (4 GPUs)
+# export MACHINE_TYPE="g4-standard-384" # (8 GPUs)
 #export MACHINE_TYPE="a3-highgpu-8g"
+#export MACHINE_TYPE="a3-highgpu-1g"
 #export MACHINE_TYPE="a3-highgpu-2g"
 #export MACHINE_TYPE="a3-highgpu-4g"
 #export MACHINE_TYPE="n2d-standard-8"
-export MASTER_MACHINE_TYPE="${MACHINE_TYPE}"
-#export MASTER_MACHINE_TYPE="n1-standard-96"
-#export MASTER_MACHINE_TYPE="n1-standard-8"
-#export MASTER_MACHINE_TYPE="a2-highgpu-8g"
-#export MASTER_MACHINE_TYPE="a3-highgpu-8g"
+export M_MACHINE_TYPE="${MACHINE_TYPE}"
+#export M_MACHINE_TYPE="n1-standard-96"
+#export M_MACHINE_TYPE="n1-standard-8"
+#export M_MACHINE_TYPE="a2-highgpu-8g"
+#export M_MACHINE_TYPE="a3-highgpu-8g"
 export PRIMARY_MACHINE_TYPE="${MACHINE_TYPE}"
 #export PRIMARY_MACHINE_TYPE="n1-standard-8"
 #export PRIMARY_MACHINE_TYPE="g2-standard-4"
 #export PRIMARY_MACHINE_TYPE="e2-standard-4"
 #export PRIMARY_MACHINE_TYPE="n2d-highmem-32"
 export SECONDARY_MACHINE_TYPE="${PRIMARY_MACHINE_TYPE}"
-
-#export CUDNN_VERSION="8.0.5.39"
-#export NCCL_VERSION="2.8.4"
-#export DRIVER_VERSION="455.45.01"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100"
-#export ACCELERATOR_TYPE="nvidia-tesla-a100"
-#export ACCELERATOR_TYPE="nvidia-tesla-a100,count=2"
-export ACCELERATOR_TYPE="nvidia-tesla-t4"
-#export ACCELERATOR_TYPE="nvidia-l4"
-#export ACCELERATOR_TYPE="nvidia-tesla-p4,count=2"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100,count=2"
-#export ACCELERATOR_TYPE="nvidia-tesla-v100,count=4"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=4"
-#export ACCELERATOR_TYPE="nvidia-h100-80gb,count=2"
-#export MASTER_ACCELERATOR_TYPE="nvidia-tesla-t4,count=4"
-#export MASTER_ACCELERATOR_TYPE="nvidia-tesla-t4"
-#export MASTER_ACCELERATOR_TYPE="nvidia-tesla-a100,count=2"
-#export MASTER_ACCELERATOR_TYPE="nvidia-tesla-a100,count=8"
-#export MASTER_ACCELERATOR_TYPE="nvidia-h100-80gb,count=8"
-export MASTER_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-export PRIMARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
-#export CUDA_VERSION=10.2.89
-#export CUDA_VERSION=11.0
-#export DRIVER_VERSION="440.100"
-#export CUDA_VERSION=11.1
-#export DRIVER_VERSION="455.45.01"
-#export CUDA_VERSION=11.2
-#export DRIVER_VERSION="460.91.03"
-#export CUDA_VERSION=11.3
-#export DRIVER_VERSION="465.31"
-#export CUDA_VERSION=11.5
-#export CUDA_VERSION="11.1"
-#export DRIVER_VERSION="455.45.01"
-#export DRIVER_VERSION="470.256.02"
-#export CUDA_VERSION=11.2
-#export CUDA_VERSION=11.7
-#export CUDA_VERSION=11.8
-#export CUDA_VERSION=12.0
-#export CUDA_VERSION=12.1.1
-#export CUDA_VERSION=12.2
-#export CUDA_VERSION=12.1.1
-#export CUDA_VERSION=12.4
-# export CUDA_VERSION=12.4.0
-#export CUDA_VERSION="12.4.1"
-#export DRIVER_VERSION="550.135"
-#export CUDA_VERSION="12.6"
-#export CUDA_VERSION="12.6.2"
-#export CUDA_VERSION="12.6.3"
-#export DRIVER_VERSION="550.142"
-#export DRIVER_VERSION="460.73.01"
-#export DRIVER_VERSION="550.54.14"
-#export DRIVER_VERSION="560.35.03"
-#export DRIVER_VERSION="550.135"
-#export NCCL_VERSION="2.8.3"
-#export CUDNN_VERSION="8.0.5.39"
-#export NCCL_VERSION="2.8.4"
-#export ACCELERATOR_TYPE="nvidia-tesla-p100"
 
 # DPGKE
 export DPGKE_NAMESPACE=k8sns-${CLUSTER_NAME}
@@ -266,6 +256,20 @@ export HIVE_CLUSTER_NAME="hive-${CLUSTER_NAME}"
 export HIVE_DATA_BUCKET="${BUCKET}"
 export WAREHOUSE_BUCKET="gs://${HIVE_DATA_BUCKET}"
 export HIVE_METASTORE_WAREHOUSE_DIR="${WAREHOUSE_BUCKET}/datasets"
+
+# CI/CD Variables
+export CI_PROJECT_ID="$(jq -r .CI_PROJECT_ID "${GCLOUD_DIR}/env.json")"
+export CI_GCP_CREDENTIALS_PATH="$(jq -r .CI_GCP_CREDENTIALS_PATH "${GCLOUD_DIR}/env.json")"
+export CI_CSR_REPO_NAME="$(jq -r .CI_CSR_REPO_NAME "${GCLOUD_DIR}/env.json")"
+export CI_CSR_REGION="$(jq -r .CI_CSR_REGION "${GCLOUD_DIR}/env.json")"
+export CI_GITHUB_CONNECTION_NAME="$(jq -r .CI_GITHUB_CONNECTION_NAME "${GCLOUD_DIR}/env.json")"
+export CI_TRIGGER_BRANCH="$(jq -r .CI_TRIGGER_BRANCH "${GCLOUD_DIR}/env.json")"
+export CUSTOM_IMAGE_URI="$(jq -r .CUSTOM_IMAGE_URI "${GCLOUD_DIR}/env.json")"
+if [[ "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+  unset CUSTOM_IMAGE_URI
+fi
+export CI_REPO_OWNER="$(jq -r .CI_REPO_OWNER "${GCLOUD_DIR}/env.json")"
+export CI_BYOSA_EMAIL="$(jq -r .CI_BYOSA_EMAIL "${GCLOUD_DIR}/env.json")"
 
 function configure_environment() {
   dataproc_repro_configure_environment=1
@@ -311,7 +315,7 @@ function configure_environment() {
   #
   # MOK config for secure boot
   #
-  eval "$(bash lib/secure-boot/create-key-pair.sh)"
+  eval "$(bash "${GCLOUD_DIR}/lib/secure-boot/create-key-pair.sh")"
   #modulus_md5sum=cd2bd1bdd9f9e4c43c12aecf6c338d6f
   #private_secret_name=efi-db-priv-key-042
   #public_secret_name=efi-db-pub-key-042
@@ -333,10 +337,7 @@ function configure_environment() {
   # The reader will then need to pass the
   # `--image="projects/${PROJECT_ID}/global/images/"${PURPOSE}-${dataproc_version/\./-}-${timestamp}"`
   # argument instead of `--image-version "${IMAGE_VERSION}"` when
-  # performing the gcloud dataproc clusters create command.  Modify the
-  # call to gcloud in lib/shared-functions.sh's create_dpgce_cluster
-  # function.
-
+  # performing the gcloud dataproc clusters create command.
 }
 
 [[ -v dataproc_repro_configure_environment ]] || configure_environment

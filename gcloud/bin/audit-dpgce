@@ -1,0 +1,268 @@
+#!/bin/bash
+#
+# Universal audit script for all Dataproc on GCE environment variations.
+#
+# This script populates the state.db SQLite database with the current state of GCP resources.
+
+# Exit on failure
+set -e
+
+# --- Argument Parsing ---
+ARG_TIMESTAMP=""
+while (( "$#" )); do
+  case "$1" in
+    --timestamp)
+      if [[ -n "$2" && "$2" != --* ]]; then
+        ARG_TIMESTAMP="$2"
+        shift 2
+      else
+        echo "Error: --timestamp requires an argument" >&2
+        exit 1
+      fi
+      ;;
+    -*)
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *)
+      # Ignore other params
+      shift
+      ;;
+  esac
+done
+
+export ARG_TIMESTAMP
+
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
+
+# --- Source environment variables and utility functions ---
+source "${GCLOUD_DIR}/lib/env.sh"
+
+# Override TIMESTAMP if provided as an argument
+if [[ -n "${ARG_TIMESTAMP}" ]]; then
+  export TIMESTAMP="${ARG_TIMESTAMP}"
+  # Re-set variables derived from TIMESTAMP
+  export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+  export LOG_DIR="${REPRO_TMPDIR}/logs"
+  mkdir -p "${REPRO_TMPDIR}"
+  mkdir -p "${LOG_DIR}"
+  echo "Using provided TIMESTAMP for resources: ${TIMESTAMP}" >&2
+fi
+
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+
+# Initialize the state database and table
+init_state_db
+
+AUDIT_TEMP_DIR="${REPRO_TMPDIR}/audit_results"
+rm -rf "${AUDIT_TEMP_DIR}"
+mkdir -p "${AUDIT_TEMP_DIR}"
+PIDS=()
+
+# Function to run a check in the background, writing output to a temp file
+run_check() {
+  local key="$1"
+  local source_file="$2"
+  local func_name="$3"
+  shift 3
+  local cmd_out="${AUDIT_TEMP_DIR}/${key}.json"
+
+  (
+    cd "${GCLOUD_DIR}"
+    source "./lib/env.sh" # Ensure env vars are set in subshell
+    if [[ -n "${ARG_TIMESTAMP}" ]]; then # Re-apply override if needed
+      export TIMESTAMP="${ARG_TIMESTAMP}"
+      export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+      export LOG_DIR="${REPRO_TMPDIR}/logs"
+    fi
+    source "./lib/script-utils.sh"
+    source "./${source_file}" # Relative to GCLOUD_DIR
+    "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
+  ) &
+  PIDS+=($!)
+}
+
+# Function to run a check for commands in script-utils.sh or env.sh
+run_shared_check() {
+  local key="$1"
+  local func_name="$2"
+  shift 2
+  local cmd_out="${AUDIT_TEMP_DIR}/${key}.json"
+  (
+    cd "${GCLOUD_DIR}"
+    source "./lib/env.sh" # Ensure env vars are set in subshell
+    if [[ -n "${ARG_TIMESTAMP}" ]]; then # Re-apply override if needed
+      export TIMESTAMP="${ARG_TIMESTAMP}"
+      export REPRO_TMPDIR="/tmp/dataproc-repro/${TIMESTAMP}"
+      export LOG_DIR="${REPRO_TMPDIR}/logs"
+    fi
+    source "./lib/script-utils.sh"
+    "${func_name}" "$@" > "${cmd_out}" 2> "${cmd_out%.json}.err"
+  ) &
+  PIDS+=($!)
+}
+
+# --- Infrastructure State Checks ---
+run_shared_check "project" _check_exists gcloud projects describe "${PROJECT_ID}" --format="json(lifecycleState,projectId)"
+run_shared_check "billing" _check_exists gcloud beta billing projects describe "${PROJECT_ID}" --format="json(billingEnabled)"
+
+# --- Resource Existence Checks ---
+run_check "vpcNetwork" "lib/network/network.sh" exists_network
+run_check "standardSubnet" "lib/network/subnet.sh" exists_subnet "${SUBNET}"
+run_check "privateSubnet" "lib/network/subnet.sh" exists_subnet "${PRIVATE_SUBNET}"
+run_check "swpSubnet" "lib/network/subnet.sh" exists_subnet "${SWP_SUBNET}"
+run_check "cloudRouter" "lib/network/router.sh" exists_router
+run_check "cloudRouterNAT" "lib/network/router.sh" exists_router_nat "nat-config"
+run_check "firewallRule-ssh" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CLUSTER_NAME}-in-ssh"
+run_check "firewallRule-internal" "lib/swp/firewall.sh" exists_firewall_rule "fw-${CLUSTER_NAME}-in-internal"
+run_shared_check "routes" _check_exists gcloud compute routes list --project="${PROJECT_ID}" --filter="network~/${NETWORK}$" --format="json(name,selfLink)"
+run_check "serviceAccount" "lib/gcp/iam.sh" exists_service_account
+run_check "serviceAccountBindings" "lib/gcp/iam.sh" get_service_account_bindings
+run_check "serviceAccountRolesReady" "lib/gcp/iam.sh" check_service_account_bindings
+run_check "autoscalingPolicy" "lib/dataproc/autoscaling.sh" exists_autoscaling_policy
+run_check "dataprocCluster" "lib/dataproc/cluster.sh" exists_dpgce_cluster
+run_check "dataprocClusterVMs" "lib/dataproc/cluster.sh" exists_dataproc_cluster_vms
+run_check "anyNetworkVms" "lib/gcp/misc.sh" get_any_network_vms_state
+run_check "debugVms" "lib/gcp/misc.sh" exists_debug_vms
+run_check "bigtableInstance" "lib/bigtable.sh" exists_bigtable_instance
+run_check "legacyMssqlInstance" "lib/database/mssql.sh" exists_legacy_mssql_instance
+run_check "mssqlInstance" "lib/database/mssql.sh" exists_mssql_instance
+run_check "mysqlInstance" "lib/database/mysql.sh" exists_mysql_instance
+run_check "oracleVm" "lib/database/oracle.sh" exists_oracle_vm
+run_check "pgsqlInstance" "lib/database/pgsql.sh" exists_pgsql_instance
+run_check "artifactsRepository" "lib/gcp/gcr.sh" exists_artifacts_repository
+run_check "gcsBucket" "lib/gcp/gcs.sh" exists_gcs_bucket "${BUCKET}"
+run_check "gcsTempBucket" "lib/gcp/gcs.sh" exists_gcs_bucket "${TEMP_BUCKET}"
+run_check "mysqlSecret" "lib/gcp/kms.sh" exists_secret "${MYSQL_SECRET_NAME}"
+run_check "kmsKeyring" "lib/gcp/kms.sh" exists_kms_keyring
+run_check "kdcKmsKey" "lib/gcp/kms.sh" exists_kms_key "${KDC_ROOT_PASSWD_KEY}"
+run_check "gkeCluster" "lib/gke.sh" exists_gke_cluster
+run_check "dpgkeCluster" "lib/gke.sh" exists_dpgke_cluster
+run_check "kdcServer" "lib/kerberos.sh" exists_kdc_server
+run_check "ipAllocation" "lib/network/peering.sh" exists_ip_allocation
+run_check "vpcPeering" "lib/network/peering.sh" exists_vpc_peering
+run_check "phsCluster" "lib/phs.sh" exists_phs_cluster
+run_check "swpCaPool" "lib/swp/certs.sh" exists_swp_ca_pool
+run_check "swpRootCa" "lib/swp/certs.sh" exists_swp_root_ca
+run_check "swpCic" "lib/swp/certs.sh" exists_swp_cic
+run_check "swpManagedCertificate" "lib/swp/certs.sh" exists_swp_managed_certificate
+run_check "swpFirewallIngress" "lib/swp/firewall.sh" exists_firewall_rule "allow-swp-ingress-${CLUSTER_NAME}"
+run_check "swpFirewallInternal" "lib/swp/firewall.sh" exists_firewall_rule "allow-internal-${CLUSTER_NAME}"
+run_check "swpGateway" "lib/swp/gateway.sh" exists_swp_gateway
+run_check "swpPolicy" "lib/swp/policy.sh" exists_gateway_security_policy
+
+# Wait for all background jobs to finish
+for pid in "${PIDS[@]}"; do
+  wait "${pid}" || true # Ignore errors from wait
+done
+
+echo "Populating SQLite Database..."
+# Populate STATE_DB from temp files
+for key_file in $(find "${AUDIT_TEMP_DIR}" -type f -name "*.json"); do
+  key=$(basename "${key_file}" .json)
+  value=$(cat "${key_file}")
+
+  if [[ -z "${value}" ]]; then
+    value="null"
+  fi
+  # Handle empty list from gcloud for routes
+  if [[ "${key}" == "routes" && "${value}" == "[]" ]]; then
+    value="null"
+  fi
+  update_state "${key}" "${value}"
+done
+
+# --- Human Readable Report ---
+echo "--------------------------------------"
+echo "  DPGCE Environment Audit Report      "
+echo "--------------------------------------"
+PROJECT_ID_RAW=$(get_state "project")
+if [[ "${PROJECT_ID_RAW}" == "null" || -z "${PROJECT_ID_RAW}" ]]; then
+  PROJECT_ID_VAL="N/A"
+else
+  # Check if it's valid JSON before jq
+  if echo "${PROJECT_ID_RAW}" | /usr/bin/jq empty > /dev/null 2>&1; then
+    PROJECT_ID_VAL=$(echo "${PROJECT_ID_RAW}" | /usr/bin/jq -r '.projectId // "N/A"')
+  else
+    PROJECT_ID_VAL="N/A" # Not valid JSON
+  fi
+fi
+echo "Project: ${PROJECT_ID_VAL}"
+echo
+
+print_resource_status() {
+  local display_name="$1"
+  local key="$2"
+  local value
+  value=$(get_state "${key}")
+
+  echo -n "- ${display_name}: "
+  if [[ "${value}" == "null" || "${value}" == "" ]]; then
+    report_audit_status "Not Found"
+  else
+    report_audit_status "Exists"
+  fi
+}
+print_resource_status "VPC Network (${NETWORK})" "vpcNetwork"
+print_resource_status "Standard Subnet (${SUBNET})" "standardSubnet"
+print_resource_status "Private Subnet (${PRIVATE_SUBNET})" "privateSubnet"
+print_resource_status "SWP Subnet (${SWP_SUBNET})" "swpSubnet"
+print_resource_status "Cloud Router (${ROUTER_NAME})" "cloudRouter"
+print_resource_status "Cloud NAT (nat-config)" "cloudRouterNAT"
+print_resource_status "Firewall Rule (SSH)" "firewallRule-ssh"
+print_resource_status "Firewall Rule (Internal)" "firewallRule-internal"
+print_resource_status "Service Account (${GSA})" "serviceAccount"
+print_resource_status "Dataproc Autoscaling Policy (${AUTOSCALING_POLICY_NAME})" "autoscalingPolicy"
+print_resource_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+print_resource_status "Dataproc Cluster ${CLUSTER_NAME} VMs" "dataprocClusterVMs"
+print_resource_status "Bigtable Instance (${BIGTABLE_INSTANCE})" "bigtableInstance"
+print_resource_status "Cloud SQL MSSQL (Legacy VM)" "legacyMssqlInstance"
+print_resource_status "Cloud SQL MSSQL (${MSSQL_INSTANCE})" "mssqlInstance"
+print_resource_status "Cloud SQL MySQL (${MYSQL_INSTANCE})" "mysqlInstance"
+print_resource_status "Oracle VM (${ORACLE_VM_NAME})" "oracleVm"
+print_resource_status "Cloud SQL PostgreSQL (${PGSQL_INSTANCE})" "pgsqlInstance"
+print_resource_status "Artifact Repository (${ARTIFACT_REPOSITORY})" "artifactsRepository"
+print_resource_status "GCS Bucket (${BUCKET})" "gcsBucket"
+print_resource_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
+print_resource_status "Secret (MySQL)" "mysqlSecret"
+print_resource_status "KMS Keyring (${KMS_KEYRING})" "kmsKeyring"
+print_resource_status "KMS Key (KDC)" "kdcKmsKey"
+print_resource_status "GKE Cluster (${GKE_CLUSTER_NAME})" "gkeCluster"
+print_resource_status "DPGKE Cluster (${DPGKE_CLUSTER_NAME})" "dpgkeCluster"
+print_resource_status "KDC Server (${KDC_NAME})" "kdcServer"
+print_resource_status "IP Allocation (${ALLOCATION_NAME})" "ipAllocation"
+print_resource_status "VPC Peering" "vpcPeering"
+print_resource_status "PHS Cluster (${CLUSTER_NAME}-phs)" "phsCluster"
+print_resource_status "SWP CA Pool" "swpCaPool"
+print_resource_status "SWP Root CA" "swpRootCa"
+print_resource_status "SWP CIC" "swpCic"
+print_resource_status "SWP Managed Certificate" "swpManagedCertificate"
+print_resource_status "SWP Firewall (Ingress)" "swpFirewallIngress"
+print_resource_status "SWP Firewall (Internal)" "swpFirewallInternal"
+print_resource_status "SWP Gateway (${SWP_INSTANCE_NAME})" "swpGateway"
+print_resource_status "SWP Policy (${SWP_POLICY_NAME})" "swpPolicy"
+print_resource_status "Debug VMs" "debugVms"
+
+# Routes are a list, so handle differently
+routes=$(get_state "routes")
+echo -n "- Routes for ${NETWORK}: "
+if [[ "${routes}" == "null" || "${routes}" == "[]" || -z "${routes}" ]]; then
+  report_audit_status "Not Found"
+else
+  # Check if the JSON array is not empty
+  tmp_routes_file="${AUDIT_TEMP_DIR}/routes.json.tmp"
+  echo "${routes}" > "${tmp_routes_file}"
+  routes_len=$(/usr/bin/jq '. | length' "${tmp_routes_file}")
+  rm "${tmp_routes_file}"
+  if [[ "${routes_len}" -gt 0 ]]; then
+    report_audit_status "Exists"
+  else
+    report_audit_status "Not Found"
+  fi
+fi
+
+echo "--------------------------------------"
+echo "State DB at: ${STATE_DB}"

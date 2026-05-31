@@ -1,41 +1,209 @@
 #!/bin/bash
-#
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS-IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
-source lib/env.sh
-source lib/dataproc/cluster.sh
-source lib/gcp/iam.sh
+# Exit on failure
+unset REGION ZONE
+set -e
+set -e
 
-# Copy latest initialization action scripts
-#echo -n "copying actions to gcs bucket..."
-#gcloud storage cp \
-#       --manifest-path action-update.log \
-#       --recursive init/* gs://${BUCKET}/dataproc-initialization-actions
-#if [[ $? == 0 ]]; then
-#  echo "done"
-#else
-#  echo "fail"
-#  exit 1
-#fi
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+DP_EVOLUTION_DIR=$(realpath "${GCLOUD_DIR}/../..")
+export DP_EVOLUTION_DIR
 
-# re-create dpgce dataproc cluster
-delete_dpgce_cluster
-create_service_account # Ensure SA and roles exist
-create_dpgce_cluster
+# --- Source utility functions first ---
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+
+# --- Argument Parsing ---
+# Load current state to use as defaults
+# Note: get_state is from script-utils.sh, so must be sourced first.
+IS_CUSTOM=$(get_state "config.isCustom")
+NAT_EGRESS=$(get_state "config.natEgress")
+SWP_EGRESS=$(get_state "config.swpEgress")
+ENABLE_GPU=$(get_state "config.enableGpu")
+
+# Apply defaults if not set in state.db
+IS_CUSTOM=${IS_CUSTOM:-false}
+NAT_EGRESS=${NAT_EGRESS:-true}
+SWP_EGRESS=${SWP_EGRESS:-false}
+ENABLE_GPU=${ENABLE_GPU:-false}
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --custom) IS_CUSTOM=true; shift ;;
+        --no-custom) IS_CUSTOM=false; shift ;;
+        --swp-egress) SWP_EGRESS=true; shift ;;
+        --no-swp-egress) SWP_EGRESS=false; shift ;;
+        --nat-egress) NAT_EGRESS=true; shift ;;
+        --no-nat-egress) NAT_EGRESS=false; shift ;;
+        --gpu) ENABLE_GPU=true; shift ;;
+        --no-gpu) ENABLE_GPU=false; shift ;;
+        --no-init-action) export SKIP_INIT_ACTIONS=true; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+done
+
+# --- Source environment variables AFTER arguments are parsed ---
+source "${GCLOUD_DIR}/lib/env.sh"
+
+# GPU Configuration - only applied if ENABLE_GPU is true
+export ACCELERATOR_TYPE="$(jq -r .ACCELERATOR_TYPE "${GCLOUD_DIR}/env.json")"
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+    if [[ -z "${ACCELERATOR_TYPE}" || "${ACCELERATOR_TYPE}" == "null" ]]; then
+      export ACCELERATOR_TYPE="nvidia-tesla-t4"
+    fi
+
+    # --- Determine CUDA and Driver Versions ---
+    CUDA_VERSION=""
+    DRIVER_VERSION=""
+
+    # 1. Try to parse from env.json URLs
+    CUDA_URL=$(jq -r .CUDA_URL "${GCLOUD_DIR}/env.json" 2>/dev/null)
+    GPU_DRIVER_URL=$(jq -r .GPU_DRIVER_URL "${GCLOUD_DIR}/env.json" 2>/dev/null)
+    [[ "${GPU_DRIVER_URL}" == "null" ]] && GPU_DRIVER_URL=""
+
+    if [[ -n "${CUDA_URL}" && "${CUDA_URL}" != "null" ]]; then
+      CUDA_VERSION=$(echo "${CUDA_URL}" | sed -n 's/.*cuda_\([0-9.]*\)_.*_linux\.run/\1/p')
+    fi
+    if [[ -n "${GPU_DRIVER_URL}" && "${GPU_DRIVER_URL}" != "null" ]]; then
+      DRIVER_VERSION=$(echo "${GPU_DRIVER_URL}" | sed -n 's/.*NVIDIA-Linux-x86_64-\([0-9.]*\)\.run/\1/p')
+    fi
+
+    # 2. Fallback to version fields in env.json
+    if [[ -z "${CUDA_VERSION}" ]]; then
+      CUDA_VERSION=$(jq -r .CUDA_VERSION "${GCLOUD_DIR}/env.json" 2>/dev/null)
+      [[ "${CUDA_VERSION}" == "null" ]] && CUDA_VERSION=""
+    fi
+    if [[ -z "${DRIVER_VERSION}" ]]; then
+      DRIVER_VERSION=$(jq -r .DRIVER_VERSION "${GCLOUD_DIR}/env.json" 2>/dev/null)
+      [[ "${DRIVER_VERSION}" == "null" ]] && DRIVER_VERSION=""
+    fi
+
+    # 3. Fallback to defaults based on DATAPROC_IMAGE_VERSION
+    DATAPROC_IMAGE_VERSION=$(jq -r .IMAGE_VERSION "${GCLOUD_DIR}/env.json" | cut -d- -f1)
+    if [[ -z "${CUDA_VERSION}" || -z "${DRIVER_VERSION}" ]]; then
+      DEFAULT_CUDA_VERSION=""
+      DEFAULT_DRIVER_VERSION=""
+
+      case "${DATAPROC_IMAGE_VERSION}" in
+        "1.5" ) DEFAULT_CUDA_VERSION="11.6.2" ; DEFAULT_DRIVER_VERSION="510.47.03" ;;
+        "2.0" ) DEFAULT_CUDA_VERSION="12.1.1" ; DEFAULT_DRIVER_VERSION="530.30.02" ;; # Cuda 12.1.1 - Driver v530.30.02 is the latest version supported by Ubuntu 18)
+        "2.1" ) DEFAULT_CUDA_VERSION="12.4.1" ; DEFAULT_DRIVER_VERSION="550.135" ;;
+        "2.2" ) DEFAULT_CUDA_VERSION="13.1.1" ; DEFAULT_DRIVER_VERSION="550.142" ;;
+        "2.3" ) DEFAULT_CUDA_VERSION="13.1.1" ; DEFAULT_DRIVER_VERSION="550.142" ;;
+        *   )
+          echo "ERROR: Unrecognized Dataproc image version: ${DATAPROC_IMAGE_VERSION}" >&2
+          exit 1
+          ;;
+      esac
+
+      if [[ -z "${CUDA_VERSION}" ]]; then
+        CUDA_VERSION="${DEFAULT_CUDA_VERSION}"
+        echo "INFO: Using default CUDA_VERSION=${CUDA_VERSION} for image ${DATAPROC_IMAGE_VERSION}" >&2
+      fi
+      if [[ -z "${DRIVER_VERSION}" ]]; then
+        DRIVER_VERSION="${DEFAULT_DRIVER_VERSION}"
+        echo "INFO: Using default DRIVER_VERSION=${DRIVER_VERSION} for image ${DATAPROC_IMAGE_VERSION}" >&2
+      fi
+    fi
+
+    # 4. Error if versions are still not set
+    if [[ -z "${CUDA_VERSION}" || -z "${DRIVER_VERSION}" || "${DRIVER_VERSION}" == "<"* ]]; then
+      echo "ERROR: Could not determine CUDA or DRIVER version." >&2
+      echo "  Checked env.json: CUDA_URL, GPU_DRIVER_URL, CUDA_VERSION, DRIVER_VERSION" >&2
+      echo "  Checked defaults for DATAPROC_IMAGE_VERSION: ${DATAPROC_IMAGE_VERSION}" >&2
+      exit 1
+    fi
+
+    export CUDA_VERSION
+    export DRIVER_VERSION
+    echo "INFO: GPU enabled: Type=${ACCELERATOR_TYPE}, CUDA=${CUDA_VERSION}, Driver=${DRIVER_VERSION}" >&2
+else
+  export CUDA_VERSION=""
+  export DRIVER_VERSION=""
+fi
+export M_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export PRIMARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+
+# Upload local GPU init action if --gpu is enabled
+unset GPU_INIT_ACTION_URI
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  TIMESTAMP=$(date +%s)
+  export GPU_INIT_ACTION_URI="gs://${BUCKET}/tmp_init_actions/install_gpu_driver_${TIMESTAMP}.sh"
+  echo "INFO: Uploading local GPU init action to ${GPU_INIT_ACTION_URI}" >&2
+  gsutil cp "${DP_EVOLUTION_DIR}/initialization-actions/gpu/install_gpu_driver.sh" "${GPU_INIT_ACTION_URI}"
+fi
+
+# --- Source other necessary function files ---
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+
+# Export boolean flags for use in functions
+export IS_CUSTOM
+export SWP_EGRESS
+export NAT_EGRESS
+export ENABLE_GPU
+
+# --- Configuration Validation ---
+if [[ "${IS_CUSTOM}" == "true" ]]; then
+  if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+    echo "ERROR: --custom flag is set but CUSTOM_IMAGE_URI is not defined in env.json" >&2
+    exit 1
+  fi
+fi
+
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  if [[ -z "${ACCELERATOR_TYPE}" || "${ACCELERATOR_TYPE}" == "null" ]]; then
+    echo "ERROR: --gpu flag is set but ACCELERATOR_TYPE is not defined in env.json" >&2
+    exit 1
+  fi
+  echo "INFO: GPU enabled with ACCELERATOR_TYPE=${ACCELERATOR_TYPE}" >&2
+fi
+
+# --- Main Logic ---
+configure_gcloud
+init_state_db # Initialize the database if it doesn't exist
+
+# Store NEW config flags in the database
+update_state "config.isCustom" "${IS_CUSTOM}"
+update_state "config.swpEgress" "${SWP_EGRESS}"
+update_state "config.natEgress" "${NAT_EGRESS}"
+update_state "config.enableGpu" "${ENABLE_GPU}"
+
+echo "INFO: Configuration to be applied - IS_CUSTOM=${IS_CUSTOM}, NAT_EGRESS=${NAT_EGRESS}, SWP_EGRESS=${SWP_EGRESS}, ENABLE_GPU=${ENABLE_GPU}" >&2
+
+# --- Run an audit to refresh the current state of resources ---
+# The audit will use the same TIMESTAMP as defined in env.sh for its own logs
+print_status "Auditing environment to refresh state..."
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+report_result "Done"
+
+if (( DEBUG != 0 )); then
+  set -x
+fi
 
 echo "========================================"
-echo "General Purpose DPGCE Cluster re-created"
+echo "Starting DPGCE Cluster Recreation"
+echo "========================================"
+
+print_status "Attempting to ensure any pre-existing cluster named '${CLUSTER_NAME}' is deleted..."
+delete_dpgce_cluster
+report_result "Done"
+
+# Upload init actions before recreation to ensure latest scripts are used
+upload_init_actions
+
+# Re-create the cluster based on the loaded config
+print_status "Creating cluster ${CLUSTER_NAME}..."
+create_dpgce_cluster
+
+# After creation, run audit again to update state file with new resource details
+print_status "Running final audit to update cache..."
+"${GCLOUD_DIR}/bin/audit-dpgce" > /dev/null
+report_result "Done"
+
+echo "========================================"
+echo "DPGCE Cluster re-created"
 echo "========================================"

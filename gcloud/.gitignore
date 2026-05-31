@@ -1,5 +1,17 @@
-init/*/
-tls/
-#tmp/
-*~
+# Env files
 env.json
+*.env
+
+# Logs
+logs/
+*.log
+
+# Temp files
+tmp/
+.DS_Store
+*~
+
+# State
+state.db
+state.json
+*.db-journal

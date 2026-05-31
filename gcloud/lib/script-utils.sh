@@ -23,30 +23,111 @@ function report_result() {
 }
 export -f report_result
 
+# Compatibility wrapper for older scripts
+function print_result() {
+  report_result "$@"
+}
+export -f print_result
+
+# Usage: report_audit_status "Exists" | "Not Found"
+function report_audit_status() {
+  local status="$1"
+  case "${status}" in
+    Exists) echo -e " [${GREEN}Exists${NC}]" ;;
+    "Not Found") echo -e " [${YELLOW}Not Found${NC}]" ;;
+    True) echo -e " [${GREEN}True${NC}]" ;;
+    False) echo -e " [${RED}False${NC}]" ;;
+    Done) echo -e " [${GREEN}Done${NC}]" ;;
+    *) echo -e " [${YELLOW}${status}${NC}]" ;;
+  esac
+}
+export -f report_audit_status
+
+function configure_gcloud() {
+  local cache_file="${HOME}/.config/gcloud/dpgce_config_cache_ts.txt"
+  local cache_ttl=300 # 5 minutes
+
+  if [[ -f "${cache_file}" ]]; then
+    local last_run=$(cat "${cache_file}")
+    local now=$(date +%s)
+    if (( now - last_run < cache_ttl )); then
+      # echo "DEBUG: gcloud config cache hit" >&2
+      return 0
+    fi
+  fi
+  # echo "DEBUG: gcloud config cache miss" >&2
+
+  print_status "Checking gcloud config..."
+  local account=$(gcloud config get-value account 2> /dev/null)
+  local project=$(gcloud config get-value project 2> /dev/null)
+  local region=$(gcloud config get-value compute/region 2> /dev/null)
+  local zone=$(gcloud config get-value compute/zone 2> /dev/null)
+
+  if [[ -z "${account}" || -z "${project}" || -z "${region}" || -z "${zone}" ]]; then
+    echo -e "${RED}GCLOUD NOT CONFIGURED:${NC}" >&2
+    echo "Please run the following commands:" >&2
+    echo "  gcloud config set account <YOUR_ACCOUNT>" >&2
+    echo "  gcloud config set project <YOUR_PROJECT>" >&2
+    echo "  gcloud config set compute/region <YOUR_REGION>" >&2
+    echo "  gcloud config set compute/zone <YOUR_ZONE>" >&2
+    exit 1
+  fi
+
+  # Check for reauthentication error
+  if ! gcloud projects describe "${project}" > /dev/null 2>&1; then
+      echo -e "
+  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}" >&2
+      echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
+      exit 1
+  fi
+
+  # Update cache timestamp
+  date +%s > "${cache_file}"
+  report_result "Pass"
+}
+export -f configure_gcloud
+
 # Usage: run_gcloud <log_file_name> <gcloud command ...>
 function run_gcloud() {
   local log_file_name=$1
   shift
-  local log_file="${REPRO_TMPDIR}/${log_file_name}"
+  local log_file="${LOG_DIR}/${log_file_name}"
   local log_dir=$(dirname "${log_file}") # Get the directory part
   mkdir -p "${log_dir}" # Create the directory if it doesn't exist
 
   if (( DEBUG != 0 )); then
-    echo "  RUNNING: $*" >&2
+    echo "  RUNNING: ${@}" >&2
   fi
-  "$@" > "${log_file}" 2>&1
+  "${@}" > "${log_file}" 2>&1
   local exit_code=$?
   if [[ ${exit_code} -ne 0 ]]; then
     if grep -q -e "Reauthentication failed" -e "gcloud auth login" -e "gcloud config set account" "${log_file}"; then
-      echo -e "\n  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}"
+      echo -e "
+  ${RED}GCLOUD AUTHENTICATION ERROR:${NC}" >&2
       echo -e "  Please run ${YELLOW}gcloud auth login${NC} and ${YELLOW}gcloud auth application-default login${NC} to re-authenticate." >&2
-    elif (( DEBUG != 0 )); then
-      cat "${log_file}" >&2
-    else
-      :
+      exit 1
     fi
+    # Check for ALREADY_EXISTS, and don't print the whole log if found
+    if grep -q "ALREADY_EXISTS" "${log_file}"; then
+      echo -e " [${BLUE}Kept${NC}]"
+      return 0
+    fi
+    # Check for NOT_FOUND on delete operations
+    if [[ "$*" == *delete* ]] && grep -q "NOT_FOUND" "${log_file}"; then
+      echo -e " [${YELLOW}Pass*${NC}]" # Already gone
+      return 0
+    fi
+    # Check for IAM policy binding not found errors
+    if grep -q "Policy binding with the specified principal, role, and condition not found" "${log_file}"; then
+      echo -e " [${YELLOW}Pass*${NC}]" # Binding already gone
+      return 0
+    fi
+
+    echo -e "${RED}ERROR: ${NC}Command failed with exit code ${exit_code}. Log: ${log_file}" >&2
+    cat "${log_file}" >&2
+    return ${exit_code}
   fi
-  return ${exit_code}
+  return 0
 }
 export -f run_gcloud
 
@@ -63,111 +144,132 @@ function parse_args() {
       --no-create-cluster)
         CREATE_CLUSTER=false
         shift
-        ;;      --force)
+        ;;
+      --force)
         FORCE_DELETE=true
         FORCE_AUDIT=true # Audit scripts use this too
         shift
-        ;;      --quiet-gcloud)
+        ;;
+      --quiet-gcloud)
         GCLOUD_QUIET=true
         shift
-        ;;      *)
-        PARAMS="$PARAMS \"$1\""
+        ;;
+      *)
+        PARAMS="$PARAMS "$1""
         shift
-        ;;    esac
+        ;;
+    esac
   done
   eval set -- "${PARAMS}"
 }
 export -f parse_args
 
-# --- Sentinel Functions ---
-function get_sentinel_file() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  echo "${SENTINEL_DIR}/${phase_name}-${sentinel_name}"
+# --- State Management Functions ---
+function init_state_db() {
+    local db_file="${STATE_DB}"
+    sqlite3 "${db_file}" "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);"
 }
-export -f get_sentinel_file
+export -f init_state_db
 
-function create_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  touch "$(get_sentinel_file "${phase_name}" "${sentinel_name}")"
-}
-export -f create_sentinel
+function update_state() {
+    local resource_key=$1
+    local resource_value=$2 # JSON string or "null"
+    local db_file="${STATE_DB}"
 
-function check_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  [[ -f "$(get_sentinel_file "${phase_name}" "${sentinel_name}")" ]]
+    local sql
+    if [[ "${resource_value}" == "null" ]]; then
+        sql="DELETE FROM state WHERE key = '${resource_key}';"
+    else
+        local escaped_value=$(echo "${resource_value}" | sed "s/'/''/g")
+        sql="INSERT OR REPLACE INTO state (key, value) VALUES ('${resource_key}', '${escaped_value}');"
+    fi
+    sqlite3 "${db_file}" "${sql}"
 }
-export -f check_sentinel
+export -f update_state
 
-function remove_sentinel() {
-  local phase_name="$1"
-  local sentinel_name="$2"
-  rm -f "$(get_sentinel_file "${phase_name}" "${sentinel_name}")"
+function get_state() {
+    local resource_key=$1
+    local db_file="${STATE_DB}"
+    if [[ ! -f "${db_file}" ]]; then
+        echo ""
+        return
+    fi
+    local result=$(sqlite3 "${db_file}" "SELECT value FROM state WHERE key = '${resource_key}';")
+    if [[ -z "${result}" ]]; then
+        echo ""
+    else
+        echo "${result}"
+    fi
 }
-export -f remove_sentinel
+export -f get_state
 
-function clear_sentinels() {
-  local phase_name="$1"
-  rm -f "${SENTINEL_DIR}/${phase_name}-*"
+function refresh_resource_state() {
+    local resource_key=$1
+    local source_file=$2  # e.g., lib/dataproc/cluster.sh or ""
+    shift 2
+    local check_command=("$@") # Remaining arguments form the command
+
+    local json_output
+    local func_name="${check_command[0]}"
+
+    if [[ -n "${source_file}" ]]; then
+        # Source in a subshell, export the function, then run the command
+        if ! json_output=$(source "${GCLOUD_DIR}/${source_file}" && export -f "${func_name}" && "${check_command[@]}"); then
+            echo "ERROR: Failed to execute check_command in refresh_resource_state for key ${resource_key} from ${source_file}" >&2
+            json_output="null"
+        fi
+    else
+        # Function should already be in the environment (e.g., _check_exists)
+        if ! json_output=$("${check_command[@]}"); then
+             echo "ERROR: Failed to execute check_command in refresh_resource_state for key ${resource_key}" >&2
+             json_output="null"
+        fi
+    fi
+
+    if [[ -z "${json_output}" || "${json_output}" == "[]" ]]; then
+      json_output="null"
+    fi
+
+    update_state "${resource_key}" "${json_output}"
 }
-export -f clear_sentinels
+export -f refresh_resource_state
 
 # --- Audit Check Functions ---
-function check_resource() {
-  local test_name="$1"
-  local command_to_run="$2"
-  local grep_pattern="$3"
-  local optional="${4:-false}"
-  local log_file="${LOG_DIR}/$(echo "$test_name" | tr ' /:' '___').log"
+# These functions are now designed to be called by the audit script.
+# They return a JSON object with details if a resource is found, or the string "null".
+# Call this with command and arguments as separate words, not a single string.
+function _check_exists() {
+    local json_output
+    local exit_code=1
+    local attempts=0
+    local max_attempts=3
+    local delay=2
 
-  print_status "Checking: ${test_name}... "
+    # echo "DEBUG _check_exists called with: $@" >&2
 
-  eval "${command_to_run}" > "${log_file}" 2>&1
+    while [[ ${attempts} -lt ${max_attempts} ]]; do
+        attempts=$((attempts + 1))
+        json_output=$("$@" 2> /dev/null)
+        exit_code=$?
+        # echo "DEBUG INSIDE _check_exists (Attempt ${attempts}):" >&2
+        # echo "DEBUG CMD: $@" >&2
+        # echo "DEBUG EXIT CODE: ${exit_code}" >&2
+        # echo "DEBUG JSON OUTPUT: ${json_output}" >&2
 
-  if grep -q "${grep_pattern}" "${log_file}"; then
-    if [[ "${optional}" == "true" && "${FORCE_AUDIT}" == "false" ]]; then
-      report_result "Kept"
-      return 0
-    else
-      report_result "Fail"
-      return 1
-    fi
-  else
-    report_result "Not Found"
-    return 0
-  fi
+        if [[ ${exit_code} -eq 0 && -n "${json_output}" && "${json_output}" != "[]" ]]; then
+            # echo "DEBUG _check_exists: Returning JSON" >&2
+            echo "${json_output}"
+            return 0
+        fi
+
+        if [[ ${attempts} -lt ${max_attempts} ]]; then
+            # echo "DEBUG _check_exists: Attempt ${attempts} failed, retrying in ${delay}s..." >&2
+            sleep ${delay}
+        fi
+    done
+
+    # echo "DEBUG _check_exists: Returning null after ${max_attempts} attempts" >&2
+    echo "null"
+    return 1 # Technically the last exit_code, but we return 1 to indicate not found
 }
-export -f check_resource
-
-function check_resource_exact() {
-  local test_name="$1"
-  local command_to_run="$2"
-  local optional="${3:-false}"
-  local log_file="${LOG_DIR}/$(echo "$test_name" | tr ' /:' '___').log"
-
-  print_status "Checking: ${test_name}... "
-  if eval "${command_to_run}" > "${log_file}" 2>&1; then
-    # Command succeeded, check if it produced output
-    if [[ $(wc -l < "${log_file}") -gt 0 ]]; then
-      # Output found
-      if [[ "${optional}" == "true" && "${FORCE_AUDIT}" == "false" ]]; then
-        report_result "Kept"
-        return 0
-      else
-        report_result "Fail"
-        return 1
-      fi
-    else
-      # Command succeeded but no output, so Not Found
-      report_result "Not Found"
-      return 0
-    fi
-  else
-    # Command failed, resource likely does not exist
-    report_result "Not Found"
-    return 0
-  fi
-}
-export -f check_resource_exact
+export -f _check_exists

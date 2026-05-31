@@ -1,112 +1,366 @@
 #!/bin/bash
-#
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS-IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 # Exit on failure
+unset REGION ZONE
+set -e
 set -e
 
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
+DP_EVOLUTION_DIR=$(realpath "${GCLOUD_DIR}/../..")
+export DP_EVOLUTION_DIR
 
-parse_args "$@"
+# --- Source utility functions ---
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+
+echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run's logs." >&2
+
+# --- Argument Parsing ---
+IS_CUSTOM=false
+CREATE_CLUSTER=true
+SWP_EGRESS=false
+NAT_EGRESS=true
+ENABLE_GPU=false
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --custom) IS_CUSTOM=true; shift ;;
+        --no-custom) IS_CUSTOM=false; shift ;;
+        --swp-egress) SWP_EGRESS=true; shift ;;
+        --no-swp-egress) SWP_EGRESS=false; shift ;;
+        --nat-egress) NAT_EGRESS=true; shift ;;
+        --no-nat-egress) NAT_EGRESS=false; shift ;;
+        --gpu) ENABLE_GPU=true; shift ;;
+        --no-gpu) ENABLE_GPU=false; shift ;;
+        --no-create-cluster) CREATE_CLUSTER=false; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+done
+
+# Export boolean flags for use in functions
+export IS_CUSTOM
+export SWP_EGRESS
+export NAT_EGRESS
+export ENABLE_GPU
+
+# --- Source environment variables AFTER arguments are parsed ---
+source "${GCLOUD_DIR}/lib/env.sh"
+
+# GPU Configuration - only applied if ENABLE_GPU is true
+export ACCELERATOR_TYPE="$(jq -r .ACCELERATOR_TYPE "${GCLOUD_DIR}/env.json")"
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  if [[ -z "${ACCELERATOR_TYPE}" || "${ACCELERATOR_TYPE}" == "null" ]]; then
+    export ACCELERATOR_TYPE="nvidia-tesla-t4"
+  fi
+
+  # Read from env.json, but do not export if not set, to allow init action defaults
+  CUDA_VERSION_FROM_ENV=$(jq -r .CUDA_VERSION "${GCLOUD_DIR}/env.json")
+  DRIVER_VERSION_FROM_ENV=$(jq -r .DRIVER_VERSION "${GCLOUD_DIR}/env.json")
+  CUDA_URL_FROM_ENV=$(jq -r .CUDA_URL "${GCLOUD_DIR}/env.json")
+  GPU_DRIVER_URL_FROM_ENV=$(jq -r .GPU_DRIVER_URL "${GCLOUD_DIR}/env.json")
+
+  if [[ -n "${CUDA_VERSION_FROM_ENV}" && "${CUDA_VERSION_FROM_ENV}" != "null" ]]; then
+    export CUDA_VERSION="${CUDA_VERSION_FROM_ENV}"
+  else
+    unset CUDA_VERSION
+  fi
+  if [[ -n "${DRIVER_VERSION_FROM_ENV}" && "${DRIVER_VERSION_FROM_ENV}" != "null" ]]; then
+    export DRIVER_VERSION="${DRIVER_VERSION_FROM_ENV}"
+  else
+    unset DRIVER_VERSION
+  fi
+  if [[ -n "${CUDA_URL_FROM_ENV}" && "${CUDA_URL_FROM_ENV}" != "null" ]]; then
+    export CUDA_URL="${CUDA_URL_FROM_ENV}"
+  else
+    unset CUDA_URL
+  fi
+  if [[ -n "${GPU_DRIVER_URL_FROM_ENV}" && "${GPU_DRIVER_URL_FROM_ENV}" != "null" ]]; then
+    export GPU_DRIVER_URL="${GPU_DRIVER_URL_FROM_ENV}"
+  else
+    unset GPU_DRIVER_URL
+  fi
+  echo "INFO: GPU enabled: Type=${ACCELERATOR_TYPE}, CUDA_VER=${CUDA_VERSION:-Default}, DRIVER_VER=${DRIVER_VERSION:-Default}, CUDA_URL=${CUDA_URL:-None}, DRIVER_URL=${GPU_DRIVER_URL:-None}" >&2
+else
+  export ACCELERATOR_TYPE=""
+  unset CUDA_VERSION
+  unset DRIVER_VERSION
+  unset CUDA_URL
+  unset GPU_DRIVER_URL
+fi
+export M_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export PRIMARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+export SECONDARY_ACCELERATOR_TYPE="${ACCELERATOR_TYPE}"
+
+# Upload local GPU init action if --gpu is enabled
+unset GPU_INIT_ACTION_URI
+if [[ "${ENABLE_GPU}" == "true" ]]; then
+  TIMESTAMP=$(date +%s)
+  export GPU_INIT_ACTION_URI="gs://${BUCKET}/tmp_init_actions/install_gpu_driver_${TIMESTAMP}.sh"
+  echo "INFO: Uploading local GPU init action to ${GPU_INIT_ACTION_URI}" >&2
+  gsutil cp "${DP_EVOLUTION_DIR}/initialization-actions/gpu/install_gpu_driver.sh" "${GPU_INIT_ACTION_URI}"
+fi
+
+if [[ "${IS_CUSTOM}" == "true" ]]; then
+  if [[ -z "${CUSTOM_IMAGE_URI}" || "${CUSTOM_IMAGE_URI}" == "null" ]]; then
+    echo "ERROR: --custom flag is set but CUSTOM_IMAGE_URI is not defined in env.json" >&2
+    exit 1
+  fi
+fi
 
 if (( DEBUG != 0 )); then
   set -x
 fi
 
-# Source function files
-source lib/gcp/project.sh
-source lib/gcp/misc.sh
-source lib/misc.sh
-source lib/gcp/iam.sh
-source lib/gcp/gcs.sh
-source lib/network/network.sh
-source lib/network/subnet.sh
-source lib/network/router.sh
-source lib/network/routes.sh
-source lib/network/firewall.sh
-source lib/dataproc/cluster.sh
-source lib/dataproc/autoscaling.sh
-# Add others as needed, e.g.:
-# source lib/network/peering.sh
-# source lib/bigtable.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
+# Source all function files needed for checks and creation
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gcp/project.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/network/routes.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+source "${GCLOUD_DIR}/lib/misc.sh"
+source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
 
-create_project
+# Source SWP functions
+for swp_script in $(ls "${GCLOUD_DIR}/lib/swp/"*.sh); do
+  source "${swp_script}"
+done
 
+# --- Main Logic ---
 configure_gcloud
+init_state_db # Ensures the fixed state.db and table exist
 
-set_cluster_name
+# Store config flags in the database
+update_state "config.isCustom" "${IS_CUSTOM}"
+update_state "config.swpEgress" "${SWP_EGRESS}"
+update_state "config.natEgress" "${NAT_EGRESS}"
+update_state "config.enableGpu" "${ENABLE_GPU}"
 
-enable_services
+print_status "Auditing environment to ensure cache is fresh..."
+"${GCLOUD_DIR}/bin/audit-dpgce" &> /dev/null
+report_result "Done"
 
-create_service_account
-
-create_bucket
-
-create_vpc_network
-
-#create_ip_allocation
-
-#create_vpc_peering
-
-# Create a cloud router
-
-create_vpc_network
-
-create_subnet
-
-create_router
-
-create_default_route
-
-add_nat_policy
-
-create_firewall_rules
-
-# Create logging firewall rules
-
-#create_logging_firewall_rules
-
-#create_bigtable_instance
-
-#create_mysql_instance
-#create_legacy_mssql_instance
-
-# Create PHS dataproc cluster
-
-#create_phs_cluster
-
-# Create normal dataproc cluster
-
-create_autoscaling_policy
-
-if [[ "${CREATE_CLUSTER}" = true ]]; then
-  print_status "Creating Dataproc Cluster ${CLUSTER_NAME}..."
-  if create_dpgce_cluster; then
-    print_result "Pass"
-  else
-    print_result "Fail"
-    exit 1
-  fi
-else
-  echo -e "${YELLOW}Skipping Cluster Creation due to --no-create-cluster flag.${NC}"
+# --- Set derived resource names for SWP ---
+# This must happen after audit to reuse existing versioned resources (certs/policies)
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  get_or_construct_swp_cert_uri
+  get_or_construct_swp_policy_uri
 fi
 
-# Perform some connectivity tests
+echo "--- Current Environment State (from Audit) --- "
+# Function to display resource status from DB
+display_status() {
+  local display_name="$1"
+  local key="$2"
+  local value=$(get_state "${key}")
+  echo -n "- ${display_name}: "
+  if [[ "${key}" == *RolesReady ]]; then
+    if [[ "${value}" == "true" ]]; then
+      report_audit_status "True"
+    elif [[ "${value}" == "false" ]]; then
+      report_audit_status "False"
+    else
+      report_audit_status "Unknown"
+    fi
+  elif [[ "${value}" == "" ]]; then
+    report_audit_status "Not Found"
+  else
+    report_audit_status "Exists"
+  fi
+}
 
-#perform_connectivity_tests
+# Display status for all potentially relevant resources
+display_status "Service Account" "serviceAccount"
+if [[ $(get_state "serviceAccount") != "" ]]; then
+  display_status "  Roles Ready" "serviceAccountRolesReady"
+fi
+display_status "GCS Bucket (${BUCKET})" "gcsBucket"
+display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
+display_status "VPC Network (${NETWORK})" "vpcNetwork"
+display_status "Standard Subnet (${SUBNET})" "standardSubnet"
+display_status "Cloud Router" "cloudRouter"
+if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "" ]]; then
+  display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
+fi
+display_status "Firewall Rules" "firewallRule-ssh" # Assuming this key represents all base rules
+display_status "Autoscaling Policy" "autoscalingPolicy"
+if [[ "${CREATE_CLUSTER}" == "true" ]]; then
+  display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+fi
 
+# SWP Resources
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "" ]]; then
+  display_status "SWP Subnet" "swpSubnet"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCaPool") != "" ]]; then
+  display_status "SWP CA Pool" "swpCaPool"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpRootCa") != "" ]]; then
+  display_status "SWP Root CA" "swpRootCa"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpCic") != "" ]]; then
+  display_status "SWP CIC" "swpCic"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpManagedCertificate") != "" ]]; then
+  display_status "SWP Managed Certificate" "swpManagedCertificate"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpPolicy") != "" ]]; then
+  display_status "SWP Policy" "swpPolicy"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "" ]]; then
+  display_status "SWP Gateway" "swpGateway"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallIngress") != "" ]]; then
+  display_status "SWP Firewall Ingress" "swpFirewallIngress"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpFirewallInternal") != "" ]]; then
+  display_status "SWP Firewall Internal" "swpFirewallInternal"
+fi
+echo "----------------------------------------------"
+# --- Determine Intended State & Generate Plan ---
+PLAN=()
+INTENDED=()
+
+# Basic resources for all types
+INTENDED+=("gcsBucket" "gcsTempBucket" "vpcNetwork" "standardSubnet" "firewallRule-ssh" "autoscalingPolicy" "defaultRoute")
+
+if [[ "${NAT_EGRESS}" == "true" ]]; then
+  INTENDED+=("cloudRouter")
+fi
+
+# Service Account and Roles are handled separately
+if [[ $(get_state "serviceAccount") == "" ]]; then
+  PLAN+=("CREATE_serviceAccount")
+  PLAN+=("ENSURE_serviceAccountRoles") # If we create it, we need to ensure roles
+elif [[ $(get_state "serviceAccountRolesReady") != "true" ]]; then
+  PLAN+=("ENSURE_serviceAccountRoles")
+fi
+
+if [[ "${SWP_EGRESS}" == "true" ]]; then
+  INTENDED+=("swpSubnet" "swpPolicy" "swpCaPool" "swpManagedCertificate" "swpGateway" "swpFirewallIngress" "swpFirewallInternal")
+fi
+if [[ "${CREATE_CLUSTER}" == "true" ]]; then
+  INTENDED+=("dataprocCluster")
+fi
+
+# Helper to check if a resource needs creation
+needs_create() {
+  local key="$1"
+  [[ $(get_state "${key}") == "" ]]
+}
+
+# Add to plan if resource is missing
+for resource in "${INTENDED[@]}"; do
+  if [[ "${resource}" == "dataprocCluster" ]]; then continue; fi
+  if [[ "${resource}" == "defaultRoute" ]]; then
+    if [[ "${NAT_EGRESS}" == "true" ]] && ! check_default_route; then
+      PLAN+=("ENSURE_DEFAULT_ROUTE")
+    fi
+    continue
+  fi
+
+  # For other resources, check if they need creation based on audit
+  if needs_create "${resource}"; then
+    PLAN+=("CREATE_${resource}")
+  fi
+done
+
+
+# NAT Egress logic
+if [[ "${NAT_EGRESS}" == "true" ]]; then
+  if [[ $(get_state "cloudRouter") != "" ]]; then
+    NAT_STATE=$(get_state "cloudRouterNAT")
+    if [[ "${NAT_STATE}" == "" ]]; then
+      PLAN+=("ADD_NAT_TO_ROUTER")
+    fi
+  fi
+else
+  # --no-nat-egress passed, remove NAT and Router if they exist
+  if [[ $(get_state "cloudRouterNAT") != "" ]]; then
+    PLAN+=("REMOVE_NAT_FROM_ROUTER")
+  fi
+  if [[ $(get_state "cloudRouter") != "" ]]; then
+    PLAN+=("DELETE_ROUTER")
+  fi
+fi
+
+# Special handling for dataprocCluster
+if [[ " ${INTENDED[*]} " =~ " dataprocCluster " ]]; then
+  if needs_create "dataprocCluster"; then
+    PLAN+=("CREATE_dataprocCluster")
+  else
+    echo "INFO: Dataproc Cluster '${CLUSTER_NAME}' already exists. Skipping creation." >&2
+  fi
+fi
+
+if [[ ${#PLAN[@]} -eq 0 ]]; then
+  echo "No actions needed. Environment matches target state."
+  exit 0
+fi
+
+echo "--- Execution Plan ---"
+for action in "${PLAN[@]}"; do
+  echo "- ${action}"
+done
+echo "----------------------"
+
+# --- Plan Execution ---
+echo "Executing plan..."
+
+# Order matters here for dependencies
+if [[ " ${PLAN[*]} " =~ " CREATE_serviceAccount " ]]; then create_service_account; fi
+if [[ " ${PLAN[*]} " =~ " ENSURE_serviceAccountRoles " ]]; then ensure_service_account_roles; fi
+
+# GCS Buckets - No strong dependencies between them
+if [[ " ${PLAN[*]} " =~ " CREATE_gcsBucket " ]]; then create_gcs_bucket "${BUCKET}" "Standard"; grant_gcs_bucket_perms "${BUCKET}"; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_gcsTempBucket " ]]; then create_gcs_bucket "${TEMP_BUCKET}" "Standard"; grant_gcs_bucket_perms "${TEMP_BUCKET}"; fi
+upload_init_actions
+
+if [[ " ${PLAN[*]} " =~ " CREATE_vpcNetwork " ]]; then create_vpc_network; fi
+if [[ " ${PLAN[*]} " =~ " ENSURE_DEFAULT_ROUTE " ]]; then ensure_default_internet_route; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_standardSubnet " ]]; then create_subnet "${SUBNET}" "standardSubnet" "${RANGE}"; fi
+
+# SWP Resources
+if [[ " ${PLAN[*]} " =~ " CREATE_swpSubnet " ]]; then create_swp_subnet; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpPolicy " ]]; then create_gateway_security_policy; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpCaPool " ]]; then create_managed_certificate; fi # This creates CaPool, RootCa, and CIC
+if [[ " ${PLAN[*]} " =~ " CREATE_swpGateway " ]]; then create_swp_gateway; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpFirewallIngress " ]]; then create_allow_swp_ingress_rule; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_swpFirewallInternal " ]]; then create_allow_internal_subnets_rule; fi
+
+if [[ " ${PLAN[*]} " =~ " CREATE_cloudRouter " ]]; then
+  create_router
+  if [[ "${NAT_EGRESS}" == "true" ]]; then add_nat_to_router; fi
+elif [[ " ${PLAN[*]} " =~ " ADD_NAT_TO_ROUTER " ]]; then
+  echo "INFO: NAT Egress enabled, ensuring NAT on existing router..."
+  add_nat_to_router
+fi
+if [[ " ${PLAN[*]} " =~ " REMOVE_NAT_FROM_ROUTER " ]]; then
+  remove_nat_from_router
+fi
+if [[ " ${PLAN[*]} " =~ " DELETE_ROUTER " ]]; then
+  delete_router
+fi
+
+if [[ " ${PLAN[*]} " =~ " CREATE_firewallRule-ssh " ]]; then create_firewall_rules; fi
+if [[ " ${PLAN[*]} " =~ " CREATE_autoscalingPolicy " ]]; then create_autoscaling_policy; fi
+
+# Cluster Creation if CREATE is in plan
+if [[ " ${PLAN[*]} " =~ " CREATE_dataprocCluster " ]]; then
+    create_dpgce_cluster
+else
+  echo "INFO: Skipping cluster creation, already exists or not requested."
+fi
+
+echo "Plan execution finished."
+
+# --- Final Audit ---
+print_status "Running final audit to update cache..."
+"${GCLOUD_DIR}/bin/audit-dpgce" &> /dev/null
+report_result "Done"

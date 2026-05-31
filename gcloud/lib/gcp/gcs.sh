@@ -2,6 +2,16 @@
 #
 # GCS Bucket functions
 
+function exists_gcs_bucket() {
+  local bucket_name="$1"
+  if gcloud storage ls --buckets "gs://${bucket_name}" > /dev/null 2>&1; then
+    echo "{\"name\": \"${bucket_name}\", \"exists\": true}"
+  else
+    echo "null"
+  fi
+}
+export -f exists_gcs_bucket
+
 function create_bucket () {
   local phase_name="create_bucket"
   if check_sentinel "${phase_name}" "done"; then
@@ -15,6 +25,10 @@ function create_bucket () {
   if ! gcloud storage ls --buckets "gs://${BUCKET}" > /dev/null 2>&1 ; then
     if run_gcloud "${log_file}" gcloud storage buckets create --location ${REGION} gs://${BUCKET}; then
       report_result "Created"
+      local cache_key="gcsBucket-${bucket_name}"
+      if [[ "${bucket_name}" == "${BUCKET}" ]]; then cache_key="gcsBucket"; fi
+      if [[ "${bucket_name}" == "${TEMP_BUCKET}" ]]; then cache_key="gcsTempBucket"; fi
+      refresh_resource_state "${cache_key}" "exists_gcs_bucket ${bucket_name}" "lib/gcp/gcs.sh"
     else
       report_result "Fail"
       return 1
@@ -22,6 +36,7 @@ function create_bucket () {
   else
     report_result "Exists"
   fi
+
   # Grant SA permissions on BUCKET
   print_status "  Granting Storage Admin on gs://${BUCKET}..."
   if run_gcloud "${log_file}" gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" --member="serviceAccount:${GSA}" --role="roles/storage.admin"; then
@@ -42,6 +57,7 @@ function create_bucket () {
   else
     report_result "Exists"
   fi
+
   # Grant SA permissions on TEMP_BUCKET
   print_status "  Granting Storage Admin on gs://${TEMP_BUCKET}..."
   if run_gcloud "${temp_log_file}" gcloud storage buckets add-iam-policy-binding "gs://${TEMP_BUCKET}" --member="serviceAccount:${GSA}" --role="roles/storage.admin"; then
@@ -49,8 +65,21 @@ function create_bucket () {
   else
     report_result "Fail"
   fi
+}
 
-  # Copy initialization action scripts
+function grant_gcs_bucket_perms() {
+  local bucket_name="$1"
+  local log_file="grant_perms_${bucket_name}.log"
+  print_status "  Granting Storage Admin on gs://${bucket_name}..."
+  if run_gcloud "${log_file}" gcloud storage buckets add-iam-policy-binding "gs://${bucket_name}" --member="serviceAccount:${GSA}" --role="roles/storage.admin"; then
+    report_result "Pass"
+  else
+    report_result "Fail"
+  fi
+}
+
+
+function upload_init_actions() {
   if [[ -d init ]] ; then
     print_status "Copying init scripts to ${INIT_ACTIONS_ROOT}..."
     local cp_log="copy_init_scripts.log"
@@ -60,7 +89,6 @@ function create_bucket () {
       report_result "Fail"
     fi
   fi
-  create_sentinel "${phase_name}" "done"
 }
 
 function delete_bucket () {
@@ -69,7 +97,6 @@ function delete_bucket () {
   if gcloud storage ls --buckets "gs://${BUCKET}" > /dev/null 2>&1; then
     if run_gcloud "${log_file}" gcloud storage rm --recursive "gs://${BUCKET}"; then
       report_result "Deleted"
-      remove_sentinel "create_bucket" "done"
     else
       report_result "Fail"
     fi

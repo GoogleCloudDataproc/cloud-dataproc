@@ -1,0 +1,81 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "$TEST_ENV_JSON" > env.json
+        echo "CI/CD env.json content:"
+        cat env.json
+  # --- Test Standard DPGCE ---
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Standard Create'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/create-dpgce && ./bin/audit-dpgce-create']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Standard Destroy'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/destroy-dpgce --force && ./bin/audit-dpgce-destroy --force']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+    waitFor: ['Test Standard Create']
+
+  # --- Test Private DPGCE ---
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Private Create'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/create-dpgce-private && ./bin/audit-private-create']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Private Destroy'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/destroy-dpgce-private --force && ./bin/audit-private-destroy --force']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+    waitFor: ['Test Private Create']
+
+  # --- Test Custom Standard DPGCE ---
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Custom Std Create'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/create-dpgce-custom && ./bin/audit-dpgce-create-custom']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Custom Std Destroy'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/destroy-dpgce --force && ./bin/audit-dpgce-destroy --force']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+    waitFor: ['Test Custom Std Create']
+
+  # --- Test Custom Private DPGCE ---
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Custom Pvt Create'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/create-dpgce-custom-private && ./bin/audit-dpgce-create-custom-private']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Test Custom Pvt Destroy'
+    entrypoint: 'bash'
+    args: ['-c', 'source lib/env.sh && ./bin/destroy-dpgce-private --force && ./bin/audit-private-destroy --force']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+    waitFor: ['Test Custom Pvt Create']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/test-env-json/versions/latest
+    env: 'TEST_ENV_JSON'
+
+options:
+  env:
+  - 'PROJECT_ID=cjac-2025-01' # Use CI_PROJECT_ID here
+  - 'CLOUDSDK_CORE_DISABLE_PROMPTS=1'
+substitutions:
+  _CI_PROJECT_ID: "cjac-2025-01"
+timeout: 3600s # 60 minutes

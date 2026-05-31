@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# Universal audit script for Dataproc on GKE (DPGKE) environments.
+#
+# This script inspects the live state of GCP resources to generate a report,
+# ignoring potentially stale local sentinel files.
+
+# Exit on failure
+set -e
+
+# --- Get script's real directory ---
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
+source "${GCLOUD_DIR}/lib/gke.sh"
+source "${GCLOUD_DIR}/lib/dpgke.sh"
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+
+# --- Argument Parsing ---
+AUDIT_DESTROY=false
+OUTPUT_FORMAT="text"
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --destroy) AUDIT_DESTROY=true ;;
+        --format=json) OUTPUT_FORMAT="json" ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# --- Main Audit Logic ---
+if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+  configure_gcloud
+fi
+
+declare -A AUDIT_RESULTS
+
+if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+  echo "================================================="
+  echo "Starting Comprehensive DPGKE Environment Audit"
+  echo "================================================="
+fi
+
+if [[ "$AUDIT_DESTROY" == "true" ]]; then
+    # --- Verify Destruction ---
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      echo
+      echo "Verifying Complete Resource Destruction..."
+    fi
+    check_not_exists "Dataproc on GKE Cluster '${DPGKE_CLUSTER_NAME}'" "exists_dpgke_cluster"
+    check_not_exists "GKE Cluster '${GKE_CLUSTER_NAME}'" "exists_gke_cluster"
+    check_not_exists "Default NodePool" "exists_gke_nodepool '${DP_POOLNAME_DEFAULT}'"
+    check_not_exists "Spark Driver NodePool" "exists_gke_nodepool '${DP_DRIVER_POOLNAME}'"
+    check_not_exists "Spark Executor NodePool" "exists_gke_nodepool '${DP_EXEC_POOLNAME}'"
+
+    # Correct sentinels
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      print_status "Updating sentinel files based on audit findings..."
+      report_result "Done"
+    fi
+else
+    # --- Verify Creation ---
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      print_status "Auditing environment state..."
+    fi
+    AUDIT_RESULTS["GKE Cluster"]=$(_check_exists "GKE Cluster '${GKE_CLUSTER_NAME}'" "exists_gke_cluster")
+    AUDIT_RESULTS["Dataproc on GKE Cluster"]=$(_check_exists "Dataproc on GKE Cluster '${DPGKE_CLUSTER_NAME}'" "exists_dpgke_cluster")
+    if [[ ${AUDIT_RESULTS["GKE Cluster"]} == "Exists" ]]; then
+        AUDIT_RESULTS["Default NodePool"]=$(_check_exists "Default NodePool" "exists_gke_nodepool '${DP_POOLNAME_DEFAULT}'")
+        AUDIT_RESULTS["Spark Driver NodePool"]=$(_check_exists "Spark Driver NodePool" "exists_gke_nodepool '${DP_DRIVER_POOLNAME}'")
+        AUDIT_RESULTS["Spark Executor NodePool"]=$(_check_exists "Spark Executor NodePool" "exists_gke_nodepool '${DP_EXEC_POOLNAME}'")
+    fi
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      report_result "Done"
+    fi
+
+    # Correct sentinels
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      print_status "Updating sentinel files based on audit findings..."
+    fi
+    if [[ ${AUDIT_RESULTS["Dataproc on GKE Cluster"]} == "Exists" ]]; then
+    else
+    fi
+    if [[ "${OUTPUT_FORMAT}" != "json" ]]; then
+      report_result "Done"
+    fi
+fi
+
+# --- Output Results ---
+if [[ "${OUTPUT_FORMAT}" == "json" ]]; then
+  # Build a JSON object with jq
+  json_output=$(jq -n \
+    --arg gke_cluster "${AUDIT_RESULTS["GKE Cluster"]:-"Not Checked"}" \
+    --arg dpgke_cluster "${AUDIT_RESULTS["Dataproc on GKE Cluster"]:-"Not Checked"}" \
+    --arg default_nodepool "${AUDIT_RESULTS["Default NodePool"]:-"Not Checked"}" \
+    --arg driver_nodepool "${AUDIT_RESULTS["Spark Driver NodePool"]:-"Not Checked"}" \
+    --arg exec_nodepool "${AUDIT_RESULTS["Spark Executor NodePool"]:-"Not Checked"}" \
+    '{
+      "resources": {
+        "gkeCluster": $gke_cluster,
+        "dataprocOnGkeCluster": $dpgke_cluster,
+        "defaultNodePool": $default_nodepool,
+        "sparkDriverNodePool": $driver_nodepool,
+        "sparkExecutorNodePool": $exec_nodepool
+      }
+    }')
+  echo "${json_output}"
+else
+  # Print the human-readable summary
+  echo
+  echo "================================================="
+  echo "               Audit Summary"
+  echo "================================================="
+  for resource in "GKE Cluster" "Dataproc on GKE Cluster" "Default NodePool" "Spark Driver NodePool" "Spark Executor NodePool"; do
+      if [[ -v AUDIT_RESULTS[${resource}] ]]; then
+          printf "%-25s: %s
+" "${resource}" "${AUDIT_RESULTS[${resource}]}"
+      fi
+  done
+  echo "================================================="
+fi

@@ -2,192 +2,175 @@
 #
 # IAM related functions
 
-function create_service_account() {
-  local phase_name="create_service_account"
-  local sentinel_name="${SA_NAME}_done"
+ROLES=(
+  roles/dataproc.worker
+  roles/dataproc.editor
+  roles/dataproc.admin
+  roles/bigquery.dataEditor
+  roles/bigquery.dataViewer
+  roles/bigquery.user
+  roles/storage.admin
+  roles/secretmanager.secretAccessor
+  roles/compute.admin
+  roles/iam.serviceAccountUser
+)
 
-  if check_sentinel "${phase_name}" "${sentinel_name}"; then
-    print_status "Checking Service Account ${GSA} and roles..."
-    report_result "Exists"
-    return 0
-  fi
+function exists_service_account() {
+  _check_exists gcloud iam service-accounts describe "${GSA}" --project="${PROJECT_ID}" --format="json(email,name)"
+}
+export -f exists_service_account
 
-  print_status "Creating/Verifying Service Account ${GSA}..."
-  local log_file="create_service_account_${SA_NAME}.log"
-
-  SA_EXISTS=$(gcloud iam service-accounts list \
-    --project="${PROJECT_ID}" \
-    --filter="email=${GSA}" \
-    --format="value(email)" 2>/dev/null)
-
-  if [[ -z "${SA_EXISTS}" ]]; then
-    if ! run_gcloud "${log_file}" gcloud iam service-accounts create "${SA_NAME}" \
-      --project="${PROJECT_ID}" \
-      --description="Service account for use with cluster ${CLUSTER_NAME}" \
-      --display-name="${SA_NAME}"; then
-      report_result "Fail"
-      return 1
-    fi
-    report_result "Created"
-    sleep 10
-  else
-    report_result "Exists"
-  fi
-
-  # Bind roles
-  print_status "  Ensuring roles for ${GSA}... "
-  ROLES=(
-    roles/dataproc.worker
-    roles/dataproc.editor
-    roles/dataproc.admin
-    roles/bigquery.dataEditor
-    roles/bigquery.dataViewer
-    roles/bigquery.user
-    roles/storage.admin
-    roles/secretmanager.secretAccessor
-    roles/compute.admin
-    roles/iam.serviceAccountUser
+function get_service_account_bindings() {
+  local cmd=(
+    gcloud projects get-iam-policy "${PROJECT_ID}"
+    --format=json
   )
-  local all_roles_bound=true
+
+  local policy
+  if ! policy=$("${cmd[@]}" 2>/dev/null); then
+    echo "null"
+    return
+  fi
+
+  if [[ -z "${policy}" ]]; then
+    echo "null"
+    return
+  fi
+
+  # Extract unique roles bound to the service account
+  echo "${policy}" | jq -r --arg GSA "serviceAccount:${GSA}" '[.bindings[] | select(.members // [] | any(. == $GSA)) | .role] | unique' | jq -c 'if length == 0 then null else . end'
+}
+export -f get_service_account_bindings
+
+# Returns "true" or "false"
+function check_service_account_bindings() {
+  local roles_json=$(get_service_account_bindings)
+  if [[ "${roles_json}" == "null" || -z "${roles_json}" ]]; then
+    echo "false"
+    return
+  fi
+
   for role in "${ROLES[@]}"; do
-    local role_file_name=$(echo "${role}" | tr '/' '_')
-    local role_log="bind_roles/bind_${role_file_name}_${SA_NAME}.log"
-    # print_status "    Binding ${role}..."
-    if ! run_gcloud "${role_log}" gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-      --member="serviceAccount:${GSA}" \
-      --role="${role}" --condition=None; then
-      all_roles_bound=false
-      # report_result "Fail"
+    local role_found=$(echo "${roles_json}" | jq --arg ROLE "${role}" 'index($ROLE) != null')
+    if [[ "${role_found}" != "true" ]]; then
+      # echo "DEBUG: Role ${role} not found for ${GSA}" >&2
+      echo "false"
+      return
     fi
   done
+  echo "true"
+}
+export -f check_service_account_bindings
 
-  if [[ "${all_roles_bound}" = true ]]; then
-     report_result "Pass" # Overall role binding status
-     create_sentinel "${phase_name}" "${sentinel_name}"
+# This function is called by the audit script
+function audit_service_account_roles() {
+  check_service_account_bindings
+}
+export -f audit_service_account_roles
+
+function create_service_account() {
+  print_status "Creating Service Account ${GSA}..."
+  local log_file="create_service_account_${SA_NAME}.log"
+
+  local cmd=(
+    gcloud iam service-accounts create "${SA_NAME}"
+    --project="${PROJECT_ID}"
+    --description="Service account for use with cluster ${CLUSTER_NAME}"
+    --display-name="${SA_NAME}"
+  )
+  if run_gcloud "${log_file}" "${cmd[@]}"; then
+    report_result "Created"
+    refresh_resource_state "serviceAccount" "lib/gcp/iam.sh" exists_service_account
+    sleep 10 # Allow propagation
   else
-     report_result "Fail"
-     return 1
+    report_result "Fail"
+    return 1
   fi
 }
 export -f create_service_account
 
-function delete_service_account() {
-  print_status "Deleting Service Account ${GSA}..."
-  SA_EXISTS=$(gcloud iam service-accounts list \
-    --project="${PROJECT_ID}" \
-    --filter="email=${GSA}" \
-    --format="value(email)" 2>/dev/null)
+function ensure_service_account_roles() {
+  print_status "Ensuring roles for ${GSA}... "
+  local all_roles_bound=true
+  for role in "${ROLES[@]}"; do
+    local role_log="bind_roles/bind_${role//\//_}_${SA_NAME}.log"
+    local cmd=(
+      gcloud projects add-iam-policy-binding "${PROJECT_ID}"
+      --member="serviceAccount:${GSA}"
+      --role="${role}"
+      --condition=None
+      --quiet
+    )
+    # We don't care if the run_gcloud fails here, as the binding might already exist.
+    run_gcloud "${role_log}" "${cmd[@]}" > /dev/null 2>&1 || true
+  done
 
-  if [[ -z "${SA_EXISTS}" ]]; then
+  # Verify bindings with retries
+  local bindings_ok="false"
+  local attempts=0
+  while [[ "${bindings_ok}" != "true" && ${attempts} -lt 5 ]]; do
+    attempts=$((attempts + 1))
+    bindings_ok=$(check_service_account_bindings)
+    if [[ "${bindings_ok}" != "true" ]]; then
+      if (( attempts > 1 )); then
+          echo "  DEBUG: Role bindings not fully ready, attempt ${attempts}/5. Waiting 10s..." >&2
+          sleep 10
+      fi
+    fi
+  done
+  update_state "serviceAccountBindings" "$(get_service_account_bindings)"
+  update_state "serviceAccountRolesReady" "${bindings_ok}"
+
+  if [[ "${bindings_ok}" = true ]]; then
+     report_result "Pass"
+  else
+     report_result "Fail"
+     echo "  ERROR: Failed to bind all required roles to ${GSA}" >&2
+     return 1
+  fi
+}
+export -f ensure_service_account_roles
+
+function delete_service_account() {
+  print_status "Deleting Service Account ${GSA}... Element: serviceAccount"
+  local log_file="delete_service_account_${SA_NAME}.log"
+
+  if [[ $(get_state "serviceAccount") == "null" ]]; then
     report_result "Not Found"
     return 0
   fi
 
-  local log_file="delete_service_account_${SA_NAME}.log"
-  # Attempt to remove bindings - ignore errors if not found
-  for svc in spark-executor spark-driver agent ; do
-    gcloud iam service-accounts remove-iam-policy-binding \
-      --role=roles/iam.workloadIdentityUser \
-      --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${DPGKE_NAMESPACE}/${svc}]" \
-      "${GSA}" > /dev/null 2>&1 || true
-  done
-
-  ROLES=(
-    roles/dataproc.worker
-    roles/dataproc.editor
-    roles/dataproc.admin
-    roles/bigquery.dataEditor
-    roles/bigquery.dataViewer
-    roles/bigquery.user
-    roles/storage.admin
-    roles/secretmanager.secretAccessor
-    roles/compute.admin
-    roles/iam.serviceAccountUser
-  )
-  for role in "${ROLES[@]}"; do
-    gcloud projects remove-iam-policy-binding \
-      --role="${role}" \
-      --member="serviceAccount:${GSA}" \
-      "${PROJECT_ID}" --condition=None > /dev/null 2>&1 || true
-  done
-
-   gcloud iam service-accounts remove-iam-policy-binding "${GSA}" \
-    --member="serviceAccount:${GSA}" \
-    --role=roles/iam.serviceAccountUser > /dev/null 2>&1 || true
-
-  # Delete the service account
-  if run_gcloud "${log_file}" gcloud iam service-accounts delete --quiet "${GSA}"; then
-    report_result "Deleted"
-    remove_sentinel "create_service_account" "${SA_NAME}_done"
+  # Attempt to remove common project-level bindings
+  print_status "Removing IAM policy bindings for ${GSA}..."
+  local bindings_json=$(get_state "serviceAccountBindings")
+  if [[ "${bindings_json}" != "null" ]]; then
+    mapfile -t roles_to_remove < <(echo "${bindings_json}" | jq -r '.[].role' | sort -u)
+    for role in "${roles_to_remove[@]}"; do
+      local role_log="unbind_roles/unbind_${role//\//_}_${SA_NAME}.log"
+      local cmd=(
+        gcloud projects remove-iam-policy-binding "${PROJECT_ID}"
+        --role="${role}"
+        --member="serviceAccount:${GSA}"
+        --condition=None
+        --quiet
+      )
+      run_gcloud "${role_log}" "${cmd[@]}" || true
+    done
+    report_result "Bindings removed"
   else
-    report_result "Fail"
+    report_result "No Bindings Found"
+  fi
+  update_state "serviceAccountBindings" "null"
+  update_state "serviceAccountRolesReady" "null"
+
+  print_status "Deleting service account ${GSA}..."
+  local delete_cmd=(gcloud iam service-accounts delete --quiet "${GSA}")
+  if run_gcloud "${log_file}" "${delete_cmd[@]}"; then
+    report_result "Deleted"
+    update_state "serviceAccount" "null"
+  else
+    report_result "Fail" # Fail the script if SA deletion fails and it wasn't a NOT_FOUND
+    return 1
   fi
 }
-
-function grant_kms_roles(){
-      print_status "Granting KMS Roles to ${GSA}..."
-      local log_file="grant_kms_roles_${SA_NAME}.log"
-      if run_gcloud "${log_file}" gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="serviceAccount:${GSA}" \
-        --role=roles/cloudkms.cryptoKeyDecrypter; then
-        report_result "Pass"
-      else
-        report_result "Fail"
-      fi
-    }
-    export -f grant_kms_roles
-
-    function grant_mysql_roles(){
-      print_status "Granting MySQL/Cloud SQL Roles to ${GSA}..."
-      local log_file="grant_mysql_roles_${SA_NAME}.log"
-      if run_gcloud "${log_file}" gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="serviceAccount:${GSA}" \
-        --role=roles/cloudsql.editor; then
-        report_result "Pass"
-      else
-        report_result "Fail"
-      fi
-    }
-    export -f grant_mysql_roles
-
-    function grant_bigtables_roles(){
-      print_status "Granting Bigtable Roles to ${GSA}..."
-      local log_file="grant_bigtable_roles_${SA_NAME}.log"
-      local all_ok=true
-      if ! run_gcloud "${log_file}" gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="serviceAccount:${GSA}" \
-        --role=roles/bigtable.user; then
-        all_ok=false
-      fi
-      if ! run_gcloud "${log_file}" gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="serviceAccount:${GSA}" \
-        --role=roles/bigtable.admin; then
-        all_ok=false
-      fi
-      if [[ "${all_ok}" = true ]]; then report_result "Pass"; else report_result "Fail"; fi
-    }
-    export -f grant_bigtables_roles
-
-    function grant_gke_roles(){
-      print_status "Granting GKE Roles to ${GSA}..."
-      local log_file="grant_gke_roles_${SA_NAME}.log"
-      local all_ok=true
-      for svc in agent spark-driver spark-executor ; do
-        if ! run_gcloud "${log_file}" gcloud iam service-accounts add-iam-policy-binding \
-          --role=roles/iam.workloadIdentityUser \
-          --member="serviceAccount:${PROJECT_ID}.svc.id.goog[${DPGKE_NAMESPACE}/${svc}]" \
-          "${GSA}"; then
-          all_ok=false
-        fi
-      done
-      if ! run_gcloud "${log_file}" gcloud artifacts repositories add-iam-policy-binding "${ARTIFACT_REPOSITORY}" \
-          --location="${REGION}" \
-          --member="serviceAccount:${GSA}" \
-          --role=roles/artifactregistry.writer; then
-          all_ok=false
-      fi
-      if [[ "${all_ok}" = true ]]; then report_result "Pass"; else report_result "Fail"; fi
-    }
-    export -f grant_gke_roles
-
-
+export -f delete_service_account

@@ -1,77 +1,275 @@
 #!/bin/bash
-#
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS-IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
+# Exit on failure
 set -e
 
-source lib/env.sh
+# --- Get script's real directory ---
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+GCLOUD_DIR="$(realpath "${SCRIPT_DIR}/..")"
+export GCLOUD_DIR
 
-# Source function files
-source lib/dataproc/cluster.sh
-source lib/gcp/iam.sh
-source lib/dataproc/autoscaling.sh
-source lib/network/routes.sh
-source lib/network/router.sh
-source lib/network/firewall.sh
-source lib/network/subnet.sh
-source lib/network/network.sh
-source lib/gcp/gcs.sh
-# source lib/database/mysql.sh
-# source lib/database/mssql.sh
+# --- Source environment variables and utility functions ---
+source "${GCLOUD_DIR}/lib/env.sh"
+source "${GCLOUD_DIR}/lib/script-utils.sh"
 
-parse_args "$@"
+echo "INFO: Using TIMESTAMP ${TIMESTAMP} for this run." >&2
+source "${GCLOUD_DIR}/lib/gcp/misc.sh"
+source "${GCLOUD_DIR}/lib/network/network.sh"
+source "${GCLOUD_DIR}/lib/network/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/router.sh"
+source "${GCLOUD_DIR}/lib/network/routes.sh"
+source "${GCLOUD_DIR}/lib/network/firewall.sh"
+source "${GCLOUD_DIR}/lib/gcp/iam.sh"
+source "${GCLOUD_DIR}/lib/gcp/gcs.sh"
+source "${GCLOUD_DIR}/lib/dataproc/cluster.sh"
+source "${GCLOUD_DIR}/lib/dataproc/autoscaling.sh"
+# Add other libs as needed for full cleanup
+source "${GCLOUD_DIR}/lib/phs.sh"
+source "${GCLOUD_DIR}/lib/gke.sh"
+source "${GCLOUD_DIR}/lib/database/mssql.sh"
+source "${GCLOUD_DIR}/lib/database/mysql.sh"
+source "${GCLOUD_DIR}/lib/database/oracle.sh"
+source "${GCLOUD_DIR}/lib/database/pgsql.sh"
+source "${GCLOUD_DIR}/lib/kerberos.sh"
+source "${GCLOUD_DIR}/lib/swp/certs.sh"
+source "${GCLOUD_DIR}/lib/swp/firewall.sh"
+source "${GCLOUD_DIR}/lib/swp/gateway.sh"
+source "${GCLOUD_DIR}/lib/swp/policy.sh"
+source "${GCLOUD_DIR}/lib/swp/subnet.sh"
+source "${GCLOUD_DIR}/lib/network/peering.sh"
 
-if (( DEBUG != 0 )); then
-  set -x
+# --- Argument Parsing ---
+FORCE_DELETE=false
+IS_CUSTOM=false
+IS_PRIVATE=false
+SWP_EGRESS=false
+NAT_EGRESS=false
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --force) FORCE_DELETE=true; shift ;;
+        --custom) IS_CUSTOM=true; shift ;; # Infer intent
+        --nat-egress) NAT_EGRESS=true; shift ;; # Infer intent
+        --swp-egress) SWP_EGRESS=true; IS_PRIVATE=true; shift ;; # Infer intent
+        --private) IS_PRIVATE=true; shift ;; # Infer intent
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+done
+
+# --- Main Logic ---
+configure_gcloud
+
+if [[ "${FORCE_DELETE}" == "true" ]]; then
+  echo "INFO: --force set. Clearing state database and generating fresh TIMESTAMP." >&2
+  rm -f "${STATE_DB}"
+  unset TIMESTAMP
+  # Re-source env.sh to get a fresh TIMESTAMP and recreate state.db
+  source "${GCLOUD_DIR}/lib/env.sh"
+  init_state_db
+  # Update the persistent timestamp so future runs use this new one
+  update_state "config.timestamp" "${TIMESTAMP}"
+else
+  init_state_db
 fi
 
-delete_dpgce_cluster
+echo "========================================"
+echo "Starting DPGCE Environment Teardown"
+echo "========================================"
 
-delete_service_account
+# Run audit to get the current state
+print_status "Auditing environment..."
+"${GCLOUD_DIR}/bin/audit-dpgce" --timestamp "${TIMESTAMP}" &> /dev/null
+report_result "Done"
 
-delete_autoscaling_policy
+echo "--- Current Environment State (from Audit) --- "
+# Function to display resource status from DB
+display_status() {
+  local display_name="$1"
+  local key="$2"
+  local value=$(get_state "${key}")
+  echo -n "- ${display_name}: "
+  if [[ -z "${value}" || "${value}" == "null" ]]; then
+    report_audit_status "Not Found"
+  else
+    report_audit_status "Exists"
+  fi
+}
 
-#delete_phs_cluster()
+# Display status for contextually relevant resources
+display_status "Service Account" "serviceAccount"
+display_status "GCS Bucket (${BUCKET})" "gcsBucket"
+display_status "GCS Temp Bucket (${TEMP_BUCKET})" "gcsTempBucket"
+display_status "VPC Network (${NETWORK})" "vpcNetwork"
+display_status "Standard Subnet (${SUBNET})" "standardSubnet"
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpSubnet") != "null" ]]; then
+  display_status "SWP Subnet (${SWP_SUBNET})" "swpSubnet"
+fi
+display_status "Cloud Router" "cloudRouter"
+if [[ "${NAT_EGRESS}" == "true" || $(get_state "cloudRouterNAT") != "null" ]]; then
+  display_status "Cloud NAT (nat-config)" "cloudRouterNAT"
+fi
+if [[ "${SWP_EGRESS}" == "true" || $(get_state "swpGateway") != "null" || $(get_state "swpCaPool") != "null" ]]; then
+    display_status "SWP CA Pool" "swpCaPool"
+    display_status "SWP Root CA" "swpRootCa"
+    display_status "SWP CIC" "swpCic"
+    display_status "SWP Managed Certificate" "swpManagedCertificate"
+    display_status "SWP Gateway (${SWP_INSTANCE_NAME})" "swpGateway"
+    display_status "SWP Policy (${SWP_POLICY_NAME})" "swpPolicy"
+    display_status "SWP Firewall (Ingress)" "swpFirewallIngress"
+    display_status "SWP Firewall (Internal)" "swpFirewallInternal"
+fi
+display_status "Firewall Rules (SSH)" "firewallRule-ssh"
+display_status "Firewall Rules (Internal)" "firewallRule-internal"
+display_status "Autoscaling Policy" "autoscalingPolicy"
+display_status "Dataproc Cluster (${CLUSTER_NAME})" "dataprocCluster"
+echo "----------------------------------------------"
 
-#delete_mysql_instance
-#delete_legacy_mssql_instance
+# --- Teardown Plan Generation ---
+PLAN=()
 
-delete_default_route
+# Helper to check if a resource exists
+exists() {
+  local key="$1"
+  local val=$(get_state "${key}")
+  [[ -n "${val}" && "${val}" != "null" ]]
+}
 
-delete_nat_configs # Should be called before delete_router
+# Order matters for dependencies
+if exists "dataprocCluster"; then PLAN+=("DELETE_dataprocCluster"); fi
+if exists "phsCluster"; then PLAN+=("DELETE_phsCluster"); fi
+if exists "autoscalingPolicy"; then PLAN+=("DELETE_autoscalingPolicy"); fi
 
-delete_router
+# Warning for GKE resources - DO NOT DELETE IN THIS SCRIPT
+GKE_RESOURCES_FOUND=false
+if exists "dpgkeCluster" || exists "gkeCluster"; then
+  GKE_RESOURCES_FOUND=true
+fi
 
-delete_firewall_rules
 
-#delete_logging_firewall_rules
+if exists "anyNetworkVms"; then
+  PLAN+=("DELETE_all_network_vms")
+fi
 
-#delete_ip_allocation
+ROUTES_RAW=$(get_state "routes")
+if [[ "${ROUTES_RAW}" != "null" && "${ROUTES_RAW}" != "[]" ]]; then
+  if [[ $(echo "${ROUTES_RAW}" | jq 'map(select(.name | test("^default-route-") | not)) | length') -gt 0 ]]; then
+    PLAN+=("DELETE_custom_routes")
+  fi
+fi
 
-delete_subnet
+if exists "kdcServer"; then PLAN+=("DELETE_kdcServer"); fi
+if exists "oracleVm"; then PLAN+=("DELETE_oracleVm"); fi
+if exists "legacyMssqlInstance"; then PLAN+=("DELETE_legacyMssqlInstance"); fi
+if exists "mssqlInstance"; then PLAN+=("DELETE_mssqlInstance"); fi
+if exists "mysqlInstance"; then PLAN+=("DELETE_mysqlInstance"); fi
+if exists "pgsqlInstance"; then PLAN+=("DELETE_pgsqlInstance"); fi
+if exists "debugVms"; then PLAN+=("DELETE_debugVms"); fi
 
-delete_vpc_network
+# SWP Components
+if exists "swpGateway"; then PLAN+=("DELETE_swpGateway"); fi
+if exists "swpFirewallIngress"; then PLAN+=("DELETE_swpFirewallIngress"); fi
+if exists "swpFirewallInternal"; then PLAN+=("DELETE_swpFirewallInternal"); fi
 
-#delete_vpc_peering
+# Networking
+if exists "firewallRule-ssh" || exists "firewallRule-internal"; then PLAN+=("DELETE_firewallRules"); fi
+if exists "cloudRouter"; then PLAN+=("DELETE_cloudRouter"); fi
+if exists "vpcPeering"; then PLAN+=("DELETE_vpcPeering"); fi
+if exists "ipAllocation"; then PLAN+=("DELETE_ipAllocation"); fi
+if exists "swpSubnet"; then PLAN+=("DELETE_swpSubnet"); fi
+if exists "privateSubnet"; then PLAN+=("DELETE_privateSubnet"); fi
+if exists "standardSubnet"; then PLAN+=("DELETE_standardSubnet"); fi
+if exists "vpcNetwork"; then PLAN+=("DELETE_vpcNetwork"); fi
+
+# Other Resources
+if exists "serviceAccount"; then PLAN+=("DELETE_serviceAccount"); fi
+
+# Persistent resources requiring --force to delete
+PROTECTED_RESOURCES_EXIST=false
+if exists "gcsBucket" || exists "gcsTempBucket" || exists "swpCaPool" || exists "swpRootCa" || exists "swpCic" || exists "swpManagedCertificate" || exists "swpPolicy"; then
+  PROTECTED_RESOURCES_EXIST=true
+fi
 
 if [[ "${FORCE_DELETE}" = true ]]; then
-  delete_bucket
+  if exists "gcsBucket"; then PLAN+=("DELETE_gcsBucket"); fi
+  if exists "gcsTempBucket"; then PLAN+=("DELETE_gcsTempBucket"); fi
+  if exists "swpManagedCertificate"; then PLAN+=("DELETE_swpManagedCertificate"); fi
+  if exists "swpPolicy"; then PLAN+=("DELETE_swpPolicy"); fi
 else
-  print_status "Skipping Bucket Deletion. Use --force to delete buckets."
-  report_result "Skipped"
+  if [[ "${PROTECTED_RESOURCES_EXIST}" = true ]]; then
+    echo "INFO: Persistent resources (Buckets, SWP Certs/Policy) exist but --force not specified, skipping their deletion."
+  fi
 fi
 
-set +x
+if [[ ${#PLAN[@]} -eq 0 ]]; then
+  echo "No resources found to delete."
+  exit 0
+fi
+
+echo "--- Teardown Plan ---"
+for action in "${PLAN[@]}"; do
+  echo "- ${action}"
+done
+echo "----------------------"
+
+# --- Plan Execution ---
+echo "Executing teardown plan..."
+
+for action in "${PLAN[@]}"; do
+  case ${action} in
+    DELETE_dataprocCluster) delete_dpgce_cluster ;;
+    DELETE_phsCluster) delete_phs_cluster ;;
+    DELETE_autoscalingPolicy) delete_autoscaling_policy ;;
+    DELETE_all_network_vms) delete_all_network_vms ;;
+    DELETE_kdcServer) delete_kdc_server ;;
+    DELETE_oracleVm) delete_oracle_vm ;;
+    DELETE_legacyMssqlInstance) delete_legacy_mssql_instance ;;
+    DELETE_mssqlInstance) delete_mssql_instance ;;
+    DELETE_mysqlInstance) delete_mysql_instance ;;
+    DELETE_pgsqlInstance) delete_pgsql_instance ;;
+    DELETE_debugVms) 
+      print_status "Deleting Debug VMs..."
+      if exists "debugVms"; then
+        gcloud compute instances delete $(get_state "debugVms" | jq -r '.[].name') --zone "${ZONE}" --quiet || true
+        update_state "debugVms" "null"
+      fi
+      report_result "Done"
+      ;;
+    DELETE_swpGateway) delete_swp_gateway ;;
+    DELETE_swpPolicy) delete_gateway_security_policy ;;
+    DELETE_swpManagedCertificate) delete_managed_certificate ;;
+    DELETE_swpFirewallIngress) delete_allow_swp_ingress_rule ;;
+    DELETE_swpFirewallInternal) delete_allow_internal_subnets_rule ;;
+    DELETE_firewallRules) delete_firewall_rules ;;
+    DELETE_custom_routes)
+      ROUTES_RAW=$(get_state "routes")
+      if [[ "${ROUTES_RAW}" != "null" && "${ROUTES_RAW}" != "[]" ]]; then
+          mapfile -t route_names < <(echo "${ROUTES_RAW}" | jq -r '.[].name')
+          for route_name in "${route_names[@]}"; do
+              # Ignore all auto-generated default peering/network routes
+              if [[ ! "${route_name}" =~ ^default-route- ]]; then
+                  delete_route "${route_name}"
+              fi
+          done
+      fi
+      ;;
+    DELETE_cloudRouter) delete_router ;;
+    DELETE_vpcPeering) delete_vpc_peering ;;
+    DELETE_ipAllocation) delete_ip_allocation ;;
+    DELETE_swpSubnet) delete_subnet "${SWP_SUBNET}" "swpSubnet" ;;
+    DELETE_privateSubnet) delete_subnet "${PRIVATE_SUBNET}" "privateSubnet" ;;
+    DELETE_standardSubnet) delete_subnet "${SUBNET}" "standardSubnet" ;;
+    DELETE_vpcNetwork) delete_vpc_network ;;
+    DELETE_serviceAccount) delete_service_account ;;
+    DELETE_gcsBucket) delete_gcs_bucket "${BUCKET}" ;;
+    DELETE_gcsTempBucket) delete_gcs_bucket "${TEMP_BUCKET}" ;;
+  esac
+done
+
+echo "========================================"
+echo "DPGCE Environment teardown complete"
+echo "========================================"
+
+if [[ "${GKE_RESOURCES_FOUND}" == "true" ]]; then
+  echo -e "\n${YELLOW}WARNING:${NC} GKE-specific resources were detected but NOT deleted."
+  echo -e "Please run ${BLUE}bash bin/destroy-dpgke${NC} to clean up GKE components."
+fi

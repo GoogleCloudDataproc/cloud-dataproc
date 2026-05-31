@@ -27,6 +27,7 @@ function delete_ip_allocation () {
   if gcloud compute addresses describe ${ALLOCATION_NAME} --global --project="${PROJECT_ID}" > /dev/null 2>&1; then
     if run_gcloud "${log_file}" gcloud compute addresses delete --quiet --global ${ALLOCATION_NAME}; then
       report_result "Deleted"
+      update_state "ipAllocation" "null"
     else
       report_result "Fail"
     fi
@@ -34,6 +35,13 @@ function delete_ip_allocation () {
     report_result "Not Found"
   fi
 }
+
+function exists_vpc_peering() {
+   # Naming format: <servicenetworking-googleapis-com>
+   local peering_name="servicenetworking-googleapis-com"
+  _check_exists gcloud compute networks peerings list --network="${NETWORK}" --project="${PROJECT_ID}" --filter="name=${peering_name}" --format="json(name,state)" | jq 'if . == [] then null else .[0] end'
+}
+export -f exists_vpc_peering
 
 function create_vpc_peering () {
   print_status "Creating VPC Peering for ${NETWORK}..."
