@@ -218,14 +218,14 @@ function set_proxy(){
       trusted_pem_dir="/usr/local/share/ca-certificates"
       proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
       mkdir -p "${trusted_pem_dir}"
-      gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      gcloud storage cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
       update-ca-certificates
       trusted_pem_path="/etc/ssl/certs/ca-certificates.crt"
     elif is_rocky ; then
       trusted_pem_dir="/etc/pki/ca-trust/source/anchors"
       proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
       mkdir -p "${trusted_pem_dir}"
-      gsutil cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      gcloud storage cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
       update-ca-trust
       trusted_pem_path="/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
     fi

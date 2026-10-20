@@ -60,7 +60,7 @@ in the [Preprocessing](#preprocessing) section so that the preprocessed data
 meant for prediction is stored in `$OUTPUT_DIR`. If you used Dataproc to
 preprocess the data for prediction, `$OUTPUT_DIR` is a Cloud Storage bucket. If
 not, then you will have to move your data to Cloud Storage to make it available
-for batch prediction. You can do so using the [gsutil
+for batch prediction. You can do so using the [gcloud storage
 tool](https://cloud.google.com/storage/docs/gsutil).
 
 Once your data is on GCS, please set the `GCS_PATH` environment variable to the
