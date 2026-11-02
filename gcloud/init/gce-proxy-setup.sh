@@ -56,9 +56,24 @@ function is_rocky()    {  [[ "$(os_id)" == "rocky" ]] ; }
 # --- End OS Detection Helpers ---
 
 # --- Version Comparison Helpers ---
+function version_ge(){ [[ "$1" = "$(echo -e "$1\n$2"|sort -V|tail -n1)" ]]; }
+function version_gt(){ [[ "$1" = "$2" ]] && return 1 || version_ge "$1" "$2"; }
 function version_le(){ [[ "$1" = "$(echo -e "$1\n$2"|sort -V|head -n1)" ]]; }
 function version_lt(){ [[ "$1" = "$2" ]] && return 1 || version_le "$1" "$2"; }
 # --- End Version Comparison Helpers ---
+
+# With the 402.0.0 release of gcloud sdk, `gcloud storage` can be
+# used as a more performant replacement for `gsutil`
+gcloud_sdk_version="$(gcloud --version 2>/dev/null | awk -F'SDK ' '/Google Cloud SDK/ {print $2}' || echo '0.0.0')"
+if [[ -z "${gcloud_sdk_version}" ]] || version_lt "${gcloud_sdk_version}" "402.0.0" ; then
+  gsutil_cmd=("gsutil" "-o" "GSUtil:check_hashes=never")
+  gsutil_stat_cmd=("gsutil" "stat")
+  rsync_cmd=("gsutil" "-o" "GSUtil:check_hashes=never" "-m" "rsync")
+else
+  gsutil_cmd=("gcloud" "storage")
+  gsutil_stat_cmd=("gcloud" "storage" "objects" "describe")
+  rsync_cmd=("gcloud" "storage" "rsync")
+fi
 
 function execute_with_retries() {
   local -r cmd="$*"
@@ -218,14 +233,14 @@ function set_proxy(){
       trusted_pem_dir="/usr/local/share/ca-certificates"
       proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
       mkdir -p "${trusted_pem_dir}"
-      gcloud storage cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      "${gsutil_cmd[@]}" cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
       update-ca-certificates
       trusted_pem_path="/etc/ssl/certs/ca-certificates.crt"
     elif is_rocky ; then
       trusted_pem_dir="/etc/pki/ca-trust/source/anchors"
       proxy_ca_pem="${trusted_pem_dir}/proxy_ca.crt"
       mkdir -p "${trusted_pem_dir}"
-      gcloud storage cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
+      "${gsutil_cmd[@]}" cp "${METADATA_HTTP_PROXY_PEM_URI}" "${proxy_ca_pem}" || { echo "ERROR: Failed to download proxy CA cert from GCS." ; exit 1 ; }
       update-ca-trust
       trusted_pem_path="/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
     fi

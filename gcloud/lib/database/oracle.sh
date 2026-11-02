@@ -60,7 +60,7 @@ EOF
   fi
 
   print_status "  Uploading OVA to GCS..."
-  if run_gcloud "${log_file}" gcloud storage cp "${REPRO_TMPDIR}/${ova_file}" "${gcs_uri}"; then
+  if run_gcloud "${log_file}" "${gsutil_cmd[@]}" cp "${REPRO_TMPDIR}/${ova_file}" "${gcs_uri}"; then
     report_result "Pass"
   else
     report_result "Fail"

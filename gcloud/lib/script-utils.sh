@@ -6,6 +6,27 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# --- Version Comparison Helpers ---
+function version_ge(){ [[ "$1" = "$(echo -e "$1\n$2"|sort -V|tail -n1)" ]]; }
+function version_gt(){ [[ "$1" = "$2" ]] && return 1 || version_ge "$1" "$2"; }
+function version_le(){ [[ "$1" = "$(echo -e "$1\n$2"|sort -V|head -n1)" ]]; }
+function version_lt(){ [[ "$1" = "$2" ]] && return 1 || version_le "$1" "$2"; }
+export -f version_ge version_gt version_le version_lt
+# --- End Version Comparison Helpers ---
+
+# With the 402.0.0 release of gcloud sdk, `gcloud storage` can be
+# used as a more performant replacement for `gsutil`
+gcloud_sdk_version="$(gcloud --version 2>/dev/null | awk -F'SDK ' '/Google Cloud SDK/ {print $2}' || echo '0.0.0')"
+if [[ -z "${gcloud_sdk_version}" ]] || version_lt "${gcloud_sdk_version}" "402.0.0" ; then
+  gsutil_cmd=("gsutil" "-o" "GSUtil:check_hashes=never")
+  gsutil_stat_cmd=("gsutil" "stat")
+  rsync_cmd=("gsutil" "-o" "GSUtil:check_hashes=never" "-m" "rsync")
+else
+  gsutil_cmd=("gcloud" "storage")
+  gsutil_stat_cmd=("gcloud" "storage" "objects" "describe")
+  rsync_cmd=("gcloud" "storage" "rsync")
+fi
+
 # Usage: print_status "Message..."
 function print_status() {
   local message="$1"
