@@ -32,7 +32,7 @@ echo "Starting Oracle DB setup..."
 # sudo yum install -y oracle-database-preinstall-19c
 
 # 2. Download Oracle Database Software (e.g., from Oracle website or GCS)
-# Example: wget ... or gsutil cp ...
+# Example: wget ... or gcloud storage cp ...
 
 # 3. Unzip and Run Oracle Installer
 # Example: unzip ...
@@ -60,7 +60,7 @@ EOF
   fi
 
   print_status "  Uploading OVA to GCS..."
-  if run_gcloud "${log_file}" gsutil cp "${REPRO_TMPDIR}/${ova_file}" "${gcs_uri}"; then
+  if run_gcloud "${log_file}" "${gsutil_cmd[@]}" cp "${REPRO_TMPDIR}/${ova_file}" "${gcs_uri}"; then
     report_result "Pass"
   else
     report_result "Fail"

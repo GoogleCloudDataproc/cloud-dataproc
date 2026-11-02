@@ -40,7 +40,7 @@ These scripts deploy Dataproc clusters in various configurations, supporting bot
 ## Setup & Configuration
 
 1.  **Prerequisites:**
-    *   `gcloud` CLI and `gsutil`
+    *   `gcloud` CLI and `gcloud storage`
     *   `jq` (for JSON parsing)
     *   `sqlite3` (for state cache queries)
     *   `perl` (used in some robust text-manipulation utilities)

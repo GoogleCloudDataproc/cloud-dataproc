@@ -132,7 +132,7 @@ if [[ "${ENABLE_GPU}" == "true" ]]; then
   TIMESTAMP=$(date +%s)
   export GPU_INIT_ACTION_URI="gs://${BUCKET}/tmp_init_actions/install_gpu_driver_${TIMESTAMP}.sh"
   echo "INFO: Uploading local GPU init action to ${GPU_INIT_ACTION_URI}" >&2
-  gsutil cp "${DP_EVOLUTION_DIR}/initialization-actions/gpu/install_gpu_driver.sh" "${GPU_INIT_ACTION_URI}"
+  "${gsutil_cmd[@]}" cp "${DP_EVOLUTION_DIR}/initialization-actions/gpu/install_gpu_driver.sh" "${GPU_INIT_ACTION_URI}"
 fi
 
 # --- Source other necessary function files ---
